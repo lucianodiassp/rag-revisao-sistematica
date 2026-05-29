@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+venv/
+env/
+
+# Banco de Dados Local (Volume do Docker que definimos)
+rag_postgres_data/
+
+# IDEs
+.vscode/
+.idea/

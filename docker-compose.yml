@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # --------------------------------------------------------
+  # PostgreSQL com pgvector (Banco de Dados Principal)
+  # --------------------------------------------------------
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: rag_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: rag_user
+      POSTGRES_PASSWORD: rag_password
+      POSTGRES_DB: rag_systematic_review
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql # Mapeamento para auto-executar o schema
+    networks:
+      - rag_network
+
+  # --------------------------------------------------------
+  # pgAdmin (Interface Gráfica de Gestão do Banco)
+  # --------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: rag_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@rag.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - rag_network
+
+networks:
+  rag_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: rag_postgres_data
