@@ -82,7 +82,9 @@ CREATE TABLE screening_decisions (
     paper_id UUID REFERENCES deduplicated_papers(id) ON DELETE CASCADE,
     suggested_decision VARCHAR(50),
     human_decision VARCHAR(50),
-    rationale_jsonb JSONB
+    rationale_jsonb JSONB,
+	justification TEXT,
+    reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Matriz de evidências estruturada
