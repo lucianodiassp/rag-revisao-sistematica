@@ -23,7 +23,7 @@ def recolher_artigos_semantic(query_term, max_resultados=5):
             time.sleep(2) 
             
             headers = {
-                "User-Agent": "Projeto-Academico-RAG/1.0 (mailto:lucianodiass@gmail.com)"
+                "User-Agent": "Projeto-Academico-RAG/1.0 (mailto:lucianodiassp@hotmail.com)"
             }
             
             response = requests.get(url, params=params, headers=headers)
