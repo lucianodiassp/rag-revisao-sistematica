@@ -104,3 +104,14 @@ CREATE TABLE evaluation_runs (
     params_jsonb JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 1. Garante que a extensão de vetores está ativa no banco de dados
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 2. Criação da tabela para armazenamento dos pedaços de textos e embeddings do RAG
+CREATE TABLE IF NOT EXISTS document_chunks (
+    id SERIAL PRIMARY KEY,
+    paper_id VARCHAR(50), -- Opcional: para vincular ao ID original do artigo se necessário
+    chunk_text TEXT,
+    embedding VECTOR(384) -- 384 dimensões correspondentes ao modelo all-MiniLM-L6-v2
+);
