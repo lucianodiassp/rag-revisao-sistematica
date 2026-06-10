@@ -2,7 +2,7 @@ import requests
 import uuid
 import time # <-- Nova biblioteca para gerir as pausas
 
-def recolher_artigos_semantic(query_term, max_resultados=5):
+def recolher_artigos_semantic(query_term, max_resultados=100):
     """
     Pesquisa artigos no Semantic Scholar com mecanismo de retry para evitar Erro 429.
     """

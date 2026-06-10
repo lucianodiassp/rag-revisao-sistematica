@@ -35,14 +35,13 @@ def dividir_em_chunks(texto, tamanho_maximo=150):
 # 3. O MOTOR PRINCIPAL (Ler, Vetorizar e Gravar)
 # ==========================================
 def processar_artigos():
-    # Ligar ao PostgreSQL local (Ajusta a password se a tua for diferente)
-    # Geralmente no Docker padrão o utilizador é 'postgres'
+    # Ligar ao PostgreSQL local
     conexao = psycopg2.connect(
         host="localhost",
         port="5432",
-        dbname="rag_systematic_review", # ou o nome que a Pessoa 3 deu à base de dados
+        dbname="rag_systematic_review",
         user="rag_user",   
-        password="rag_password"   # a password que configuraram no docker-compose
+        password="rag_password"
     )
     cursor = conexao.cursor()
 
@@ -55,11 +54,35 @@ def processar_artigos():
     """)
     artigos = cursor.fetchall()
     
-    print(f"📊 Encontrados {len(artigos)} artigos para processar. A iniciar...\n")
+    print(f"📊 Encontrados {len(artigos)} artigos para processar. A iniciar validação de qualidade...\n")
 
     chunks_inseridos = 0
+    artigos_ignorados = 0
+
+    # Definição das mensagens de fallback que não contêm ciência real
+    mensagens_lixo = [
+        "Abstract indisponível.",
+        "Abstract extraído do índice (simplificado para este exemplo).",
+        "Abstract via PubMed E-Summary (Requer E-Fetch para texto completo)."
+    ]
 
     for artigo_id, abstract in artigos:
+        
+        # --- FILTRO DE QUALIDADE SEMÂNTICA ---
+        # 1. Verifica se o texto é uma das mensagens exatas de erro
+        if abstract.strip() in mensagens_lixo:
+            print(f"⚠️ Artigo ignorado (Mensagem de API): ID {artigo_id[:8]}...")
+            artigos_ignorados += 1
+            continue
+            
+        # 2. Verifica se o abstract é demasiado curto para conter contexto útil
+        # (menos de 20 caracteres é provável que seja lixo ou um erro desconhecido)
+        if len(abstract.strip()) < 20:
+            print(f"⚠️ Artigo ignorado (Texto muito curto): ID {artigo_id[:8]}...")
+            artigos_ignorados += 1
+            continue
+        # ---------------------------------------
+
         # A. Fatiar o resumo (Chunking)
         fatias = dividir_em_chunks(abstract, tamanho_maximo=150)
 
@@ -85,7 +108,8 @@ def processar_artigos():
     conexao.close()
 
     print(f"\n🎉 Processo concluído com sucesso!")
-    print(f"🧠 Total de {chunks_inseridos} 'fatias de conhecimento' vetorizadas e guardadas no pgvector.")
+    print(f"🧠 Total de {chunks_inseridos} 'fatias de conhecimento' reais vetorizadas.")
+    print(f"🗑️ Total de {artigos_ignorados} artigos com abstracts inúteis descartados da vetorização.")
 
 if __name__ == "__main__":
     processar_artigos()

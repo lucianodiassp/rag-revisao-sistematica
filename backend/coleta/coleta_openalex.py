@@ -2,30 +2,55 @@ import requests
 import json
 import uuid
 
-# IMPORTANTE: Vamos simular a importação da função da Pessoa 3.
-# Se o ficheiro database.py estiver na pasta 'app', garante que o caminho está correto.
-# from app.database import salvar_artigo_coletado
-
-def recolher_artigos_openalex(query_term, max_resultados=5):
+def reconstruir_abstract_openalex(inverted_index):
     """
-    Pesquisa artigos no OpenAlex e formata-os para o contrato de dados da equipa.
+    Reconstrói o abstract original a partir do formato Inverted Index do OpenAlex.
+    """
+    if not inverted_index or not isinstance(inverted_index, dict):
+        return "Abstract indisponível."
+    
+    try:
+        # Descobrir o tamanho total do abstract (a maior posição no índice)
+        posicoes_maximas = [pos for posicoes in inverted_index.values() for pos in posicoes]
+        if not posicoes_maximas:
+            return "Abstract indisponível."
+            
+        tamanho_total = max(posicoes_maximas) + 1
+        
+        # Criar uma lista vazia com esse tamanho
+        palavras = [""] * tamanho_total
+        
+        # Preencher a lista colocando cada palavra na sua posição correta
+        for palavra, posicoes in inverted_index.items():
+            for pos in posicoes:
+                palavras[pos] = palavra
+                
+        # Juntar tudo com espaços e remover espaços duplos
+        texto_limpo = " ".join(palavras).strip()
+        return texto_limpo
+        
+    except Exception as e:
+        print(f"Erro ao reconstruir abstract do OpenAlex: {e}")
+        return "Abstract indisponível."
+
+def recolher_artigos_openalex(query_term, max_resultados=10):
+    """
+    Pesquisa artigos no OpenAlex e formata-os para o contrato de dados da equipa,
+    reconstruindo o abstract a partir do Inverted Index.
     """
     print(f"🔍 A iniciar pesquisa no OpenAlex por: '{query_term}'")
     
-    # URL base da API do OpenAlex para trabalhos (works)
     url = "https://api.openalex.org/works"
     
-    # Parâmetros da pesquisa
     params = {
         "search": query_term,
         "per-page": max_resultados,
-        # O email coloca-nos na 'Polite Pool' (mais rápido e sem bloqueios)
         "mailto": "equipa_rag@teu_dominio.com" 
     }
 
     try:
         response = requests.get(url, params=params)
-        response.raise_for_status() # Verifica se houve algum erro HTTP
+        response.raise_for_status() 
         dados_brutos = response.json()
         
         resultados = dados_brutos.get("results", [])
@@ -34,14 +59,13 @@ def recolher_artigos_openalex(query_term, max_resultados=5):
         artigos_formatados = []
         
         for artigo in resultados:
-            # 1. Extração segura de dados (usando .get() para evitar erros se o campo não existir)
             titulo = artigo.get("title")
-            if not titulo: # Se não tem título, ignoramos (lixo da API)
+            if not titulo: 
                 continue
                 
-            # O OpenAlex devolve o abstract num formato invertido estranho, isto limpa ou deixa vazio
+            # --- NOVA LÓGICA DE EXTRAÇÃO DO ABSTRACT ---
             abstract_invertido = artigo.get("abstract_inverted_index", {})
-            abstract = "Abstract indisponível." if not abstract_invertido else "Abstract extraído do índice (simplificado para este exemplo)."
+            abstract_real = reconstruir_abstract_openalex(abstract_invertido)
             
             # Extrair autores
             autores = [autor.get("author", {}).get("display_name") for autor in artigo.get("authorships", [])]
@@ -49,12 +73,12 @@ def recolher_artigos_openalex(query_term, max_resultados=5):
             # Extrair conceitos/palavras-chave (limitado aos 5 principais)
             conceitos = [conceito.get("display_name") for conceito in artigo.get("concepts", [])][:5]
 
-            # --- NOVA EXTRAÇÃO SEGURA PARA A REVISTA ---
+            # Extração da revista
             local_primario = artigo.get("primary_location")
             fonte = local_primario.get("source") if local_primario else None
             nome_revista = fonte.get("display_name") if fonte else "Revista não especificada"
 
-            # 2. Construir o NOSSO contrato de dados (O JSON que acordámos)
+            # Construir o contrato de dados
             fontes_dict = {
                 "sources": ["OpenAlex"],
                 "external_ids": {
@@ -64,20 +88,18 @@ def recolher_artigos_openalex(query_term, max_resultados=5):
                 "metadata": {
                     "publication_year": artigo.get("publication_year"),
                     "authors": autores,
-                    "journal_name": nome_revista, # <-- Usamos a nossa variável segura aqui
+                    "journal_name": nome_revista, 
                     "language": artigo.get("language", "en")
                 },
                 "concepts": conceitos
             }
             
-            # Gerar um UUID único para a nossa base de dados (exigência da Pessoa 3)
             id_interno = str(uuid.uuid4())
             
-            # Adicionar à nossa lista processada
             artigos_formatados.append({
                 "id": id_interno,
                 "titulo": titulo,
-                "abstract": abstract,
+                "abstract": abstract_real, # <-- Guardamos o texto reconstruído aqui!
                 "fontes_dict": fontes_dict
             })
             
@@ -89,19 +111,12 @@ def recolher_artigos_openalex(query_term, max_resultados=5):
         print(f"❌ Erro ao contactar o OpenAlex: {e}")
         return []
 
-# ==========================================
-# TESTE DE EXECUÇÃO
-# ==========================================
 if __name__ == "__main__":
-    # 1. Fazemos a recolha (limitado a 3 para testar)
     artigos_para_guardar = recolher_artigos_openalex("Retrieval-Augmented Generation", max_resultados=3)
     
     print("\n💾 Simulação de gravação na Base de Dados:")
-    # 2. Enviamos para a função da Pessoa 3
     for art in artigos_para_guardar:
         print(f"A chamar salvar_artigo_coletado() para o ID: {art['id']}")
-        # Aqui, na prática, faríamos o 'uncomment' desta linha:
-        # salvar_artigo_coletado(art["id"], art["titulo"], art["abstract"], art["fontes_dict"])
         
     print("\n✨ Ficheiro JSON de exemplo do primeiro artigo gerado:")
     if artigos_para_guardar:

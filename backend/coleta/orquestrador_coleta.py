@@ -82,7 +82,12 @@ def iniciar_recolha(query, max_por_fonte=5):
 
 if __name__ == "__main__":
     # Podes mudar o termo de pesquisa aqui!
-    termo_pesquisa = "Retrieval-Augmented Generation"
+    termo_pesquisa = r"""
+("artificial intelligence" OR "machine learning" OR "deep learning") 
+AND ("clinical practice" OR "healthcare" OR "diagnosis") 
+AND ("efficiency" OR "accuracy" OR "patient outcomes")
+""".strip()
+
     
     # Vamos pedir 5 artigos para este primeiro teste
-    iniciar_recolha(termo_pesquisa, max_por_fonte=5)
+    iniciar_recolha(termo_pesquisa, max_por_fonte=10)

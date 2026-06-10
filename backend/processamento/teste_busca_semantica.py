@@ -47,5 +47,5 @@ def buscar_artigos_similares(pergunta, limite=3):
         print("-" * 60)
 
 if __name__ == "__main__":
-    minha_pergunta = "How to benchmark and evaluate large language models?"
+    minha_pergunta = "How to describe Hyperparameter?"
     buscar_artigos_similares(minha_pergunta)
