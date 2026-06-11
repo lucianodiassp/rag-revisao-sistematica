@@ -1,6 +1,6 @@
 import os
 import psycopg2
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from sentence_transformers import SentenceTransformer
 from google import genai
 from google.genai import types
@@ -9,7 +9,7 @@ from google.genai import types
 # CONFIGURAÇÃO DE AMBIENTE E MODELOS
 # ==========================================
 # Carregar variáveis de ambiente (banco de dados e API Key)
-load_dotenv()
+load_dotenv(find_dotenv())
 
 # Inicializar o cliente com a nova biblioteca oficial da Google
 cliente = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -19,13 +19,14 @@ NOME_MODELO_LLM = 'gemini-2.5-flash'
 modelo_vetorial = SentenceTransformer('all-MiniLM-L6-v2')
 
 def get_conexao():
-    """Estabelece a conexão com o PostgreSQL utilizando variáveis de ambiente e fallbacks seguros."""
+    """Estabelece a conexão estritamente via variáveis de ambiente."""
+    # Se DB_USER ou DB_PASSWORD não existirem no .env, o sistema falha com segurança
     return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
+        host=os.getenv("DB_HOST", "localhost"), # Host e Port podem ter fallback pois não são sensíveis
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "rag_systematic_review"),
-        user=os.getenv("DB_USER", "rag_user"),
-        password=os.getenv("DB_PASSWORD", "rag_password")
+        user=os.environ["DB_USER"],         # Usa os.environ para forçar erro se não existir
+        password=os.environ["DB_PASSWORD"]  # Força a leitura exclusiva do .env
     )
 
 # ==========================================

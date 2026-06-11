@@ -9,13 +9,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_conexao():
-    """Estabelece a conexão com o PostgreSQL utilizando variáveis de ambiente."""
+    """Estabelece a conexão estritamente via variáveis de ambiente."""
+    # Se DB_USER ou DB_PASSWORD não existirem no .env, o sistema falha com segurança
     return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
+        host=os.getenv("DB_HOST", "localhost"), # Host e Port podem ter fallback pois não são sensíveis
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "rag_systematic_review"),
-        user=os.getenv("DB_USER", "rag_user"),
-        password=os.getenv("DB_PASSWORD", "rag_password")
+        user=os.environ["DB_USER"],         # Usa os.environ para forçar erro se não existir
+        password=os.environ["DB_PASSWORD"]  # Força a leitura exclusiva do .env
     )
 
 def buscar_artigo_pendente():
