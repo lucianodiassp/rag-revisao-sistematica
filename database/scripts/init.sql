@@ -112,6 +112,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS document_chunks (
     id SERIAL PRIMARY KEY,
     paper_id VARCHAR(50), -- Opcional: para vincular ao ID original do artigo se necessário
+    chunk_index INTEGER DEFAULT 0,
     chunk_text TEXT,
     embedding VECTOR(384) -- 384 dimensões correspondentes ao modelo all-MiniLM-L6-v2
 );

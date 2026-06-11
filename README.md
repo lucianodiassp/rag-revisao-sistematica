@@ -70,7 +70,7 @@ source venv/bin/activate
 #### 3. Instalar as dependências
 
 ```bash
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 #### 4. Configurar as variáveis de ambiente
@@ -79,9 +79,32 @@ Crie um arquivo `.env` na raiz do projeto:
 
 ```env
 GEMINI_API_KEY="sua-chave-aqui"
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=rag_systematic_review
+DB_USER=rag_user
+DB_PASSWORD=rag_password
 ```
 
-#### 5. Executar a Interface Web (Streamlit)
+#### 5. Carregar artigos e gerar embeddings
+
+Antes de usar a interface RAG, carregue os artigos no banco e gere os vetores usados pela busca semântica.
+
+No Windows PowerShell, mantenha o ambiente virtual ativado e execute:
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+python backend/coleta/orquestrador_coleta.py
+python backend/processamento/gerador_embeddings.py
+```
+
+O primeiro script coleta artigos nas fontes configuradas e grava na tabela `deduplicated_papers`.
+
+O segundo script lê os abstracts, divide em chunks, gera embeddings com `all-MiniLM-L6-v2` e grava na tabela `document_chunks`.
+
+> Observação: algumas APIs públicas podem aplicar limite temporário de requisições. Se uma fonte retornar erro `429`, execute a carga novamente mais tarde.
+
+#### 6. Executar a Interface Web (Streamlit)
 
 Com o banco de dados em execução e as dependências instaladas:
 
@@ -94,6 +117,129 @@ A aplicação abrirá automaticamente em:
 ```text
 http://localhost:8501
 ```
+
+---
+
+## Operação do Projeto
+
+### Fluxo normal de uso
+
+1. Subir o banco de dados e o pgAdmin:
+
+```powershell
+docker compose up -d
+```
+
+2. Ativar o ambiente Python:
+
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+3. Carregar ou atualizar os artigos:
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+python backend/coleta/orquestrador_coleta.py
+```
+
+4. Gerar os embeddings para busca semântica:
+
+```powershell
+python backend/processamento/gerador_embeddings.py
+```
+
+5. Abrir a interface RAG:
+
+```powershell
+python -m streamlit run frontend/app.py
+```
+
+6. Acessar no navegador:
+
+```text
+http://localhost:8501
+```
+
+### Consultar os dados no pgAdmin
+
+Acesse:
+
+```text
+http://localhost:5050
+```
+
+Login do pgAdmin:
+
+```text
+Email: admin@rag.com
+Senha: admin
+```
+
+Ao registrar o servidor no pgAdmin:
+
+```text
+Server Name: RAG PostgreSQL
+Host name/address: db
+Port: 5432
+Maintenance database: rag_systematic_review
+Username: rag_user
+Password: rag_password
+```
+
+Tabelas principais:
+
+| Tabela | Finalidade |
+|---------|------------|
+| `deduplicated_papers` | Artigos coletados e deduplicados |
+| `document_chunks` | Trechos dos abstracts com embeddings vetoriais |
+| `agent_interactions` | Logs das interações dos agentes LLM |
+| `screening_decisions` | Decisões e validações humanas de triagem |
+
+### Verificar se a carga funcionou
+
+Execute no pgAdmin ou via `psql`:
+
+```sql
+SELECT 'deduplicated_papers' AS tabela, COUNT(*) FROM deduplicated_papers
+UNION ALL
+SELECT 'document_chunks', COUNT(*) FROM document_chunks;
+```
+
+Se `deduplicated_papers` tiver registros, a coleta carregou artigos.
+
+Se `document_chunks` tiver registros, os embeddings foram gerados e a interface RAG já tem base para responder perguntas.
+
+### Atualização de schema em banco já existente
+
+O arquivo `database/scripts/init.sql` só é executado automaticamente quando o volume do PostgreSQL é criado pela primeira vez.
+
+Se o volume Docker já existir, alterações posteriores no `init.sql` não são reaplicadas automaticamente.
+
+Para aplicar a atualização necessária na tabela `screening_decisions` sem apagar dados:
+
+```powershell
+docker exec rag_postgres_db psql -U rag_user -d rag_systematic_review -c "ALTER TABLE screening_decisions ADD COLUMN IF NOT EXISTS justification TEXT; ALTER TABLE screening_decisions ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"
+```
+
+Para recriar o banco do zero e reaplicar todo o `init.sql`:
+
+```powershell
+docker compose down -v
+docker compose up -d
+```
+
+> Atenção: `docker compose down -v` apaga o volume do PostgreSQL e remove os dados carregados.
+
+### Parar os serviços
+
+Para parar os containers sem apagar os dados:
+
+```powershell
+docker compose down
+```
+
+Para parar a interface Streamlit, pressione `Ctrl+C` no terminal em que ela estiver rodando.
 
 ---
 
