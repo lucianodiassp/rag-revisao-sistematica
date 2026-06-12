@@ -1,55 +1,21 @@
 import os
-import json
+import sys
 import psycopg2
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
+
+# Adiciona o caminho raiz para podermos importar o agente relator dinâmico
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from backend.agentes.agente_relator import gerar_relatorio_final
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 load_dotenv(find_dotenv())
 
-def get_conexao():
-    """Lança a conexão com fallback seguro."""
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "127.0.0.1"),
-        port=os.getenv("DB_PORT", "5432"),
-        dbname=os.getenv("DB_NAME", "rag_systematic_review"),
-        user=os.getenv("DB_USER", "rag_user"),
-        password=os.getenv("DB_PASSWORD", "rag_password")
-    )
-
-def carregar_matriz_evidencias():
-    """Busca as evidências na base de dados."""
-    try:
-        conexao = get_conexao()
-        cursor = conexao.cursor()
-        cursor.execute("""
-            SELECT p.title, e.extraction_jsonb
-            FROM extracted_evidence e
-            JOIN deduplicated_papers p ON p.id = e.paper_id;
-        """)
-        resultados = cursor.fetchall()
-        conexao.close()
-        
-        dados_formatados = []
-        for titulo, jsonb_data in resultados:
-            if isinstance(jsonb_data, str):
-                jsonb_data = json.loads(jsonb_data)
-            
-            dados_formatados.append({
-                "Título": titulo,
-                "Objetivo": jsonb_data.get("objective", "N/A"),
-                "Método": jsonb_data.get("method", "N/A"),
-                "Resultados": jsonb_data.get("main_results", "N/A")
-            })
-        return dados_formatados
-    except Exception as e:
-        return []
-
-def carregar_metricas_auditoria():
-    """Lê o ficheiro CSV gerado pelo Agente Juiz."""
+def carregar_metricas_auditoria_legada():
+    """Lê o ficheiro CSV gerado pelo Agente Juiz (módulo RAG)."""
     raiz_projeto = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
     caminho_csv = os.path.join(raiz_projeto, 'metricas_rag_auditoria.csv')
     
@@ -60,84 +26,89 @@ def carregar_metricas_auditoria():
         pass
     return None
 
-def gerar_markdown_relatorio(matriz, df_metricas):
-    """Compila todos os dados num relatório Markdown estruturado."""
-    md = "# Relatório Final da Revisão Sistemática\n\n"
-    md += "Este documento foi gerado automaticamente pelo Sistema RAG de Apoio a Revisões Sistemáticas.\n\n"
-    
-    # 1. Secção de Auditoria (Métricas)
-    md += "## 1. Auditoria Quantitativa do Modelo de IA\n"
-    if df_metricas is not None:
-        media_fidelidade = df_metricas['Fidelidade (0-10)'].mean()
-        media_relevancia = df_metricas['Relevância (0-10)'].mean()
-        md += f"- **Fidelidade Geral (Anti-Alucinação):** {media_fidelidade:.1f} / 10\n"
-        md += f"- **Relevância Geral das Respostas:** {media_relevancia:.1f} / 10\n\n"
-        md += "### Testes Realizados:\n"
-        for index, row in df_metricas.iterrows():
-            md += f"- **Q:** {row['Pergunta']}\n  - *Fidelidade:* {row['Fidelidade (0-10)']} | *Relevância:* {row['Relevância (0-10)']}\n  - *Parecer do Juiz:* {row['Justificativa do Juiz']}\n\n"
-    else:
-        md += "*Dados de auditoria quantitativa não disponíveis no momento.*\n\n"
-
-    # 2. Secção de Evidências (Matriz)
-    md += "---\n## 2. Matriz de Evidências Extraídas\n\n"
-    if matriz:
-        for idx, artigo in enumerate(matriz, 1):
-            md += f"### {idx}. {artigo['Título']}\n"
-            md += f"- **Objetivo:** {artigo['Objetivo']}\n"
-            md += f"- **Método Aplicado:** {artigo['Método']}\n"
-            md += f"- **Principais Resultados:** {artigo['Resultados']}\n\n"
-    else:
-        md += "*Nenhum artigo aprovado ou matriz extraída até ao momento.*\n"
-        
-    return md
-
 # ==========================================
 # INTERFACE GRÁFICA (STREAMLIT)
 # ==========================================
 st.set_page_config(page_title="Relatório Final", page_icon="📑", layout="wide")
 
-st.title("📑 Relatório Final da Revisão Sistemática")
-st.markdown("Consolidação das métricas de inteligência artificial e da extração de conhecimento da literatura indexada.")
+st.title("📑 Relatório Final e Auditoria")
+st.markdown("""
+Consolidação das métricas do fluxo de seleção (inspirado no PRISMA), 
+auditoria dos agentes e síntese académica automatizada dos artigos incluídos.
+""")
 st.divider()
 
-# Carregar Dados
-matriz_dados = carregar_matriz_evidencias()
-metricas_df = carregar_metricas_auditoria()
+# MECANISMO DE SEGURANÇA: Inicializa o estado da sessão para evitar múltiplas chamadas à API do Gemini
+if "relatorio_compilado" not in st.session_state:
+    st.session_state.relatorio_compilado = None
 
-# Layout em Duas Colunas
-col1, col2 = st.columns([1, 2])
+# Cabeçalho de Comando de Compilação
+col_tit, col_btn = st.columns([2, 1])
+with col_tit:
+    st.write("### ⚙️ Central de Consolidação do Sistema")
+with col_btn:
+    if st.button("🚀 Gerar / Atualizar Relatório Final", type="primary", use_container_width=True):
+        with st.spinner("A extrair dados do PostgreSQL e a invocar o Agente Relator..."):
+            try:
+                # Invoca o backend e armazena em cache na sessão
+                st.session_state.relatorio_compilado = gerar_relatorio_final()
+                st.success("Relatório compilado com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao executar o Agente Relator: {e}")
 
-with col1:
-    st.subheader("Desempenho do Agente (LLM-as-a-Judge)")
-    if metricas_df is not None:
-        media_fid = metricas_df['Fidelidade (0-10)'].mean()
-        media_rel = metricas_df['Relevância (0-10)'].mean()
-        
-        st.metric(label="Média de Fidelidade (Zero Alucinação)", value=f"{media_fid:.1f} / 10")
-        st.metric(label="Média de Relevância", value=f"{media_rel:.1f} / 10")
-        
-        with st.expander("Ver detalhes dos testes"):
-            st.dataframe(metricas_df[['Pergunta', 'Fidelidade (0-10)', 'Relevância (0-10)']], hide_index=True)
-    else:
-        st.warning("⚠️ O ficheiro de métricas ainda não foi gerado. Rode o `agente_avaliador.py`.")
+st.divider()
 
-with col2:
-    st.subheader("Pré-visualização do Relatório")
-    relatorio_md = gerar_markdown_relatorio(matriz_dados, metricas_df)
+# Renderização Condicional: Só renderiza o painel se houver dados em cache
+if st.session_state.relatorio_compilado is not None:
+    resultado = st.session_state.relatorio_compilado
+    metricas_prisma = resultado["metricas"]
+    texto_relatorio = resultado["relatorio_md"]
     
-    # Caixa com scroll para ler o relatório
-    with st.container(height=400):
-        st.markdown(relatorio_md)
+    # 1. Painel Superior: Métricas Reais do Banco de Dados (Fluxo de Triagem Humana/IA)
+    st.subheader("📊 Mapeamento de Fluxo Quantitativo (Inspirado no PRISMA)")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("1. Artigos Únicos", metricas_prisma.get('total_unicos', 0))
+    m2.metric("2. Triados pela IA", metricas_prisma.get('triados_ia', 0))
+    m3.metric("3. Aprovados (Humano)", metricas_prisma.get('aprovados_humano', 0))
+    m4.metric("4. Evidências Extraídas", metricas_prisma.get('evidencias_extraidas', 0))
     
     st.divider()
-    st.write("### 📥 Exportação Oficial")
     
-    # Botão para exportar em formato .MD (Pode ser aberto no Word, Notion, Obsidian, etc)
-    st.download_button(
-        label="📄 Baixar Relatório Completo (Markdown)",
-        data=relatorio_md.encode('utf-8'),
-        file_name="Relatorio_Final_Revisao_Sistematica.md",
-        mime="text/markdown",
-        type="primary",
-        use_container_width=True
-    )
+    # 2. Corpo Central: Duas colunas distribuindo o Relatório e a Auditoria Externa
+    col_visualizacao, col_auditoria = st.columns([2, 1])
+    
+    with col_visualizacao:
+        st.subheader("📝 Síntese Académica das Evidências (Gerada por IA)")
+        with st.container(height=500, border=True):
+            st.markdown(texto_relatorio)
+            
+        st.write("### 📥 Exportação do Documento")
+        st.download_button(
+            label="📄 Baixar Relatório Completo (Markdown)",
+            data=texto_relatorio.encode('utf-8'),
+            file_name="Relatorio_Final_Revisao_Sistematica.md",
+            mime="text/markdown",
+            type="primary",
+            use_container_width=True
+        )
+        
+    with col_auditoria:
+        st.subheader("🛡️ Auditoria de RAG Integrada")
+        
+        # Tenta carregar os dados locais legados do CSV do Agente Juiz
+        df_juiz = carregar_metricas_auditoria_legada()
+        if df_juiz is not None:
+            st.markdown("**Métricas de Avaliação (LLM-as-a-Judge):**")
+            media_fid = df_juiz['Fidelidade (0-10)'].mean()
+            media_rel = df_juiz['Relevância (0-10)'].mean()
+            
+            st.metric(label="Fidelidade Média (Anti-Alucinação)", value=f"{media_fid:.1f} / 10")
+            st.metric(label="Relevância Média das Respostas", value=f"{media_rel:.1f} / 10")
+            
+            with st.expander("Ver logs detalhados do Juiz"):
+                st.dataframe(df_juiz[['Pergunta', 'Fidelidade (0-10)', 'Relevância (0-10)']], hide_index=True)
+        else:
+            st.info("ℹ️ Os logs quantitativos adicionais do Agente Juiz ficarão visíveis aqui assim que o módulo de testes vetoriais do RAG for executado.")
+
+else:
+    st.info("👉 O relatório final ainda não foi gerado nesta sessão de uso. Clique no botão **'Gerar / Atualizar Relatório Final'** localizado no canto superior direito para iniciar a compilação de dados.")
