@@ -1,9 +1,14 @@
 import os
+import sys
 import json
 import psycopg2
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
+
+# Adiciona o caminho raiz para podermos importar o agente extrator
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from backend.agentes.agente_extrator import executar_pipeline_extracao
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
@@ -66,10 +71,24 @@ def carregar_matriz_evidencias():
 st.set_page_config(page_title="Matriz de Evidências", page_icon="📊", layout="wide")
 
 st.title("📊 Matriz de Evidências")
-st.markdown("""
-Aqui estão os dados estruturados extraídos automaticamente pela Inteligência Artificial dos artigos que você aprovou na Triagem.
-Estes dados estão prontos para compor o **Relatório Final da Revisão Sistemática**.
-""")
+
+# Layout do cabeçalho com botão de ação para automatizar a extração
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    st.markdown("""
+    Aqui estão os dados estruturados extraídos automaticamente pela Inteligência Artificial dos artigos que você aprovou na Triagem.
+    Estes dados estão prontos para compor o **Relatório Final da Revisão Sistemática**.
+    """)
+
+with col2:
+    # O botão mágico de automatização
+    if st.button("🔄 Extrair Novas Evidências", type="primary", use_container_width=True):
+        with st.spinner("A IA está a ler e a estruturar os novos artigos. Pode demorar alguns instantes..."):
+            executar_pipeline_extracao() # Chama o script automaticamente!
+        st.success("Extração concluída com sucesso!")
+        st.rerun() # Recarrega a página para exibir os novos dados
+
 st.divider()
 
 # Carrega e converte os dados para um DataFrame do Pandas
@@ -100,4 +119,4 @@ if dados:
         type="primary"
     )
 else:
-    st.info("Ainda não há evidências extraídas. Aprove artigos na página de Triagem e rode o Agente Extrator.")
+    st.info("Ainda não há evidências extraídas. Vá à página de Triagem, aprove os artigos que desejar e depois volte aqui para clicar no botão 'Extrair Novas Evidências'.")
