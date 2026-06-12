@@ -97,21 +97,21 @@ def triar_artigo_com_ia(titulo, resumo, tentativa=1):
         print(f"❌ Erro estrutural ao processar o artigo: {e}")
         return None
 
-def executar_pipeline_triagem():
-    print("🔍 A buscar artigos pendentes de análise pela IA...")
+def executar_pipeline_triagem_ui():
+    """Executa a triagem emitindo atualizações de estado (yield) para a interface gráfica."""
     artigos = buscar_artigos_sem_analise()
     
     if not artigos:
-        print("🎉 Todos os artigos válidos já possuem análise da IA!")
+        yield {"status": "concluido", "atual": 0, "total": 0, "msg": "Nenhum artigo novo para analisar."}
         return
 
-    print(f"📊 Encontrados {len(artigos)} artigos para triagem automática.\n")
-    
+    total = len(artigos)
     conexao = get_conexao()
     cursor = conexao.cursor()
 
-    for paper_id, titulo, abstract in artigos:
-        print(f"🧠 IA a analisar: '{titulo[:50]}...'")
+    for i, (paper_id, titulo, abstract) in enumerate(artigos, 1):
+        # 1. Avisa a interface que começou a processar um artigo específico
+        yield {"status": "processando", "atual": i, "total": total, "msg": f"🧠 A analisar {i}/{total}: '{titulo[:40]}...'"}
         
         resultado_ia = triar_artigo_com_ia(titulo, abstract)
         
@@ -145,15 +145,18 @@ def executar_pipeline_triagem():
                 json.dumps(resultado_ia),
                 json.dumps({"provider": "Google", "model_name": NOME_MODELO})
             ))
-            conexao.commit() # Commit iterativo para não perder o que já foi salvo
-            print(f"   -> Veredicto IA: {sugestao} | Gravado com sucesso.")
+            conexao.commit()
             
-            # Pausa proativa de 15 segundos entre cada artigo para evitar bater na cota de 5 req/min
-            time.sleep(15) 
+            # 2. Avisa a interface que vai fazer a pausa de segurança
+            if i < total:
+                yield {"status": "pausa", "atual": i, "total": total, "msg": f"⏳ Veredicto gravado ({sugestao}). Pausa de 15s para evitar bloqueio da API..."}
+                time.sleep(15) 
             
     cursor.close()
     conexao.close()
-    print("\n🎉 Triagem automática concluída de forma auditável!")
+    
+    # 3. Avisa a interface que terminou
+    yield {"status": "concluido", "atual": total, "total": total, "msg": "🎉 Triagem automática concluída!"}
 
 if __name__ == "__main__":
     executar_pipeline_triagem()

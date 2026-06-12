@@ -11,3 +11,4 @@ rag_postgres_data/
 # IDEs
 .vscode/
 .idea/
+research_question.json

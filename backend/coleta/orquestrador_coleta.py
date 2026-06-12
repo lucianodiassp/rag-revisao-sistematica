@@ -77,17 +77,32 @@ def iniciar_recolha(query, max_por_fonte=5):
             # A base de dados vai rejeitar se o ID já lá estiver (Primary Key Duplicada)
             # ou a função da Pessoa 3 vai gerir o erro (ON CONFLICT DO NOTHING)
             print(f"⚠️ Artigo '{artigo['titulo'][:20]}...' ignorado/erro: {e}")
-
+            
     print(f"\n✅ Processo concluído! Tentativa de gravar {len(artigos_totais)} artigos.")
+    
+    return sucessos, len(artigos_totais)
 
 if __name__ == "__main__":
-    # Podes mudar o termo de pesquisa aqui!
-    termo_pesquisa = r"""
-("artificial intelligence" OR "machine learning" OR "deep learning") 
-AND ("clinical practice" OR "healthcare" OR "diagnosis") 
-AND ("efficiency" OR "accuracy" OR "patient outcomes")
-""".strip()
-
+    import json
     
-    # Vamos pedir 5 artigos para este primeiro teste
-    iniciar_recolha(termo_pesquisa, max_por_fonte=10)
+    # 1. Definir o caminho onde o Agente Formulador guardou o JSON
+    caminho_json = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../research_question.json'))
+    
+    # 2. Verificar se o ficheiro existe
+    if os.path.exists(caminho_json):
+        print("📄 Ficheiro de configuração encontrado! A ler estratégia de busca...")
+        with open(caminho_json, 'r', encoding='utf-8') as f:
+            dados_pesquisa = json.load(f)
+            
+        termo_pesquisa = dados_pesquisa.get("search_string", "")
+        
+        if termo_pesquisa:
+            print(f"🔍 Estratégia carregada: {termo_pesquisa}\n")
+            # Vamos pedir 5 artigos para este teste (pode aumentar depois)
+            iniciar_recolha(termo_pesquisa, max_por_fonte=5)
+        else:
+            print("❌ Erro: O ficheiro JSON não contém uma 'search_string' válida.")
+            
+    else:
+        print("⚠️ Aviso: O ficheiro 'research_question.json' não foi encontrado.")
+        print("👉 Por favor, vá à interface do Streamlit (0_Configuração_Pesquisa) e gere a estratégia primeiro!")
