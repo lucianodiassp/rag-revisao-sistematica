@@ -85,7 +85,7 @@ def buscar_contexto_hibrido(pergunta, limite=3):
 # 2. O AGENTE INTELIGENTE (Orquestrador RAG)
 # ==========================================
 def responder_com_rag(pergunta):
-    print("🔍 1. A executar Busca Híbrida (Vetor + BM25) para capturar contexto e termos exatos...")
+    print("1. A executar Busca Hibrida (Vetor + BM25) para capturar contexto e termos exatos...")
     evidencias = buscar_contexto_hibrido(pergunta, limite=3)
     
     if not evidencias:
@@ -96,7 +96,7 @@ def responder_com_rag(pergunta):
     for paper_id, texto_chunk, score in evidencias:
         contexto_formatado += f"\n[Artigo ID: {paper_id} | Score RRF: {score:.4f}]\nTrecho: {texto_chunk}\n"
 
-    print("🧠 2. A injetar o contexto estruturado no Cérebro (Google Gemini)...")
+    print("2. A injetar o contexto estruturado no modelo (Google Gemini)...")
     
     # O "Prompt Engineering" Mestre com regras de Grounding rigorosas
     prompt_sistema = f"""
@@ -131,12 +131,12 @@ if __name__ == "__main__":
     pergunta_teste = "Which metrics are used to evaluate Large Language Models?"
     
     print("=" * 60)
-    print(f"👤 PERGUNTA DO UTILIZADOR: {pergunta_teste}")
+    print(f"PERGUNTA DO UTILIZADOR: {pergunta_teste}")
     print("=" * 60)
     
     resposta_final = responder_com_rag(pergunta_teste)
     
-    print("\n🤖 RESPOSTA DO AGENTE RAG AVANÇADO (HÍBRIDO):")
+    print("\nRESPOSTA DO AGENTE RAG AVANCADO (HIBRIDO):")
     print("-" * 60)
     print(resposta_final)
     print("-" * 60)
