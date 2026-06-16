@@ -1,0 +1,5 @@
+Pergunta,Fidelidade (0-10),Relevância (0-10),Justificativa do Juiz
+Como a IA está a ser utilizada para classificar ECGs ou exames de imagem?,0,0,"Erro: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+Quais as arquiteturas de deep learning comparadas para reconhecimento de hemorragia intracraniana?,7,7,A resposta lista corretamente todas as arquiteturas de deep learning mencionadas no contexto relevante para o reconhecimento de hemorragia intracraniana.
+Quais métricas são utilizadas para avaliar os Modelos de Linguagem de Grande Escala (LLMs)?,7,7,"O contexto forneceu métricas para modelos de Machine Learning gerais, não especificamente para LLMs, justificando a recusa do sistema."
+Qual é a capital do Brasil?,7,7,"O sistema identificou corretamente a irrelevância do contexto para a pergunta e recusou-se a responder, demonstrando alta fidelidade e relevância na sua limitação."

@@ -1,61 +1,65 @@
 import os
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
-from sentence_transformers import SentenceTransformer
 from google import genai
 from google.genai import types
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E MODELOS
 # ==========================================
-# Carregar variáveis de ambiente (banco de dados e API Key)
 load_dotenv(find_dotenv())
 
-# Inicializar o cliente com a nova biblioteca oficial da Google
+# Inicializar o cliente com a API oficial da Google
 cliente = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 NOME_MODELO_LLM = 'gemini-2.5-flash'
-
-# Carregar o modelo de processamento de embeddings
-modelo_vetorial = SentenceTransformer('all-MiniLM-L6-v2')
+NOME_MODELO_EMBEDDING = 'gemini-embedding-001'
+DIMENSOES = 768
 
 def get_conexao():
     """Estabelece a conexão estritamente via variáveis de ambiente."""
-    # Se DB_USER ou DB_PASSWORD não existirem no .env, o sistema falha com segurança
     return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"), # Host e Port podem ter fallback pois não são sensíveis
+        host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "rag_systematic_review"),
-        user=os.environ["DB_USER"],         # Usa os.environ para forçar erro se não existir
-        password=os.environ["DB_PASSWORD"]  # Força a leitura exclusiva do .env
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASSWORD"]
     )
 
 # ==========================================
-# 1. MOTOR DE BUSCA HÍBRIDA (BM25 + VETORES)
+# 1. MOTOR DE BUSCA HÍBRIDA (BM25 + VETORES RRF)
 # ==========================================
 def buscar_contexto_hibrido(pergunta, limite=3):
     """
     Combina a busca semântica (pgvector) com a busca por palavras-chave (Full-Text Search)
-    utilizando a fusão matemática RRF (Reciprocal Rank Fusion) para mitigar falhas de recall.
+    utilizando a fusão matemática RRF para mitigar falhas de recall.
     """
-    # Transforma a pergunta num vetor de 384 dimensões
-    vetor_pergunta = modelo_vetorial.encode(pergunta).tolist()
+    print("   [1/2] A converter pergunta em matemática...")
+    # Transforma a pergunta num vetor usando o Gemini com compressão Matryoshka (768d)
+    resposta_emb = cliente.models.embed_content(
+        model=NOME_MODELO_EMBEDDING,
+        contents=pergunta,
+        config=types.EmbedContentConfig(output_dimensionality=DIMENSOES)
+    )
+    vetor_pergunta = resposta_emb.embeddings[0].values
 
     conexao = get_conexao()
     cursor = conexao.cursor()
 
-    # A Super Query Híbrida (Combinação exata exigida na Secção 5)
+    print("   [2/2] A executar Busca Híbrida (Vetor + BM25) no PostgreSQL...")
+    # A Super Query Híbrida adaptada para as novas tabelas
     query = """
     WITH vector_search AS (
-        SELECT id, paper_id, chunk_text,
-               RANK() OVER (ORDER BY embedding <=> %s::vector) AS vector_rank
-        FROM document_chunks
-        ORDER BY embedding <=> %s::vector
+        SELECT pc.id, pc.paper_id, pc.chunk_text,
+               RANK() OVER (ORDER BY em.embedding <=> %s::vector) AS vector_rank
+        FROM embeddings_metadata em
+        JOIN paper_chunks pc ON em.chunk_id = pc.id
+        ORDER BY em.embedding <=> %s::vector
         LIMIT 20
     ),
     keyword_search AS (
         SELECT id, paper_id, chunk_text,
                RANK() OVER (ORDER BY ts_rank_cd(to_tsvector('english', chunk_text), plainto_tsquery('english', %s)) DESC) AS keyword_rank
-        FROM document_chunks
+        FROM paper_chunks
         WHERE to_tsvector('english', chunk_text) @@ plainto_tsquery('english', %s)
         ORDER BY ts_rank_cd(to_tsvector('english', chunk_text), plainto_tsquery('english', %s)) DESC
         LIMIT 20
@@ -71,12 +75,13 @@ def buscar_contexto_hibrido(pergunta, limite=3):
     """
 
     cursor.execute(query, (
-        str(vetor_pergunta), str(vetor_pergunta),  # Parâmetros da busca vetorial
-        pergunta, pergunta, pergunta,              # Parâmetros da busca por palavras-chave
-        limite                                     # Limite final de chunks combinados
+        str(vetor_pergunta), str(vetor_pergunta),  # Parâmetros vetoriais
+        pergunta, pergunta, pergunta,              # Parâmetros de texto
+        limite                                     # Limite de RRF
     ))
     
     resultados = cursor.fetchall()
+    cursor.close()
     conexao.close()
     
     return resultados
@@ -85,20 +90,20 @@ def buscar_contexto_hibrido(pergunta, limite=3):
 # 2. O AGENTE INTELIGENTE (Orquestrador RAG)
 # ==========================================
 def responder_com_rag(pergunta):
-    print("1. A executar Busca Hibrida (Vetor + BM25) para capturar contexto e termos exatos...")
-    evidencias = buscar_contexto_hibrido(pergunta, limite=3)
+    print("\n🔍 INÍCIO DA RECUPERAÇÃO DE EVIDÊNCIAS")
+    evidencias = buscar_contexto_hibrido(pergunta, limite=4) # Aumentado ligeiramente para mais contexto
     
     if not evidencias:
         return "Não tenho dados suficientes nos artigos recolhidos para responder."
 
-    # Formatar o contexto incluindo o Score Híbrido para fins de auditoria
     contexto_formatado = ""
+    print("\n📑 EVIDÊNCIAS RECUPERADAS (TOP SCORE RRF):")
     for paper_id, texto_chunk, score in evidencias:
+        print(f" -> Artigo ID: {paper_id[:8]}... | Score Híbrido: {score:.4f}")
         contexto_formatado += f"\n[Artigo ID: {paper_id} | Score RRF: {score:.4f}]\nTrecho: {texto_chunk}\n"
 
-    print("2. A injetar o contexto estruturado no modelo (Google Gemini)...")
+    print("\n🧠 A gerar síntese com IA baseada EXCLUSIVAMENTE no contexto...")
     
-    # O "Prompt Engineering" Mestre com regras de Grounding rigorosas
     prompt_sistema = f"""
     És um assistente de pesquisa académica rigoroso focado em Revisões Sistemáticas. 
     Vais receber uma Pergunta e um Contexto científico extraído de artigos através de busca híbrida.
@@ -112,13 +117,12 @@ def responder_com_rag(pergunta):
     {contexto_formatado}
     """
 
-    # Chamada à API usando o novo padrão de configuração oficial
     resposta = cliente.models.generate_content(
         model=NOME_MODELO_LLM,
         contents=pergunta,
         config=types.GenerateContentConfig(
             system_instruction=prompt_sistema,
-            temperature=0.1 # Temperatura baixa para garantir determinismo científico
+            temperature=0.1
         )
     )
     
@@ -128,15 +132,15 @@ def responder_com_rag(pergunta):
 # 3. O TESTE FINAL LOCAL
 # ==========================================
 if __name__ == "__main__":
-    pergunta_teste = "Which metrics are used to evaluate Large Language Models?"
+    pergunta_teste = "Como a inteligência artificial é utilizada na classificação de eletrocardiogramas (ECG) ou exames de imagem?"
     
-    print("=" * 60)
-    print(f"PERGUNTA DO UTILIZADOR: {pergunta_teste}")
-    print("=" * 60)
+    print("=" * 70)
+    print(f"PERGUNTA: {pergunta_teste}")
+    print("=" * 70)
     
     resposta_final = responder_com_rag(pergunta_teste)
     
-    print("\nRESPOSTA DO AGENTE RAG AVANCADO (HIBRIDO):")
-    print("-" * 60)
+    print("\n======================================================================")
+    print("🤖 RESPOSTA DO AGENTE RAG AVANÇADO (HÍBRIDO):")
+    print("======================================================================")
     print(resposta_final)
-    print("-" * 60)

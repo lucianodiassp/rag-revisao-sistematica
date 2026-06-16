@@ -1,115 +1,98 @@
+import os
 import psycopg2
-from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 
 # ==========================================
-# 1. CARREGAR A INTELIGÊNCIA ARTIFICIAL
+# CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
-print("🧠 A ligar os motores da IA...")
-print("A descarregar/carregar o modelo 'all-MiniLM-L6-v2' (pode demorar 1 minuto na primeira vez)...")
-modelo = SentenceTransformer('all-MiniLM-L6-v2')
-print("✅ IA pronta a vetorizar!\n")
+load_dotenv()
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+NOME_MODELO_EMBEDDING = "gemini-embedding-001"
+DIMENSOES = 768
 
-# ==========================================
-# 2. FUNÇÃO DE CHUNKING (FATIAMENTO)
-# ==========================================
-def dividir_em_chunks(texto, tamanho_maximo=150):
+def get_conexao():
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
+        dbname=os.getenv("DB_NAME", "rag_systematic_review"),
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASSWORD"]
+    )
+
+def criar_chunks(texto, max_palavras=150):
     """
-    Pega num texto longo e corta-o em blocos (chunks) de X palavras.
-    Num projeto mais avançado, poderíamos usar bibliotecas como o LangChain para isto,
-    mas para o nosso MVP, uma divisão por palavras é perfeita e ultra-rápida.
+    Divide o texto em pedaços menores (chunks) para melhorar a precisão da busca vetorial.
     """
     if not texto:
         return []
-        
+    
     palavras = texto.split()
     chunks = []
-    
-    # Percorre o texto e cria fatias de 150 em 150 palavras
-    for i in range(0, len(palavras), tamanho_maximo):
-        chunk = " ".join(palavras[i:i + tamanho_maximo])
+    for i in range(0, len(palavras), max_palavras):
+        chunk = " ".join(palavras[i:i + max_palavras])
         chunks.append(chunk)
-        
     return chunks
 
-# ==========================================
-# 3. O MOTOR PRINCIPAL (Ler, Vetorizar e Gravar)
-# ==========================================
-def processar_artigos():
-    # Ligar ao PostgreSQL local
-    conexao = psycopg2.connect(
-        host="localhost",
-        port="5432",
-        dbname="rag_systematic_review",
-        user="rag_user",   
-        password="rag_password"
-    )
+def processar_indexacao_vetorial():
+    """Lê os artigos aprovados e converte-os em vetores matemáticos no pgvector."""
+    conexao = get_conexao()
     cursor = conexao.cursor()
-
-    # Vamos buscar todos os artigos que tenham um abstract preenchido
-    print("🔍 A procurar artigos na base de dados...")
+    
+    print("🔍 A procurar artigos aprovados pendentes de indexação...")
+    
+    # Busca artigos que foram aprovados pelo humano, mas que ainda não estão na tabela paper_chunks
     cursor.execute("""
-        SELECT id, abstract 
-        FROM deduplicated_papers 
-        WHERE abstract IS NOT NULL AND abstract != '';
+        SELECT d.id, d.title, d.abstract 
+        FROM deduplicated_papers d
+        JOIN screening_decisions s ON d.id = s.paper_id
+        WHERE s.human_decision = 'Incluir'
+        AND d.id NOT IN (SELECT paper_id FROM paper_chunks)
     """)
     artigos = cursor.fetchall()
     
-    print(f"📊 Encontrados {len(artigos)} artigos para processar. A iniciar validação de qualidade...\n")
+    if not artigos:
+        print("✅ Não há novos artigos aprovados para indexar.")
+        cursor.close()
+        conexao.close()
+        return
 
-    chunks_inseridos = 0
-    artigos_ignorados = 0
-
-    # Definição das mensagens de fallback que não contêm ciência real
-    mensagens_lixo = [
-        "Abstract indisponível.",
-        "Abstract extraído do índice (simplificado para este exemplo).",
-        "Abstract via PubMed E-Summary (Requer E-Fetch para texto completo)."
-    ]
-
-    for artigo_id, abstract in artigos:
+    for paper_id, titulo, abstract in artigos:
+        print(f"🧠 A processar vetorização para: '{titulo[:50]}...'")
         
-        # --- FILTRO DE QUALIDADE SEMÂNTICA ---
-        # 1. Verifica se o texto é uma das mensagens exatas de erro
-        if abstract.strip() in mensagens_lixo:
-            print(f"⚠️ Artigo ignorado (Mensagem de API): ID {artigo_id[:8]}...")
-            artigos_ignorados += 1
-            continue
-            
-        # 2. Verifica se o abstract é demasiado curto para conter contexto útil
-        # (menos de 20 caracteres é provável que seja lixo ou um erro desconhecido)
-        if len(abstract.strip()) < 20:
-            print(f"⚠️ Artigo ignorado (Texto muito curto): ID {artigo_id[:8]}...")
-            artigos_ignorados += 1
-            continue
-        # ---------------------------------------
-
-        # A. Fatiar o resumo (Chunking)
-        fatias = dividir_em_chunks(abstract, tamanho_maximo=150)
-
-        for indice, pedaco_texto in enumerate(fatias):
-            # B. Vetorizar (A Magia!)
-            # O modelo lê o pedaço de texto e devolve uma lista de 384 números flutuantes
-            vetor = modelo.encode(pedaco_texto).tolist()
-
-            # C. Gravar no PostgreSQL usando a extensão pgvector
-            cursor.execute(
-                """
-                INSERT INTO document_chunks (paper_id, chunk_index, chunk_text, embedding)
-                VALUES (%s, %s, %s, %s::vector)
-                """,
-                (artigo_id, indice, pedaco_texto, str(vetor))
+        # Junta o título e o resumo para garantir que o contexto é rico
+        texto_completo = f"Título: {titulo}. Resumo: {abstract}"
+        chunks = criar_chunks(texto_completo)
+        
+        for index, chunk_text in enumerate(chunks):
+            # 1. Gera o Embedding (Vetor) usando a API do Gemini com compressão Matryoshka
+            resposta = client.models.embed_content(
+                model=NOME_MODELO_EMBEDDING,
+                contents=chunk_text,
+                config=types.EmbedContentConfig(output_dimensionality=DIMENSOES)
             )
-            chunks_inseridos += 1
-            print(f"   -> Artigo {artigo_id[:8]}... | Chunk {indice} vetorizado e guardado.")
+            vetor = resposta.embeddings[0].values
+            
+            # 2. Insere o Chunk textual na base de dados
+            cursor.execute("""
+                INSERT INTO paper_chunks (paper_id, chunk_type, chunk_text)
+                VALUES (%s, %s, %s) RETURNING id
+            """, (paper_id, f"abstract_part_{index+1}", chunk_text))
+            chunk_id = cursor.fetchone()[0]
+            
+            # 3. Insere o vetor matemático associado a esse Chunk
+            cursor.execute("""
+                INSERT INTO embeddings_metadata (chunk_id, model_name, dimensions, embedding)
+                VALUES (%s, %s, %s, %s)
+            """, (chunk_id, NOME_MODELO_EMBEDDING, DIMENSOES, str(vetor)))
+            
+        conexao.commit()
+        print("   💾 Embeddings guardados com sucesso!")
 
-    # Confirmar as alterações na base de dados
-    conexao.commit()
     cursor.close()
     conexao.close()
-
-    print(f"\n🎉 Processo concluído com sucesso!")
-    print(f"🧠 Total de {chunks_inseridos} 'fatias de conhecimento' reais vetorizadas.")
-    print(f"🗑️ Total de {artigos_ignorados} artigos com abstracts inúteis descartados da vetorização.")
+    print("\n🎉 Indexação de todos os artigos concluída!")
 
 if __name__ == "__main__":
-    processar_artigos()
+    processar_indexacao_vetorial()
