@@ -189,3 +189,10 @@ docker compose down -v
 ```
 
 > ⚠️ Atenção: o comando acima apagará permanentemente todos os dados armazenados no PostgreSQL.
+
+
+## 🧪 Validação e Testes com Utilizadores
+
+Se você é um testador ou avaliador da plataforma, preparamos um roteiro passo a passo com cenários práticos para guiar a sua experiência e capturar o seu feedback de forma estruturada.
+
+👉 **[Clique aqui para acessar o Roteiro de Testes Funcionais (UAT)](docs/roteiro_testes.md)**
