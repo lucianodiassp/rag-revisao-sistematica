@@ -83,28 +83,37 @@ if os.path.exists(CAMINHO_JSON_PERGUNTA):
     with col_coleta:
         st.info("A sua estratégia de busca está pronta para ser executada nas bases de dados científicas (PubMed, OpenAlex, Semantic Scholar).")
         
+        # --- NOVO BLOCO: CAMPO EDITÁVEL PARA A STRING DE BUSCA ---
+        st.markdown("### 🔧 Ajuste Fino da Estratégia")
+        string_manual = st.text_area(
+            "String de Busca Booleana (Edite livremente antes de coletar):",
+            value=termo_busca,
+            height=150,
+            help="Pode apagar o conteúdo gerado pela IA e colar a sua própria string de busca aqui."
+        )
+        
         # O utilizador pode escolher o tamanho da amostra
         qtd_artigos = st.slider("Máximo de artigos por fonte (API):", min_value=5, max_value=50, value=10, step=5)
         st.write(f"*Total estimado: Até {qtd_artigos * 3} artigos combinados.*")
         
         # O Botão que aciona o Orquestrador
         if st.button("🚀 Iniciar Coleta nas Bases de Dados", type="primary", use_container_width=True):
-            if termo_busca:
+            if string_manual.strip(): # Passamos a usar a string_manual editada!
                 with st.spinner(f"A contactar APIs científicas e a recolher até {qtd_artigos} artigos por base. Isto pode demorar um pouco..."):
                     try:
-                        # Agora capturamos os resultados devolvidos pelo orquestrador!
-                        qtd_salvos, qtd_encontrados = iniciar_recolha(termo_busca, max_por_fonte=qtd_artigos)
+                        # Agora enviamos a string que está na caixa de texto, com os ajustes do utilizador
+                        qtd_salvos, qtd_encontrados = iniciar_recolha(string_manual.strip(), max_por_fonte=qtd_artigos)
                         
                         if qtd_encontrados == 0:
-                            st.warning("⚠️ A busca não encontrou nenhum artigo nas bases de dados. Tente pedir à IA para gerar uma string de busca mais abrangente.")
+                            st.warning("⚠️ A busca não encontrou nenhum artigo nas bases de dados. Tente ajustar a string acima para ser mais abrangente.")
                         elif qtd_salvos == 0:
                             st.info(f"ℹ️ Foram encontrados {qtd_encontrados} artigos nas APIs, mas **todos já existiam** na sua base de dados (Bloqueados pela regra de deduplicação).")
                         else:
                             st.success(f"✅ Coleta concluída com sucesso! Dos {qtd_encontrados} artigos encontrados, **{qtd_salvos} novos artigos** foram salvos na base de dados.")
                             st.balloons()
-                            st.markdown("👉 **O próximo passo:** Vá à página **'1 Triagem'** no menu lateral para avaliar os novos artigos.")
+                            st.markdown("👉 **O próximo passo:** Vá à página **'Triagem'** no menu lateral para avaliar os novos artigos.")
                             
                     except Exception as e:
                         st.error(f"Ocorreu um erro durante a coleta: {e}")
             else:
-                st.error("A string de busca está vazia no ficheiro de configuração.")
+                st.error("A string de busca não pode estar vazia. Por favor, preencha o campo acima.")

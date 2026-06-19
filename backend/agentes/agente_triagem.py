@@ -2,28 +2,30 @@ import os
 import json
 import psycopg2
 import uuid
-import time # NOVO: Biblioteca para pausar a execução
+import time
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from google.genai.errors import APIError # NOVO: Para capturar o erro específico
+from google.genai.errors import APIError
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
 # ==========================================
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-NOME_MODELO = "gemini-2.5-flash" 
+NOME_MODELO = "gemini-2.5-flash"
+
+# Novo caminho para ler o JSON dinâmico gerado pelo Front-end
+CAMINHO_JSON_PERGUNTA = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../research_question.json'))
 
 def get_conexao():
     """Estabelece a conexão estritamente via variáveis de ambiente."""
-    # Se DB_USER ou DB_PASSWORD não existirem no .env, o sistema falha com segurança
     return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"), # Host e Port podem ter fallback pois não são sensíveis
+        host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "rag_systematic_review"),
-        user=os.environ["DB_USER"],         # Usa os.environ para forçar erro se não existir
-        password=os.environ["DB_PASSWORD"]  # Força a leitura exclusiva do .env
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASSWORD"]
     )
 
 def buscar_artigos_sem_analise():
@@ -45,19 +47,35 @@ def buscar_artigos_sem_analise():
     conexao.close()
     return artigos
 
+def carregar_criterios_dinamicos():
+    """Lê as regras atualizadas do ficheiro JSON."""
+    if not os.path.exists(CAMINHO_JSON_PERGUNTA):
+        # Se não encontrar o arquivo, cai para um padrão genérico para não quebrar
+        return "Critérios não encontrados no sistema.", "Critérios de exclusão não encontrados."
+    
+    with open(CAMINHO_JSON_PERGUNTA, 'r', encoding='utf-8') as f:
+        dados = json.load(f)
+    
+    inclusao = "\n".join([f"- {c}" for c in dados.get("inclusion_criteria", [])])
+    exclusao = "\n".join([f"- {c}" for c in dados.get("exclusion_criteria", [])])
+    
+    return inclusao, exclusao
+
 def triar_artigo_com_ia(titulo, resumo, tentativa=1):
-    """Submete o artigo ao Gemini com tratamento de limite de cota (Rate Limit)."""
+    """Submete o artigo ao Gemini com critérios injetados dinamicamente e rate limit."""
+    
+    # Busca os critérios do JSON
+    criterios_inclusao, criterios_exclusao = carregar_criterios_dinamicos()
+    
     prompt = f"""
     Você é um agente especialista em triagem de artigos científicos para uma Revisão Sistemática.
     Sua tarefa é avaliar o artigo abaixo com base estrita nos critérios fornecidos.
 
     [CRITÉRIOS DE INCLUSÃO]
-    - O artigo deve abordar explicitamente abordagens de inteligência artificial, engenharia de software ou processamento de linguagem natural aplicados a revisões de literatura ou medicina.
-    - Apresenta algum método computacional, experimental ou empírico claro.
+    {criterios_inclusao}
 
     [CRITÉRIOS DE EXCLUSÃO]
-    - Editoriais, revisões simples de literatura sem método computacional de suporte, opiniões ou comentários.
-    - Artigos sem qualquer relação com automação, sistemas computacionais ou inteligência artificial.
+    {criterios_exclusao}
 
     [DADOS DO ARTIGO]
     Título: {titulo}
@@ -84,9 +102,8 @@ def triar_artigo_com_ia(titulo, resumo, tentativa=1):
         return json.loads(resposta.text)
     
     except APIError as e:
-        # Verifica se o erro é o código 429 (Resource Exhausted / Quota Exceeded)
         if e.code == 429 and tentativa <= 3:
-            tempo_espera = 60 # Esperamos 1 minuto para a cota da Google "arrefecer"
+            tempo_espera = 60
             print(f"   ⏳ Limite atingido (429). A aguardar {tempo_espera}s antes da tentativa {tentativa + 1}/3...")
             time.sleep(tempo_espera)
             return triar_artigo_com_ia(titulo, resumo, tentativa + 1)
@@ -110,7 +127,6 @@ def executar_pipeline_triagem_ui():
     cursor = conexao.cursor()
 
     for i, (paper_id, titulo, abstract) in enumerate(artigos, 1):
-        # 1. Avisa a interface que começou a processar um artigo específico
         yield {"status": "processando", "atual": i, "total": total, "msg": f"🧠 A analisar {i}/{total}: '{titulo[:40]}...'"}
         
         resultado_ia = triar_artigo_com_ia(titulo, abstract)
@@ -147,7 +163,6 @@ def executar_pipeline_triagem_ui():
             ))
             conexao.commit()
             
-            # 2. Avisa a interface que vai fazer a pausa de segurança
             if i < total:
                 yield {"status": "pausa", "atual": i, "total": total, "msg": f"⏳ Veredicto gravado ({sugestao}). Pausa de 15s para evitar bloqueio da API..."}
                 time.sleep(15) 
@@ -155,8 +170,8 @@ def executar_pipeline_triagem_ui():
     cursor.close()
     conexao.close()
     
-    # 3. Avisa a interface que terminou
     yield {"status": "concluido", "atual": total, "total": total, "msg": "🎉 Triagem automática concluída!"}
 
 if __name__ == "__main__":
-    executar_pipeline_triagem()
+    for status in executar_pipeline_triagem_ui():
+        print(status["msg"])
