@@ -40,7 +40,7 @@ for mensagem in st.session_state.mensagens:
 # 4. INTERAÇÃO COM O UTILIZADOR
 # ==========================================
 # Caixa de texto no fundo do ecrã
-pergunta_usuario = st.chat_input("Faça uma pergunta sobre os artigos (ex: Quais as métricas para avaliar LLMs?)")
+pergunta_usuario = st.chat_input("Faça uma pergunta sobre a literatura aprovada (ex: Quais as arquiteturas utilizadas no SAD?)")
 
 if pergunta_usuario:
     # A. Mostrar a pergunta do utilizador imediatamente e guardar no histórico
