@@ -12,3 +12,6 @@ rag_postgres_data/
 .vscode/
 .idea/
 research_question.json
+
+# Ignorar PDFs de artigos
+data/pdfs/*.pdf
