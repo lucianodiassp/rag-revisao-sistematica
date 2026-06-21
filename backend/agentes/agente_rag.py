@@ -132,7 +132,8 @@ def responder_com_rag(pergunta):
 # 3. O TESTE FINAL LOCAL
 # ==========================================
 if __name__ == "__main__":
-    pergunta_teste = "Como a inteligência artificial é utilizada na classificação de eletrocardiogramas (ECG) ou exames de imagem?"
+    # Pergunta genérica focada na estrutura acadêmica (agnóstica ao tema da pesquisa)
+    pergunta_teste = "Quais são os principais desafios, limitações ou lacunas de pesquisa apontados pelos autores nestes artigos?"
     
     print("=" * 70)
     print(f"PERGUNTA: {pergunta_teste}")

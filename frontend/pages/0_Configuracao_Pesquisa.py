@@ -98,11 +98,22 @@ if os.path.exists(CAMINHO_JSON_PERGUNTA):
         
         # O Botão que aciona o Orquestrador
         if st.button("🚀 Iniciar Coleta nas Bases de Dados", type="primary", use_container_width=True):
-            if string_manual.strip(): # Passamos a usar a string_manual editada!
+            nova_string = string_manual.strip() # Captura e limpa os espaços
+            
+            if nova_string: 
+                # ==========================================================
+                # NOVO: SALVAR A STRING EDITADA DE VOLTA NO JSON
+                # ==========================================================
+                if nova_string != termo_busca:
+                    dados_salvos["search_string"] = nova_string
+                    with open(CAMINHO_JSON_PERGUNTA, 'w', encoding='utf-8') as f:
+                        json.dump(dados_salvos, f, indent=4, ensure_ascii=False)
+                # ==========================================================
+                
                 with st.spinner(f"A contactar APIs científicas e a recolher até {qtd_artigos} artigos por base. Isto pode demorar um pouco..."):
                     try:
-                        # Agora enviamos a string que está na caixa de texto, com os ajustes do utilizador
-                        qtd_salvos, qtd_encontrados = iniciar_recolha(string_manual.strip(), max_por_fonte=qtd_artigos)
+                        # Agora enviamos a string validada
+                        qtd_salvos, qtd_encontrados = iniciar_recolha(nova_string, max_por_fonte=qtd_artigos)
                         
                         if qtd_encontrados == 0:
                             st.warning("⚠️ A busca não encontrou nenhum artigo nas bases de dados. Tente ajustar a string acima para ser mais abrangente.")

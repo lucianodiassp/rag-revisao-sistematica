@@ -66,19 +66,22 @@ def iniciar_recolha(query, max_por_fonte=5):
             id_inteligente = gerar_id_deterministico(artigo)
             
             # 2. Usamos o novo ID em vez do artigo["id"]
-            salvar_artigo_coletado(
+            # AGORA CAPTURAMOS O RETORNO DA FUNÇÃO:
+            inserido_com_sucesso = salvar_artigo_coletado(
                 id_artigo=id_inteligente, 
                 titulo=artigo["titulo"],
                 abstract=artigo["abstract"],
                 fontes_dict=artigo["fontes_dict"]
             )
-            sucessos += 1
-        except Exception as e:
-            # A base de dados vai rejeitar se o ID já lá estiver (Primary Key Duplicada)
-            # ou a função da Pessoa 3 vai gerir o erro (ON CONFLICT DO NOTHING)
-            print(f"⚠️ Artigo '{artigo['titulo'][:20]}...' ignorado/erro: {e}")
             
-    print(f"\n✅ Processo concluído! Tentativa de gravar {len(artigos_totais)} artigos.")
+            # 3. Só contabilizamos se o banco confirmar a inserção
+            if inserido_com_sucesso:
+                sucessos += 1
+                
+        except Exception as e:
+            print(f"⚠️ Artigo '{artigo['titulo'][:20]}...' gerou erro: {e}")
+            
+    print(f"\n✅ Processo concluído! {sucessos} novos artigos gravados de {len(artigos_totais)} encontrados.")
     
     return sucessos, len(artigos_totais)
 

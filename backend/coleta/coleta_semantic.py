@@ -1,30 +1,57 @@
+import os
 import requests
 import uuid
-import time # <-- Nova biblioteca para gerir as pausas
+import time
+from dotenv import load_dotenv
+
+# Carrega as variáveis do ficheiro .env
+load_dotenv()
 
 def recolher_artigos_semantic(query_term, max_resultados=100):
     """
-    Pesquisa artigos no Semantic Scholar com mecanismo de retry para evitar Erro 429.
+    Pesquisa artigos no Semantic Scholar com mecanismo de retry e suporte a API Key (Premium Tier).
     """
-    print(f"🔍 A iniciar pesquisa no Semantic Scholar por: '{query_term}'")
+    # 1. LIMPADOR DE QUERY PARA SEMANTIC SCHOLAR
+    # Remove operadores booleanos para evitar que o motor falhe a busca
+    query_limpa = query_term.replace("(", "").replace(")", "").replace('"', '').replace("*", "")
+    query_limpa = query_limpa.replace(" AND ", " ").replace(" OR ", " ")
+    
+    # Remove espaços duplos e garante que não excede o limite de tamanho da API
+    query_limpa = " ".join(query_limpa.split())[:300] 
+    
+    print(f"🔍 A iniciar pesquisa no Semantic Scholar por: '{query_limpa}'")
     
     url = "https://api.semanticscholar.org/graph/v1/paper/search"
     params = {
-        "query": query_term,
+        "query": query_limpa, # Usamos a query tratada aqui
         "limit": max_resultados,
         "fields": "paperId,title,abstract,authors,year,venue,externalIds"
     }
+
+    # ==========================================================
+    # CONFIGURAÇÃO DE CABEÇALHOS E AUTENTICAÇÃO
+    # ==========================================================
+    headers = {
+        "User-Agent": "Projeto-Academico-RAG/1.0 (mailto:luciano.oliveira@ensino.ipt.br)"
+    }
+    
+    api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
+    if api_key:
+        headers["x-api-key"] = api_key.strip()
+        print("🔑 Chave de API do Semantic Scholar detectada. Usando limite expandido (100 req/s).")
+    else:
+        print("ℹ️ Chave do Semantic Scholar não encontrada no .env. Executando no modo estrito (1 req/s).")
+    # ==========================================================
 
     max_tentativas = 3
     
     for tentativa in range(1, max_tentativas + 1):
         try:
-            # Pausa de cortesia de 2 segundos antes de qualquer pedido
-            time.sleep(2) 
-            
-            headers = {
-                "User-Agent": "Projeto-Academico-RAG/1.0 (mailto:lucianodiassp@hotmail.com)"
-            }
+            # Otimização: Se temos a API Key, a pausa não precisa ser de 2 segundos.
+            if api_key:
+                time.sleep(0.5)
+            else:
+                time.sleep(2) 
             
             response = requests.get(url, params=params, headers=headers)
             
@@ -32,12 +59,10 @@ def recolher_artigos_semantic(query_term, max_resultados=100):
             if response.status_code == 429:
                 print(f"   ⚠️ Servidor ocupado (Erro 429). A aguardar 5 segundos... (Tentativa {tentativa}/{max_tentativas})")
                 time.sleep(5)
-                continue # Volta ao início do ciclo para tentar de novo
+                continue 
                 
-            # Se der outro erro qualquer, isto faz o script saltar para o "except"
             response.raise_for_status() 
             
-            # Se chegou aqui, o pedido teve sucesso!
             dados_brutos = response.json()
             resultados = dados_brutos.get("data", [])
             
@@ -84,12 +109,12 @@ def recolher_artigos_semantic(query_term, max_resultados=100):
                 
                 print(f"   -> Formatado: {titulo[:50]}...")
 
-            return artigos_formatados # Devolve os artigos e sai da função
+            return artigos_formatados
 
         except requests.exceptions.RequestException as e:
             print(f"❌ Erro ao contactar o Semantic Scholar na tentativa {tentativa}: {e}")
             if tentativa == max_tentativas:
-                return [] # Se falhou a última tentativa, devolve lista vazia para não quebrar o Orquestrador
+                return [] 
             time.sleep(3)
             
-    return [] # Prevenção final
+    return []

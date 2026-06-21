@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import psycopg2
 import pandas as pd
 import streamlit as st
@@ -7,15 +8,18 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dotenv import load_dotenv, find_dotenv
 
-# Adiciona o caminho raiz para podermos importar o agente relator dinâmico
+# Adiciona o caminho raiz para podermos importar o agente relator e avaliador
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.agentes.agente_relator import gerar_relatorio_final
+from backend.agentes.agente_avaliador import executar_auditoria # <-- NOVO IMPORT DO AVALIADOR
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 st.set_page_config(page_title="Relatório e Auditoria", page_icon="📊", layout="wide")
 load_dotenv(find_dotenv())
+
+CAMINHO_JSON_AUDITORIA = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../audit_questions.json'))
 
 def get_conexao():
     return psycopg2.connect(
@@ -100,7 +104,58 @@ st.divider()
 # --- 2. AUDITORIA DO SISTEMA RAG ---
 st.header("2. Auditoria do Agente de Busca (LLM-as-a-Judge)")
 
+# --- NOVO BLOCO DE CONFIGURAÇÃO DINÂMICA DE PERGUNTAS ---
+with st.expander("⚙️ Configurar Perguntas de Auditoria (Golden Queries)", expanded=False):
+    st.markdown("Defina as perguntas de teste que o Juiz usará para avaliar a fidelidade e relevância do RAG. Insira **uma pergunta por linha**.")
+    
+    perguntas_atuais = []
+    if os.path.exists(CAMINHO_JSON_AUDITORIA):
+        try:
+            with open(CAMINHO_JSON_AUDITORIA, 'r', encoding='utf-8') as f:
+                dados = json.load(f)
+                perguntas_atuais = dados.get("questions", [])
+        except Exception:
+            pass
+
+    if not perguntas_atuais:
+        # Sugestões padrão alinhadas ao escopo real atual do sistema
+        perguntas_atuais = [
+            "Como a integração de dados de GPS e temperatura contribui para a manutenção preditiva da frota?",
+            "Quais algoritmos de Machine Learning são mais citados para prever falhas com base no histórico de manutenções?",
+            "Quais as principais limitações na implementação de Sistemas de Apoio à Decisão (SAD) na logística?",
+            "Qual é a capital da Austrália?" # Pegadinha de controle de escopo
+        ]
+
+    texto_padrao = "\n".join(perguntas_atuais)
+    perguntas_input = st.text_area("Perguntas de Teste Ativas:", value=texto_padrao, height=130)
+    
+    if st.button("💾 Salvar Perguntas de Auditoria", type="secondary"):
+        novas_perguntas = [p.strip() for p in perguntas_input.split('\n') if p.strip()]
+        with open(CAMINHO_JSON_AUDITORIA, 'w', encoding='utf-8') as f:
+            json.dump({"questions": novas_perguntas}, f, indent=4, ensure_ascii=False)
+        st.success("✅ Perguntas salvas com sucesso no arquivo `audit_questions.json`!")
+        st.rerun()
+
+st.write("")
+
+# Layout de execução e exibição de resultados
 df_juiz = carregar_metricas_auditoria_legada()
+
+col_info_auditoria, col_btn_auditoria = st.columns([2, 1])
+with col_info_auditoria:
+    st.write("Dispare o agente avaliador para testar a robustez, fidelidade contextual e o nível de recusa do sistema RAG.")
+with col_btn_auditoria:
+    if st.button("⚖️ Executar Nova Auditoria (Juiz)", type="primary", use_container_width=True):
+        with st.spinner("O Juiz está a processar as respostas e a calcular os índices. Isto pode demorar devido às pausas de segurança da API..."):
+            try:
+                executar_auditoria()
+                st.success("Auditoria realizada com sucesso! Atualizando métricas...")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao executar o pipeline de auditoria: {e}")
+
+st.write("")
+
 if df_juiz is not None and not df_juiz.empty:
     media_fid = df_juiz['Fidelidade (0-10)'].mean()
     media_rel = df_juiz['Relevância (0-10)'].mean()
@@ -115,7 +170,7 @@ if df_juiz is not None and not df_juiz.empty:
             use_container_width=True, hide_index=True
         )
 else:
-    st.warning("⚠️ O ficheiro de métricas ainda não foi gerado. Rode o `agente_avaliador.py` no terminal.")
+    st.warning("⚠️ Nenhuma métrica encontrada. Use o botão acima para executar a primeira auditoria com as perguntas configuradas.")
 
 st.divider()
 

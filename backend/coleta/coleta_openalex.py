@@ -1,6 +1,11 @@
+import os
 import requests
 import json
 import uuid
+from dotenv import load_dotenv
+
+# Garante que as variáveis do arquivo .env sejam carregadas
+load_dotenv()
 
 def reconstruir_abstract_openalex(inverted_index):
     """
@@ -35,26 +40,39 @@ def reconstruir_abstract_openalex(inverted_index):
 
 def recolher_artigos_openalex(query_term, max_resultados=10):
     """
-    Pesquisa artigos no OpenAlex e formata-os para o contrato de dados da equipa,
-    reconstruindo o abstract a partir do Inverted Index.
+    Pesquisa artigos no OpenAlex utilizando autenticação via API Key
+    e formata-os para o contrato de dados do sistema.
     """
     print(f"🔍 A iniciar pesquisa no OpenAlex por: '{query_term}'")
+    
+    # 1. TRATAMENTO DE ERRO 400: Removemos wildcards (*) que quebram o Elasticsearch do OpenAlex.
+    # O OpenAlex já faz a pluralização automática (stemming), logo não perdemos resultados.
+    query_limpa = query_term.replace("*", "")
     
     url = "https://api.openalex.org/works"
     
     params = {
-        "search": query_term,
+        "search": query_limpa,
         "per-page": max_resultados,
         "mailto": "equipa_rag@teu_dominio.com" 
     }
 
+    # 2. AUTENTICAÇÃO CORRIGIDA: O OpenAlex exige a chave nos parâmetros da URL (Query Parameter)
+    api_key = os.getenv("OPENALEX_API_KEY")
+    if api_key:
+        params["api_key"] = api_key.strip()
+        print("🔑 Chave de API do OpenAlex detectada. Usando Premium Tier.")
+    else:
+        print("ℹ️ Chave de API do OpenAlex não encontrada no .env. Executando no modo gratuito.")
+
     try:
+        # A requisição agora passa limpa e autenticada apenas com os params
         response = requests.get(url, params=params)
         response.raise_for_status() 
         dados_brutos = response.json()
         
         resultados = dados_brutos.get("results", [])
-        print(f"✅ Encontrados {len(resultados)} artigos. A formatar dados...")
+        print(f"✅ Encontrados {len(resultados)} artigos no OpenAlex. A formatar dados...")
         
         artigos_formatados = []
         
@@ -63,7 +81,7 @@ def recolher_artigos_openalex(query_term, max_resultados=10):
             if not titulo: 
                 continue
                 
-            # --- NOVA LÓGICA DE EXTRAÇÃO DO ABSTRACT ---
+            # Extração e reconstrução do abstract
             abstract_invertido = artigo.get("abstract_inverted_index", {})
             abstract_real = reconstruir_abstract_openalex(abstract_invertido)
             
@@ -99,7 +117,7 @@ def recolher_artigos_openalex(query_term, max_resultados=10):
             artigos_formatados.append({
                 "id": id_interno,
                 "titulo": titulo,
-                "abstract": abstract_real, # <-- Guardamos o texto reconstruído aqui!
+                "abstract": abstract_real,
                 "fontes_dict": fontes_dict
             })
             

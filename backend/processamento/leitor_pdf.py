@@ -37,20 +37,30 @@ def extrair_texto_pdf(caminho_pdf):
         print(f"❌ Erro ao ler {caminho_pdf}: {e}")
         return None
 
-def criar_chunks(texto, max_palavras=250):
+def criar_chunks(texto, max_palavras=250, overlap=50):
     """
-    Divide o texto em pedaços. Como os PDFs são muito grandes, 
-    usamos chunks ligeiramente maiores (250 palavras) para capturar mais contexto por vetor.
+    Divide o texto em pedaços com uma janela deslizante (overlap),
+    garantindo que nenhuma frase importante seja cortada ao meio na transição.
     """
     if not texto:
         return []
     
     palavras = texto.split()
     chunks = []
-    # Cria fatias de texto, avançando max_palavras de cada vez
-    for i in range(0, len(palavras), max_palavras):
-        chunk = " ".join(palavras[i:i + max_palavras])
+    
+    i = 0
+    while i < len(palavras):
+        # Garante que o fim não ultrapasse o tamanho total do texto
+        fim = min(i + max_palavras, len(palavras))
+        chunk = " ".join(palavras[i:fim])
         chunks.append(chunk)
+        
+        # Avança o índice mitigando o corte pelo tamanho do overlap
+        i += (max_palavras - overlap)
+        
+        if fim == len(palavras):
+            break
+            
     return chunks
 
 def processar_pdfs():

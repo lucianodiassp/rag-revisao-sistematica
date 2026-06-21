@@ -18,21 +18,35 @@ load_dotenv(find_dotenv())
 cliente_juiz = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 NOME_MODELO_JUIZ = 'gemini-2.5-flash'
 
+CAMINHO_JSON_AUDITORIA = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../audit_questions.json'))
+
 # ==========================================
-# CONJUNTO DE TESTES (GROUND TRUTH)
+# CONJUNTO DE TESTES (GROUND TRUTH / FALLBACK)
 # ==========================================
-PERGUNTAS_TESTE = [
-    "Como a IA está a ser utilizada para classificar ECGs ou exames de imagem?",
-    "Quais as arquiteturas de deep learning comparadas para reconhecimento de hemorragia intracraniana?",
-    "Quais métricas são utilizadas para avaliar os Modelos de Linguagem de Grande Escala (LLMs)?", # Base não tem sobre LLMs
-    "Qual é a capital do Brasil?" # Pergunta rasteira fora do escopo
+PERGUNTAS_PADRAO = [
+    "Quais as metodologias principais utilizadas para avaliação do modelo?",
+    "Quais são as principais limitações apontadas pelos autores?",
+    "Que tipos de algoritmos de Machine Learning são mencionados nos textos?",
+    "Qual é a capital do Brasil?" # Pergunta rasteira fora do escopo para testar a recusa
 ]
+
+def carregar_perguntas_auditoria():
+    """Lê as perguntas do ficheiro JSON; se não existir, devolve as padrão."""
+    if os.path.exists(CAMINHO_JSON_AUDITORIA):
+        try:
+            with open(CAMINHO_JSON_AUDITORIA, 'r', encoding='utf-8') as f:
+                dados = json.load(f)
+                perguntas = dados.get("questions", [])
+                if perguntas: # Só usa se a lista não estiver vazia
+                    return perguntas
+        except Exception as e:
+            print(f"⚠️ Erro ao ler {CAMINHO_JSON_AUDITORIA}: {e}. A usar fallback.")
+            
+    return PERGUNTAS_PADRAO
 
 def obter_resposta_rag_segura(pergunta, tentativa=1):
     """Envolve a chamada do RAG num mecanismo de tolerância a falhas (Rate Limit)."""
     try:
-        # A nova versão do nosso agente_rag faz uns prints que podem "sujar" o output do juiz, 
-        # mas a função principal devolve a resposta final como texto.
         return responder_com_rag(pergunta)
     except Exception as e:
         if "429" in str(e) and tentativa <= 3:
@@ -92,10 +106,13 @@ def avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa=1):
 
 def executar_auditoria():
     print("⚖️ A iniciar a Auditoria Quantitativa do Sistema RAG...\n")
+    
+    # --- NOVO: CARREGAR PERGUNTAS DINAMICAMENTE ---
+    perguntas_ativas = carregar_perguntas_auditoria()
     resultados_auditoria = []
     
-    for i, pergunta in enumerate(PERGUNTAS_TESTE, 1):
-        print(f"[{i}/{len(PERGUNTAS_TESTE)}] Testando: '{pergunta}'")
+    for i, pergunta in enumerate(perguntas_ativas, 1):
+        print(f"[{i}/{len(perguntas_ativas)}] Testando: '{pergunta}'")
         
         # 1. Pede ao motor RAG para buscar as evidências textuais puras (para o Juiz ler)
         evidencias_brutas = buscar_contexto_hibrido(pergunta, limite=3)

@@ -31,8 +31,12 @@ def salvar_artigo_coletado(id_artigo, titulo, abstract, fontes_dict):
                 ON CONFLICT (id) DO NOTHING;
             """, (id_artigo, titulo, abstract, Json(fontes_dict)))
             
+            # LÊ QUANTAS LINHAS FORAM EFETIVAMENTE INSERIDAS (1 = Novo, 0 = Duplicado)
+            linhas_inseridas = cursor.rowcount
+            
             conn.commit()
-            print(f"✅ Artigo '{titulo[:30]}...' salvo com sucesso!")
+            # Retorna True se inseriu algo, False se foi bloqueado pelo ON CONFLICT
+            return linhas_inseridas > 0
             
     except Exception as e:
         conn.rollback()
