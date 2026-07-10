@@ -1,67 +1,130 @@
-# 🚀 RAG Systematic Review: Plataforma de Apoio à Decisão
+# 🧠 RAG Acadêmico: Automação de Revisões Sistemáticas da Literatura
 
-Este projeto é um Sistema de Apoio à Decisão (SAD) baseado em Inteligência Artificial (LLMs) e Busca Vetorial (RAG) para acelerar e auditar o processo de Revisões Sistemáticas da Literatura Académica.
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B)
+![Gemini AI](https://img.shields.io/badge/AI-Google_Gemini-orange)
 
-## 🛠️ Arquitetura Atual
+## 🎯 Sobre o Projeto
 
-* **Motor LLM Central:** Google Gemini (`gemini-2.5-flash`)
-* **Motor Vetorial (Embeddings):** Google Gemini (`gemini-embedding-001`) com redução Matryoshka para 768 dimensões.
-* **Base de Dados:** PostgreSQL 16 estendido com `pgvector` (Busca Híbrida: BM25 + Vetorial com RRF).
-* **Interface:** Streamlit (Multi-page).
+Este projeto é um **Sistema de Apoio à Decisão (SAD)** de código aberto, baseado na arquitetura **RAG (Retrieval-Augmented Generation)**, desenvolvido para automatizar e conferir rigor científico ao processo de **Revisão Sistemática da Literatura (RSL)**.
 
 ---
 
-## ⚙️ Como rodar o projeto localmente
+## 🏗️ Raio-X da Arquitetura
+
+- **Frontend:** Streamlit, com páginas de configuração, gestão de PDFs, auditoria e geração do relatório final.
+- **Backend:** Python, com arquitetura modularizada por agentes inteligentes.
+- **Banco de Dados:** PostgreSQL com a extensão `pgvector`, utilizada para buscas por similaridade semântica.
+- **Inteligência Artificial:** Google Gemini, utilizando o modelo `gemini-2.5-flash` como LLM e os modelos `text-embedding-004` ou `gemini-embedding-001` para vetorização em 768 dimensões.
+
+---
+
+## 🚀 Principais Funcionalidades
+
+### 1. Orquestrador de Coleta Tripla
+
+- Integração simultânea com três importantes bases de dados científicas: **PubMed**, **OpenAlex** e **Semantic Scholar**.
+- **Degradação elegante (*graceful degradation*):** o sistema detecta a presença de chaves de API no arquivo `.env` para utilizar limites de requisição ampliados. Quando as chaves não estão disponíveis, utiliza automaticamente as rotas públicas com limites reduzidos.
+- Sanitização das consultas para evitar falhas de interpretação em APIs que não oferecem suporte completo a expressões booleanas.
+
+### 2. Ingestão e Engenharia Vetorial de PDFs
+
+- Desduplicação dos artigos no banco de dados por meio do DOI (*Digital Object Identifier*).
+- Extração integral de texto utilizando a biblioteca `PyMuPDF`, incluindo suporte a artigos estruturados em múltiplas colunas.
+- Segmentação de texto (*chunking*) com janela deslizante e sobreposição (*overlap*), reduzindo a perda de contexto entre parágrafos, fórmulas e sequências de raciocínio.
+- Armazenamento dos vetores diretamente no PostgreSQL utilizando o tipo `vector(768)`.
+
+### 3. Motor de Busca Híbrida com RRF
+
+- Implementação do algoritmo **Reciprocal Rank Fusion (RRF)** diretamente no PostgreSQL.
+- Combinação de:
+  - **Busca lexical**, utilizando pesquisa textual para localizar palavras-chave, siglas e expressões exatas.
+  - **Busca semântica**, utilizando `pgvector` para identificar conteúdos conceitualmente relacionados.
+- Prompt de sistema orientado à redução de alucinações: o modelo deve evitar respostas quando não houver evidências suficientes nos fragmentos recuperados dos PDFs armazenados.
+
+### 4. Agentes de Síntese e Auditoria
+
+- **Agente Avaliador (*LLM-as-a-Judge*):** analisa as respostas produzidas pelo sistema RAG e avalia o rigor científico utilizando as perguntas configuradas no arquivo `audit_questions.json`.
+- **Agente Relator:** coleta métricas do fluxo de trabalho, informações do processo PRISMA e dados tabulados em JSON para elaborar a seção de **Resultados e Discussão** em linguagem acadêmica.
+- O agente relator utiliza temperatura `0.2`, buscando maior consistência e rigor factual nas respostas.
+
+---
+
+## ⚙️ Como Executar o Projeto Localmente
 
 ### Pré-requisitos
 
-* **Docker Desktop** instalado (habilitar WSL 2 no Windows).
-* **Git** instalado.
-* **Python 3.10+** instalado.
+Antes de iniciar, verifique se os seguintes componentes estão instalados:
 
-### 1. Subir a Infraestrutura (Banco de Dados Vetorial)
+- **Docker Desktop**, com o WSL 2 habilitado em ambientes Windows.
+- **Git**.
+- **Python 3.10 ou superior**.
 
-Clone o repositório, entre na pasta e inicie os containers:
+---
+
+### 1. Clonar o Repositório
+
+Execute os comandos abaixo:
 
 ```bash
 git clone https://github.com/lucianodiassp/rag-revisao-sistematica.git
 cd rag-revisao-sistematica
+```
+
+---
+
+### 2. Subir a Infraestrutura
+
+Inicie os containers do PostgreSQL e do pgAdmin:
+
+```bash
 docker compose up -d
 ```
 
-* **PostgreSQL (com pgvector):** Porta `5432`
-* **pgAdmin (Interface Visual):** http://localhost:5050
+Serviços disponibilizados:
 
-**Credenciais padrão do pgAdmin:**
+- **PostgreSQL com pgvector:** porta `5432`.
+- **pgAdmin:** [http://localhost:5050](http://localhost:5050).
 
-* Usuário: `admin@rag.com`
-* Senha: `admin`
+#### Credenciais padrão do pgAdmin
 
-### 2. Preparar o Ambiente Python
+- **Usuário:** `admin@rag.com`
+- **Senha:** `admin`
 
-Crie e ative o ambiente virtual.
+> ⚠️ As credenciais padrão devem ser alteradas antes da implantação do sistema em um ambiente de produção.
 
-#### Windows (PowerShell)
+---
+
+### 3. Preparar o Ambiente Python
+
+Crie e ative um ambiente virtual.
+
+#### Windows — PowerShell
 
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 ```
 
-#### Linux/macOS
+#### Linux ou macOS
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-Instale as dependências:
+Instale as dependências do projeto:
 
 ```bash
 pip install -r backend/requirements.txt
 ```
 
-Crie um arquivo `.env` na raiz do projeto:
+---
+
+### 4. Configurar as Variáveis de Ambiente
+
+Crie um arquivo chamado `.env` na raiz do projeto:
 
 ```env
 GEMINI_API_KEY="sua-chave-api-do-google-aqui"
@@ -73,126 +136,122 @@ DB_USER=rag_user
 DB_PASSWORD=rag_password
 ```
 
+> ⚠️ Não publique o arquivo `.env` nem suas chaves de API em repositórios públicos. Verifique se o arquivo está incluído no `.gitignore`.
+
 ---
 
-## 🔄 Fluxo de Operação: Human-in-the-Loop
+## 🔄 Fluxo de Operação: *Human-in-the-Loop*
 
-Diferente de sistemas totalmente automatizados, esta plataforma exige validação humana em etapas críticas. Siga a ordem abaixo para operar o ciclo completo.
+Diferentemente de sistemas totalmente automatizados, esta plataforma exige validação humana em etapas críticas. As etapas abaixo representam o fluxo completo de operação.
 
 ### Passo 1: Coleta de Artigos
 
-Busque os artigos nas bases de dados (PubMed, OpenAlex e Semantic Scholar) utilizando sua estratégia de busca baseada em PICO.
+Realize a busca de artigos nas bases **PubMed**, **OpenAlex** e **Semantic Scholar**, utilizando uma estratégia de busca estruturada, como PICO.
+
+No Windows PowerShell, execute:
 
 ```powershell
-$env:PYTHONIOENCODING='utf-8'
+$env:PYTHONIOENCODING = "utf-8"
 python backend/coleta/orquestrador_coleta.py
+```
+
+Em ambientes Linux ou macOS, execute:
+
+```bash
+PYTHONIOENCODING=utf-8 python backend/coleta/orquestrador_coleta.py
 ```
 
 ---
 
-### Passo 2: Triagem Manual (Streamlit)
+### Passo 2: Triagem Manual no Streamlit
 
-Abra a interface web para que a IA sugira as aprovações, mas **o veredito final seja humano**.
+Inicie a interface web:
 
 ```bash
 python -m streamlit run frontend/app.py
 ```
 
-> Acesse o menu **"1. Triagem"** em http://localhost:8501 e classifique os artigos como **"Incluir"** ou **"Excluir"**.
+Acesse:
+
+[http://localhost:8501](http://localhost:8501)
+
+No menu lateral, selecione a opção **1. Triagem**.
+
+A inteligência artificial poderá sugerir a inclusão ou exclusão dos artigos, mas o veredito final deverá ser realizado por um avaliador humano.
+
+Os artigos devem ser classificados como:
+
+- **Incluir**
+- **Excluir**
 
 ---
 
 ### Passo 3: Indexação Vetorial
 
-Gere os embeddings (coordenadas matemáticas) apenas para os artigos aprovados na etapa anterior.
+Após a triagem, gere os embeddings apenas para os artigos aprovados:
 
 ```bash
 python backend/processamento/gerador_embeddings.py
 ```
 
+Os vetores gerados serão armazenados no PostgreSQL utilizando a extensão `pgvector`.
+
 ---
 
-### Passo 4: Auditoria do Sistema RAG (LLM-as-a-Judge)
+### Passo 4: Auditoria do Sistema RAG
 
-Execute o agente avaliador. Ele realizará consultas automáticas ao motor de busca e atribuirá métricas de:
-
-* Fidelidade (Faithfulness)
-* Relevância (Relevance)
-
-O objetivo é detectar possíveis alucinações e validar a qualidade das respostas.
+Execute o agente avaliador:
 
 ```bash
 python backend/agentes/agente_avaliador.py
 ```
 
----
+O agente realizará consultas automáticas ao mecanismo de busca e atribuirá métricas como:
 
-### Passo 5: Geração da Síntese e Relatório Final
+- **Fidelidade (*Faithfulness*)**
+- **Relevância (*Relevance*)**
 
-Com os embeddings armazenados e a auditoria concluída, retorne à interface web:
-
-http://localhost:8501
-
-Acesse o menu **"3. Relatório Final"** e gere o documento consolidado da revisão sistemática.
+O objetivo dessa etapa é detectar possíveis alucinações e avaliar a qualidade das respostas geradas pelo sistema.
 
 ---
 
-## 🗄️ Tabelas Principais do PostgreSQL
+### Passo 5: Geração da Síntese e do Relatório Final
 
-A base de dados combina modelagem relacional tradicional com campos JSONB e vetores para busca semântica.
+Após a geração dos embeddings e a conclusão da auditoria, acesse novamente a interface:
 
-| Tabela                | Finalidade                                                          |
-| --------------------- | ------------------------------------------------------------------- |
-| `deduplicated_papers` | Artigos coletados e deduplicados (título e resumo).                 |
-| `screening_decisions` | Registra a decisão humana e a justificativa gerada pela IA.         |
-| `paper_chunks`        | Fragmentos lógicos dos artigos aprovados.                           |
-| `embeddings_metadata` | Armazena os vetores de 768 dimensões gerados pelo Google Gemini.    |
-| `agent_interactions`  | Log auditável de todas as operações realizadas pelos agentes de IA. |
+[http://localhost:8501](http://localhost:8501)
+
+No menu lateral, selecione a opção **3. Relatório Final** para gerar o documento consolidado da revisão sistemática.
 
 ---
 
-## 🔍 Verificar se a Carga Vetorial Funcionou
+## 🛑 Como Parar os Serviços Docker
 
-Acesse o pgAdmin, abra a **Query Tool** e execute:
-
-```sql
-SELECT
-    'Artigos Aprovados' AS etapa,
-    COUNT(*) AS quantidade
-FROM screening_decisions
-WHERE human_decision = 'Incluir'
-
-UNION ALL
-
-SELECT
-    'Chunks Vetorizados',
-    COUNT(*)
-FROM embeddings_metadata;
-```
-
-> Se a linha **"Chunks Vetorizados"** retornar registros, o mecanismo de busca semântica está operacional e pronto para responder perguntas fundamentadas na literatura indexada.
-
----
-
-## 🛑 Parar os Serviços Docker
-
-Para desligar os containers sem perder os dados:
+Para desligar os containers sem remover os dados armazenados:
 
 ```bash
 docker compose down
 ```
 
-Para remover também os volumes e reiniciar a base do zero:
+Para desligar os containers e remover também os volumes:
 
 ```bash
 docker compose down -v
 ```
 
-> ⚠️ Atenção: o comando acima apagará permanentemente todos os dados armazenados no PostgreSQL.
+> ⚠️ **Atenção:** o comando `docker compose down -v` removerá permanentemente os dados armazenados nos volumes do PostgreSQL.
 
+---
 
-## 🧪 Validação e Testes com Utilizadores
+## 🧪 Validação e Testes com Usuários
 
-Se você é um testador ou avaliador da plataforma, preparamos um roteiro passo a passo com cenários práticos para guiar a sua experiência e capturar o seu feedback de forma estruturada.
+Para testadores e avaliadores da plataforma, foi preparado um roteiro com cenários práticos para orientar a utilização do sistema e registrar o feedback de forma estruturada.
 
-👉 **[Clique aqui para acessar o Roteiro de Testes Funcionais (UAT)](docs/roteiro_testes.md)**
+👉 **[Acesse o Roteiro de Testes Funcionais — UAT](docs/roteiro_testes.md)**
+
+---
+
+## 📄 Licença
+
+Este projeto é disponibilizado como software de código aberto. Consulte o arquivo `LICENSE` para conhecer as condições de utilização, modificação e distribuição.
+
