@@ -45,7 +45,7 @@ Este projeto é um **Sistema de Apoio à Decisão (SAD)** de código aberto, bas
 
 ### 4. Agentes de Síntese e Auditoria
 
-- **Agente Avaliador (*LLM-as-a-Judge*):** analisa as respostas produzidas pelo sistema RAG e avalia o rigor científico utilizando as perguntas configuradas no arquivo `audit_questions.json`.
+- **Agente Avaliador (*LLM-as-a-Judge*):** analisa as respostas produzidas pelo sistema RAG e avalia o rigor científico utilizando as perguntas registradas no protocolo versionado do projeto ativo.
 - **Agente Relator:** coleta métricas do fluxo de trabalho, informações do processo PRISMA e dados tabulados em JSON para elaborar a seção de **Resultados e Discussão** em linguagem acadêmica.
 - O agente relator utiliza temperatura `0.2`, buscando maior consistência e rigor factual nas respostas.
 
@@ -87,6 +87,18 @@ Serviços disponibilizados:
 - **PostgreSQL com pgvector:** porta `5432`.
 - **pgAdmin:** [http://localhost:5050](http://localhost:5050).
 
+#### Atualizar um banco criado por uma versão anterior
+
+Em instalações que já possuem o volume `postgres_data`, execute uma vez:
+
+```bash
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/99_project_isolation.sql
+```
+
+A migração preserva os dados existentes, associa registros antigos a um projeto
+legado quando necessário e passa a exigir isolamento por projeto. Em bancos novos,
+ela é aplicada automaticamente na primeira inicialização.
+
 #### Credenciais padrão do pgAdmin
 
 - **Usuário:** `admin@rag.com`
@@ -117,7 +129,7 @@ source venv/bin/activate
 Instale as dependências do projeto:
 
 ```bash
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 ```
 
 ---
@@ -143,6 +155,21 @@ DB_PASSWORD=rag_password
 ## 🔄 Fluxo de Operação: *Human-in-the-Loop*
 
 Diferentemente de sistemas totalmente automatizados, esta plataforma exige validação humana em etapas críticas. As etapas abaixo representam o fluxo completo de operação.
+
+### Projeto ativo e rastreabilidade
+
+Antes de operar o pipeline, crie ou selecione um projeto na página
+**Configuração Pesquisa**. A seleção é compartilhada entre as páginas da sessão e
+limita coleta, triagem, PDFs, RAG, auditoria e relatório ao corpus desse projeto.
+Cada alteração da pergunta, dos critérios ou da estratégia de busca gera uma nova
+versão auditável do protocolo no PostgreSQL.
+
+Ao executar módulos diretamente pelo terminal, defina `PROJECT_ID` quando houver
+mais de um projeto cadastrado:
+
+```powershell
+$env:PROJECT_ID = "uuid-do-projeto"
+```
 
 ### Passo 1: Coleta de Artigos
 

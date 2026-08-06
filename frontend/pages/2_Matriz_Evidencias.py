@@ -9,6 +9,7 @@ from dotenv import load_dotenv, find_dotenv
 # Adiciona o caminho raiz para podermos importar o agente extrator
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.agentes.agente_extrator import executar_pipeline_extracao
+from frontend.project_selector import selecionar_projeto_ativo
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
@@ -26,7 +27,7 @@ def get_conexao():
         password=os.environ["DB_PASSWORD"]  # Força a leitura exclusiva do .env
     )
 
-def carregar_matriz_evidencias():
+def carregar_matriz_evidencias(project_id):
     """Busca as evidências extraídas e cruza com o título do artigo."""
     try:
         conexao = get_conexao()
@@ -36,8 +37,9 @@ def carregar_matriz_evidencias():
         cursor.execute("""
             SELECT p.title, e.extraction_jsonb, e.human_review_status
             FROM extracted_evidence e
-            JOIN deduplicated_papers p ON p.id = e.paper_id;
-        """)
+            JOIN deduplicated_papers p ON p.id = e.paper_id
+            WHERE p.project_id = %s;
+        """, (project_id,))
         
         resultados = cursor.fetchall()
         conexao.close()
@@ -69,8 +71,11 @@ def carregar_matriz_evidencias():
 # INTERFACE GRÁFICA (STREAMLIT)
 # ==========================================
 st.set_page_config(page_title="Matriz de Evidências", page_icon="📊", layout="wide")
+projeto = selecionar_projeto_ativo()
+project_id = str(projeto["id"])
 
 st.title("📊 Matriz de Evidências")
+st.caption(f"Projeto ativo: **{projeto['title']}**")
 
 # Layout do cabeçalho com botão de ação para automatizar a extração
 col1, col2 = st.columns([3, 1])
@@ -85,14 +90,14 @@ with col2:
     # O botão mágico de automatização
     if st.button("🔄 Extrair Novas Evidências", type="primary", use_container_width=True):
         with st.spinner("A IA está a ler e a estruturar os novos artigos. Pode demorar alguns instantes..."):
-            executar_pipeline_extracao() # Chama o script automaticamente!
+            executar_pipeline_extracao(project_id)
         st.success("Extração concluída com sucesso!")
         st.rerun() # Recarrega a página para exibir os novos dados
 
 st.divider()
 
 # Carrega e converte os dados para um DataFrame do Pandas
-dados = carregar_matriz_evidencias()
+dados = carregar_matriz_evidencias(project_id)
 
 if dados:
     df = pd.DataFrame(dados)

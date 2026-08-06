@@ -1,4 +1,5 @@
 -- ============================================================================
+-- Execute com: psql -v project_id='<UUID_DO_PROJETO>' -f auditoria.sql
 -- SCRIPTS DE AUDITORIA E RASTREABILIDADE (REQUISITO REVISÃO SISTEMÁTICA)
 -- Objetivo: Demonstrar a transparência do pipeline, logs dos agentes e 
 --           reconciliação de decisões (Humano no Ciclo).
@@ -20,9 +21,11 @@ SELECT
     sd.reviewed_at AS data_validacao
 FROM deduplicated_papers p
 LEFT JOIN agent_interactions ai 
-    ON ai.input_jsonb->>'paper_id' = p.id::text
+    ON ai.project_id = p.project_id
+   AND ai.input_jsonb->>'paper_id' = p.id::text
 LEFT JOIN screening_decisions sd 
     ON sd.paper_id = p.id
+WHERE p.project_id = :'project_id'::uuid
 ORDER BY sd.reviewed_at DESC;
 
 
@@ -41,7 +44,9 @@ SELECT
 FROM screening_decisions sd
 JOIN deduplicated_papers p ON p.id = sd.paper_id
 JOIN agent_interactions ai ON ai.input_jsonb->>'paper_id' = p.id::text
-WHERE ai.output_jsonb->>'suggested_decision' <> sd.human_decision::text;
+WHERE p.project_id = :'project_id'::uuid
+  AND ai.project_id = p.project_id
+  AND ai.output_jsonb->>'suggested_decision' <> sd.human_decision::text;
 
 
 -- ----------------------------------------------------------------------------
@@ -58,6 +63,7 @@ SELECT
 FROM agent_interactions ai,
 LATERAL jsonb_array_elements(ai.output_jsonb->'evidence') AS evidencia
 WHERE ai.agent_name = 'screening_agent'
+  AND ai.project_id = :'project_id'::uuid
   AND ai.output_jsonb->'evidence' IS NOT NULL;
 
 
@@ -73,5 +79,6 @@ SELECT
     ROUND(AVG(CAST(ai.output_jsonb->>'confidence' AS NUMERIC)), 4) AS media_confianca_ia
 FROM agent_interactions ai
 WHERE ai.model_jsonb IS NOT NULL
+  AND ai.project_id = :'project_id'::uuid
 GROUP BY ai.model_jsonb->>'provider', ai.model_jsonb->>'model_name'
 ORDER BY total_interacoes DESC;

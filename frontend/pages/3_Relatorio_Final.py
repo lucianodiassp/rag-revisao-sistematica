@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 import psycopg2
 import pandas as pd
 import streamlit as st
@@ -11,15 +10,15 @@ from dotenv import load_dotenv, find_dotenv
 # Adiciona o caminho raiz para podermos importar o agente relator e avaliador
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.agentes.agente_relator import gerar_relatorio_final
-from backend.agentes.agente_avaliador import executar_auditoria # <-- NOVO IMPORT DO AVALIADOR
+from backend.agentes.agente_avaliador import PERGUNTAS_PADRAO, executar_auditoria
+from backend.app.database import carregar_ultima_execucao_avaliacao, salvar_protocolo_projeto
+from frontend.project_selector import selecionar_projeto_ativo
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 st.set_page_config(page_title="Relatório e Auditoria", page_icon="📊", layout="wide")
 load_dotenv(find_dotenv())
-
-CAMINHO_JSON_AUDITORIA = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../audit_questions.json'))
 
 def get_conexao():
     return psycopg2.connect(
@@ -31,41 +30,46 @@ def get_conexao():
     )
 
 @st.cache_data(ttl=60)
-def carregar_dados_triagem():
+def carregar_dados_triagem(project_id):
     """Consulta rápida ao PostgreSQL para alimentar os gráficos em tempo real."""
     conexao = get_conexao()
-    df_total = pd.read_sql("SELECT COUNT(*) as total FROM deduplicated_papers", conexao)
+    df_total = pd.read_sql(
+        "SELECT COUNT(*) as total FROM deduplicated_papers WHERE project_id = %s",
+        conexao,
+        params=(project_id,),
+    )
     df_decisoes = pd.read_sql("""
         SELECT human_decision, COUNT(*) as quantidade 
-        FROM screening_decisions 
-        WHERE human_decision IS NOT NULL
+        FROM screening_decisions s
+        JOIN deduplicated_papers p ON p.id = s.paper_id
+        WHERE p.project_id = %s AND human_decision IS NOT NULL
         GROUP BY human_decision
-    """, conexao)
+    """, conexao, params=(project_id,))
     conexao.close()
     return df_total.iloc[0]['total'], df_decisoes
 
-def carregar_metricas_auditoria_legada():
-    """Lê o ficheiro CSV gerado pelo Agente Juiz (módulo RAG)."""
-    raiz_projeto = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-    caminho_csv = os.path.join(raiz_projeto, 'metricas_rag_auditoria.csv')
-    try:
-        if os.path.exists(caminho_csv):
-            return pd.read_csv(caminho_csv)
-    except Exception:
-        pass
-    return None
+def carregar_metricas_auditoria(project_id):
+    execucao = carregar_ultima_execucao_avaliacao(project_id)
+    if not execucao:
+        return None
+    resultados = (execucao.get("metrics") or {}).get("results", [])
+    return pd.DataFrame(resultados) if resultados else None
 
 # ==========================================
 # INTERFACE GRÁFICA (STREAMLIT)
 # ==========================================
 st.title("📊 Painel de Relatório e Auditoria (SAD)")
+projeto = selecionar_projeto_ativo()
+project_id = str(projeto["id"])
+protocolo = projeto.get("criteria_jsonb") or {}
+st.caption(f"Projeto ativo: **{projeto['title']}**")
 st.markdown("Acompanhe o funil da Revisão Sistemática, as métricas de IA e a síntese final do conhecimento.")
 st.divider()
 
 # --- 1. DASHBOARD VISUAL (PRISMA) ---
 st.header("1. Fluxo Quantitativo de Triagem")
 
-total_artigos, df_decisoes = carregar_dados_triagem()
+total_artigos, df_decisoes = carregar_dados_triagem(project_id)
 aprovados = df_decisoes[df_decisoes['human_decision'] == 'Incluir']['quantidade'].sum() if not df_decisoes.empty and 'Incluir' in df_decisoes['human_decision'].values else 0
 rejeitados = df_decisoes[df_decisoes['human_decision'] == 'Excluir']['quantidade'].sum() if not df_decisoes.empty and 'Excluir' in df_decisoes['human_decision'].values else 0
 pendentes = total_artigos - (aprovados + rejeitados)
@@ -108,38 +112,28 @@ st.header("2. Auditoria do Agente de Busca (LLM-as-a-Judge)")
 with st.expander("⚙️ Configurar Perguntas de Auditoria (Golden Queries)", expanded=False):
     st.markdown("Defina as perguntas de teste que o Juiz usará para avaliar a fidelidade e relevância do RAG. Insira **uma pergunta por linha**.")
     
-    perguntas_atuais = []
-    if os.path.exists(CAMINHO_JSON_AUDITORIA):
-        try:
-            with open(CAMINHO_JSON_AUDITORIA, 'r', encoding='utf-8') as f:
-                dados = json.load(f)
-                perguntas_atuais = dados.get("questions", [])
-        except Exception:
-            pass
-
-    if not perguntas_atuais:
-        # Sugestões padrão alinhadas ao escopo real atual do sistema
-        perguntas_atuais = [
-            "Como a integração de dados de GPS e temperatura contribui para a manutenção preditiva da frota?",
-            "Quais algoritmos de Machine Learning são mais citados para prever falhas com base no histórico de manutenções?",
-            "Quais as principais limitações na implementação de Sistemas de Apoio à Decisão (SAD) na logística?",
-            "Qual é a capital da Austrália?" # Pegadinha de controle de escopo
-        ]
+    perguntas_atuais = protocolo.get("audit_questions") or PERGUNTAS_PADRAO
 
     texto_padrao = "\n".join(perguntas_atuais)
     perguntas_input = st.text_area("Perguntas de Teste Ativas:", value=texto_padrao, height=130)
     
     if st.button("💾 Salvar Perguntas de Auditoria", type="secondary"):
         novas_perguntas = [p.strip() for p in perguntas_input.split('\n') if p.strip()]
-        with open(CAMINHO_JSON_AUDITORIA, 'w', encoding='utf-8') as f:
-            json.dump({"questions": novas_perguntas}, f, indent=4, ensure_ascii=False)
-        st.success("✅ Perguntas salvas com sucesso no arquivo `audit_questions.json`!")
+        protocolo_atualizado = dict(protocolo)
+        protocolo_atualizado["audit_questions"] = novas_perguntas
+        salvar_protocolo_projeto(
+            project_id,
+            projeto["question"],
+            protocolo_atualizado,
+            motivo="Atualização das perguntas de auditoria",
+        )
+        st.success("✅ Perguntas salvas em uma nova versão do protocolo.")
         st.rerun()
 
 st.write("")
 
 # Layout de execução e exibição de resultados
-df_juiz = carregar_metricas_auditoria_legada()
+df_juiz = carregar_metricas_auditoria(project_id)
 
 col_info_auditoria, col_btn_auditoria = st.columns([2, 1])
 with col_info_auditoria:
@@ -148,7 +142,7 @@ with col_btn_auditoria:
     if st.button("⚖️ Executar Nova Auditoria (Juiz)", type="primary", use_container_width=True):
         with st.spinner("O Juiz está a processar as respostas e a calcular os índices. Isto pode demorar devido às pausas de segurança da API..."):
             try:
-                executar_auditoria()
+                executar_auditoria(project_id)
                 st.success("Auditoria realizada com sucesso! Atualizando métricas...")
                 st.rerun()
             except Exception as e:
@@ -177,8 +171,8 @@ st.divider()
 # --- 3. SÍNTESE ACADÊMICA ---
 st.header("3. Compilação da Síntese Final")
 
-if "relatorio_compilado" not in st.session_state:
-    st.session_state.relatorio_compilado = None
+if "relatorios_por_projeto" not in st.session_state:
+    st.session_state.relatorios_por_projeto = {}
 
 col_tit, col_btn = st.columns([2, 1])
 with col_tit:
@@ -187,13 +181,14 @@ with col_btn:
     if st.button("🚀 Gerar / Atualizar Relatório Final", type="primary", use_container_width=True):
         with st.spinner("A invocar o Agente Relator (Pode demorar alguns segundos)..."):
             try:
-                st.session_state.relatorio_compilado = gerar_relatorio_final()
+                st.session_state.relatorios_por_projeto[project_id] = gerar_relatorio_final(project_id)
                 st.success("Relatório compilado com sucesso!")
             except Exception as e:
                 st.error(f"Erro ao executar o Agente Relator: {e}")
 
-if st.session_state.relatorio_compilado is not None:
-    texto_relatorio = st.session_state.relatorio_compilado["relatorio_md"]
+relatorio_compilado = st.session_state.relatorios_por_projeto.get(project_id)
+if relatorio_compilado is not None:
+    texto_relatorio = relatorio_compilado["relatorio_md"]
     
     with st.container(height=500, border=True):
         st.markdown(texto_relatorio)

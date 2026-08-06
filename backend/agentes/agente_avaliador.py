@@ -3,22 +3,25 @@ import json
 import time
 import pandas as pd
 from dotenv import load_dotenv, find_dotenv
-from google import genai
 from google.genai import types
+from backend.app.gemini_client import get_gemini_client
 
 # 1. Ajuste de Caminho para importar o nosso Agente RAG
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.agentes.agente_rag import responder_com_rag, buscar_contexto_hibrido
+from backend.app.database import (
+    log_interacao_agente,
+    obter_projeto,
+    resolver_project_id,
+    salvar_execucao_avaliacao,
+)
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE DO JUIZ
 # ==========================================
 load_dotenv(find_dotenv())
-cliente_juiz = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 NOME_MODELO_JUIZ = 'gemini-2.5-flash'
-
-CAMINHO_JSON_AUDITORIA = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../audit_questions.json'))
 
 # ==========================================
 # CONJUNTO DE TESTES (GROUND TRUTH / FALLBACK)
@@ -30,29 +33,20 @@ PERGUNTAS_PADRAO = [
     "Qual é a capital do Brasil?" # Pergunta rasteira fora do escopo para testar a recusa
 ]
 
-def carregar_perguntas_auditoria():
-    """Lê as perguntas do ficheiro JSON; se não existir, devolve as padrão."""
-    if os.path.exists(CAMINHO_JSON_AUDITORIA):
-        try:
-            with open(CAMINHO_JSON_AUDITORIA, 'r', encoding='utf-8') as f:
-                dados = json.load(f)
-                perguntas = dados.get("questions", [])
-                if perguntas: # Só usa se a lista não estiver vazia
-                    return perguntas
-        except Exception as e:
-            print(f"⚠️ Erro ao ler {CAMINHO_JSON_AUDITORIA}: {e}. A usar fallback.")
-            
-    return PERGUNTAS_PADRAO
+def carregar_perguntas_auditoria(project_id):
+    """Lê as perguntas de auditoria do protocolo versionado do projeto."""
+    protocolo = obter_projeto(project_id).get("criteria_jsonb") or {}
+    return protocolo.get("audit_questions") or PERGUNTAS_PADRAO
 
-def obter_resposta_rag_segura(pergunta, tentativa=1):
+def obter_resposta_rag_segura(project_id, pergunta, tentativa=1):
     """Envolve a chamada do RAG num mecanismo de tolerância a falhas (Rate Limit)."""
     try:
-        return responder_com_rag(pergunta)
+        return responder_com_rag(pergunta, project_id)
     except Exception as e:
         if "429" in str(e) and tentativa <= 3:
             print(f"   ⏳ Rate limit do RAG atingido. A aguardar 45s (Tentativa {tentativa}/3)...")
             time.sleep(45)
-            return obter_resposta_rag_segura(pergunta, tentativa + 1)
+            return obter_resposta_rag_segura(project_id, pergunta, tentativa + 1)
         print(f"❌ Erro fatal no RAG: {e}")
         return "Erro ao gerar resposta devido a falha na API."
 
@@ -88,7 +82,7 @@ def avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa=1):
     """
     
     try:
-        resposta_avaliacao = cliente_juiz.models.generate_content(
+        resposta_avaliacao = get_gemini_client().models.generate_content(
             model=NOME_MODELO_JUIZ,
             contents=prompt_juiz,
             config=types.GenerateContentConfig(
@@ -104,22 +98,23 @@ def avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa=1):
             return avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa + 1)
         return {"fidelidade_score": 0, "relevancia_score": 0, "justificativa": f"Erro: {e}"}
 
-def executar_auditoria():
+def executar_auditoria(project_id=None):
+    project_id = resolver_project_id(project_id)
     print("⚖️ A iniciar a Auditoria Quantitativa do Sistema RAG...\n")
     
     # --- NOVO: CARREGAR PERGUNTAS DINAMICAMENTE ---
-    perguntas_ativas = carregar_perguntas_auditoria()
+    perguntas_ativas = carregar_perguntas_auditoria(project_id)
     resultados_auditoria = []
     
     for i, pergunta in enumerate(perguntas_ativas, 1):
         print(f"[{i}/{len(perguntas_ativas)}] Testando: '{pergunta}'")
         
         # 1. Pede ao motor RAG para buscar as evidências textuais puras (para o Juiz ler)
-        evidencias_brutas = buscar_contexto_hibrido(pergunta, limite=3)
+        evidencias_brutas = buscar_contexto_hibrido(pergunta, project_id=project_id, limite=3)
         contexto_texto = " ".join([chunk for _, chunk, _ in evidencias_brutas]) if evidencias_brutas else "Nenhum contexto encontrado."
         
         # 2. Pede ao RAG para gerar a resposta oficial final
-        resposta_gerada = obter_resposta_rag_segura(pergunta)
+        resposta_gerada = obter_resposta_rag_segura(project_id, pergunta)
         
         print("   -> 👨‍⚖️ O Juiz a avaliar a precisão...")
         avaliacao = avaliar_resposta(pergunta, resposta_gerada, contexto_texto)
@@ -135,20 +130,38 @@ def executar_auditoria():
             "Relevância (0-10)": relevancia,
             "Justificativa do Juiz": avaliacao.get("justificativa", "")
         })
+
+        log_interacao_agente(
+            project_id,
+            "evaluation_judge",
+            {"question": pergunta, "rag_answer": resposta_gerada, "context": contexto_texto},
+            avaliacao,
+            {"provider": "Google", "model_name": NOME_MODELO_JUIZ, "temperature": 0.0},
+        )
         
         # Pausa generosa para não estourar os limites gratuitos da Google
         time.sleep(25) 
         
     df_resultados = pd.DataFrame(resultados_auditoria)
-    caminho_csv = os.path.join(os.path.dirname(__file__), '..', '..', 'metricas_rag_auditoria.csv')
-    df_resultados.to_csv(caminho_csv, index=False, encoding='utf-8')
+    metricas = {
+        "results": resultados_auditoria,
+        "mean_faithfulness": float(df_resultados['Fidelidade (0-10)'].mean()),
+        "mean_relevance": float(df_resultados['Relevância (0-10)'].mean()),
+    }
+    salvar_execucao_avaliacao(
+        project_id,
+        "rag_llm_judge",
+        metricas,
+        {"questions": perguntas_ativas, "judge_model": NOME_MODELO_JUIZ},
+    )
     
     print("=" * 60)
     print("🎉 AUDITORIA CONCLUÍDA COM SUCESSO!")
     print(f"📈 Média de Fidelidade Conservadora: {df_resultados['Fidelidade (0-10)'].mean():.1f}/10")
     print(f"🎯 Média de Relevância Conservadora: {df_resultados['Relevância (0-10)'].mean():.1f}/10")
-    print(f"💾 Relatório guardado em: metricas_rag_auditoria.csv")
+    print("💾 Resultado guardado em evaluation_runs para o projeto ativo.")
     print("=" * 60)
+    return df_resultados
 
 if __name__ == "__main__":
-    executar_auditoria()
+    executar_auditoria(resolver_project_id())

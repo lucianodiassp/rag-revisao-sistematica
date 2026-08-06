@@ -10,13 +10,27 @@ CREATE TABLE review_projects (
     question TEXT NOT NULL,
     criteria_jsonb JSONB NOT NULL,
     status VARCHAR(50) DEFAULT 'draft_protocol',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    protocol_version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Histórico imutável das alterações do protocolo de cada revisão.
+CREATE TABLE review_protocol_versions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    question TEXT NOT NULL,
+    criteria_jsonb JSONB NOT NULL,
+    change_reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (project_id, version)
 );
 
 -- Strings e parâmetros de busca por base
 CREATE TABLE search_queries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES review_projects(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
     source VARCHAR(100) NOT NULL,
     query_text TEXT NOT NULL,
     query_jsonb JSONB,
@@ -26,7 +40,8 @@ CREATE TABLE search_queries (
 -- Registros brutos coletados nas bases abertas
 CREATE TABLE retrieved_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES review_projects(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    search_query_id UUID REFERENCES search_queries(id) ON DELETE SET NULL,
     source VARCHAR(100) NOT NULL,
     external_id VARCHAR(255),
     doi VARCHAR(255),
@@ -38,7 +53,7 @@ CREATE TABLE retrieved_records (
 -- Registros consolidados após deduplicação
 CREATE TABLE deduplicated_papers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES review_projects(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
     canonical_doi VARCHAR(255),
     title TEXT NOT NULL,
     abstract TEXT,
@@ -68,7 +83,7 @@ CREATE TABLE embeddings_metadata (
 -- Log obrigatório de todos os agentes (O coração da Rastreabilidade)
 CREATE TABLE agent_interactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES review_projects(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
     agent_name VARCHAR(100) NOT NULL,
     input_jsonb JSONB NOT NULL,
     output_jsonb JSONB NOT NULL,
@@ -98,9 +113,17 @@ CREATE TABLE extracted_evidence (
 -- Métricas e experimentos (Avaliação Quantitativa)
 CREATE TABLE evaluation_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES review_projects(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
     run_type VARCHAR(100) NOT NULL,
     metrics_jsonb JSONB NOT NULL,
     params_jsonb JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_search_queries_project ON search_queries(project_id);
+CREATE INDEX idx_retrieved_records_project ON retrieved_records(project_id);
+CREATE INDEX idx_deduplicated_papers_project ON deduplicated_papers(project_id);
+CREATE INDEX idx_agent_interactions_project ON agent_interactions(project_id);
+CREATE INDEX idx_evaluation_runs_project ON evaluation_runs(project_id);
+CREATE INDEX idx_paper_chunks_paper ON paper_chunks(paper_id);
+CREATE INDEX idx_embeddings_chunk ON embeddings_metadata(chunk_id);

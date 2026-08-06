@@ -4,15 +4,15 @@ import psycopg2
 import uuid
 import time
 from dotenv import load_dotenv, find_dotenv
-from google import genai
 from google.genai import types
 from google.genai.errors import APIError
+from backend.app.database import resolver_project_id
+from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
 # ==========================================
 load_dotenv(find_dotenv())
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 NOME_MODELO = "gemini-2.5-flash"
 
 def get_conexao():
@@ -32,9 +32,9 @@ def criar_tabela_se_nao_existir():
     cursor = conexao.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS extracted_evidence (
-            id UUID PRIMARY KEY,
-            paper_id VARCHAR(50) UNIQUE,
-            extraction_jsonb JSONB,
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            paper_id UUID UNIQUE REFERENCES deduplicated_papers(id) ON DELETE CASCADE,
+            extraction_jsonb JSONB NOT NULL,
             human_review_status VARCHAR(50) DEFAULT 'pending',
             extracted_at TIMESTAMP DEFAULT NOW()
         );
@@ -42,7 +42,7 @@ def criar_tabela_se_nao_existir():
     conexao.commit()
     conexao.close()
 
-def buscar_artigos_aprovados():
+def buscar_artigos_aprovados(project_id):
     """Busca apenas os artigos marcados como 'Incluir' pelo humano que ainda não foram extraídos."""
     conexao = get_conexao()
     cursor = conexao.cursor()
@@ -50,9 +50,10 @@ def buscar_artigos_aprovados():
         SELECT p.id, p.title, p.abstract 
         FROM deduplicated_papers p
         JOIN screening_decisions s ON p.id = s.paper_id
-        WHERE s.human_decision = 'Incluir'
+        WHERE p.project_id = %s
+          AND s.human_decision = 'Incluir'
           AND p.id NOT IN (SELECT paper_id FROM extracted_evidence);
-    """)
+    """, (project_id,))
     artigos = cursor.fetchall()
     conexao.close()
     return artigos
@@ -81,7 +82,7 @@ def extrair_evidencias_com_ia(titulo, resumo, tentativa=1):
     """
     
     try:
-        resposta = client.models.generate_content(
+        resposta = get_gemini_client().models.generate_content(
             model=NOME_MODELO,
             contents=prompt,
             config=types.GenerateContentConfig(
@@ -102,11 +103,12 @@ def extrair_evidencias_com_ia(titulo, resumo, tentativa=1):
         print(f"❌ Erro estrutural: {e}")
         return None
 
-def executar_pipeline_extracao():
+def executar_pipeline_extracao(project_id=None):
+    project_id = resolver_project_id(project_id)
     criar_tabela_se_nao_existir()
     
     print("🔍 A buscar artigos marcados como 'Incluir' pelo humano...")
-    artigos = buscar_artigos_aprovados()
+    artigos = buscar_artigos_aprovados(project_id)
     
     if not artigos:
         print("🎉 Não há artigos aprovados pendentes de extração de evidências!")
@@ -133,12 +135,13 @@ def executar_pipeline_extracao():
             
             # Registo de auditoria (Log do Agente)
             cursor.execute("""
-                INSERT INTO agent_interactions (id, agent_name, input_jsonb, output_jsonb, model_jsonb)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO agent_interactions (id, project_id, agent_name, input_jsonb, output_jsonb, model_jsonb)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (
                 str(uuid.uuid4()),
+                project_id,
                 "extraction_agent",
-                json.dumps({"paper_id": paper_id, "task": "evidence_extraction"}),
+                json.dumps({"project_id": project_id, "paper_id": str(paper_id), "task": "evidence_extraction"}),
                 json.dumps(dados_extraidos),
                 json.dumps({"provider": "Google", "model_name": NOME_MODELO})
             ))
@@ -154,4 +157,4 @@ def executar_pipeline_extracao():
     print("\n🎉 Matriz de Evidências construída com sucesso! Os dados estão salvos em JSONB.")
 
 if __name__ == "__main__":
-    executar_pipeline_extracao()
+    executar_pipeline_extracao(resolver_project_id())

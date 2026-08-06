@@ -1,130 +1,163 @@
 import os
 import sys
-import json
+
 import streamlit as st
 
-# Adiciona o caminho raiz para podermos importar os agentes do backend
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-from backend.agentes.agente_formulador import estruturar_pergunta_pesquisa
-from backend.coleta.orquestrador_coleta import iniciar_recolha # <-- O NOVO IMPORT DA COLETA
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+from backend.agentes.agente_formulador import estruturar_pergunta_pesquisa  # noqa: E402
+from backend.app.database import (  # noqa: E402
+    criar_projeto,
+    salvar_protocolo_projeto,
+)
+from backend.coleta.orquestrador_coleta import iniciar_recolha  # noqa: E402
+from frontend.project_selector import (  # noqa: E402
+    CHAVE_PROJETO_ATIVO,
+    selecionar_projeto_ativo,
+)
+
 
 st.set_page_config(page_title="Configuração da Pesquisa", page_icon="⚙️", layout="wide")
 
+
+with st.sidebar.expander("➕ Novo projeto", expanded=False):
+    with st.form("form_novo_projeto"):
+        novo_titulo = st.text_input("Título do projeto")
+        nova_pergunta = st.text_area("Pergunta inicial")
+        criar = st.form_submit_button("Criar projeto", type="primary")
+        if criar:
+            if not novo_titulo.strip() or not nova_pergunta.strip():
+                st.warning("Informe o título e a pergunta inicial.")
+            else:
+                novo_id = criar_projeto(novo_titulo, nova_pergunta)
+                st.session_state[CHAVE_PROJETO_ATIVO] = novo_id
+                st.session_state["project_selector_widget"] = novo_id
+                st.rerun()
+
+
+projeto = selecionar_projeto_ativo(obrigatorio=False)
+
 st.title("⚙️ Formulação da Pergunta de Pesquisa")
-st.markdown("Defina o escopo da sua Revisão Sistemática. A Inteligência Artificial ajudará a enquadrar a sua pergunta na metodologia **PICO** e a gerar a estratégia de busca booleana.")
+
+if projeto is None:
+    st.info("Crie o primeiro projeto no painel lateral para iniciar a revisão.")
+    st.stop()
+
+project_id = str(projeto["id"])
+protocolo_atual = projeto.get("criteria_jsonb") or {}
+
+st.caption(f"Projeto ativo: **{projeto['title']}** · protocolo v{projeto['protocol_version']}")
+st.markdown(
+    "Defina o escopo da revisão. A IA ajuda a estruturar a pergunta em PICO e a "
+    "gerar a estratégia de busca, mas cada versão permanece registrada para auditoria."
+)
 st.divider()
 
-# Caminho para salvar o arquivo gerado
-CAMINHO_JSON_PERGUNTA = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../research_question.json'))
-
-# Formulário de Entrada
 pergunta_livre = st.text_area(
     "Qual é a sua pergunta de pesquisa ou tema principal?",
-    placeholder="Ex: Como o uso de modelos de linguagem grandes afeta a precisão no diagnóstico médico?",
-    height=100
+    value=projeto.get("question") or "",
+    height=100,
 )
 
 if st.button("🧠 Estruturar Pergunta (IA)", type="primary"):
     if not pergunta_livre.strip():
-        st.warning("Por favor, digite uma pergunta ou tema de pesquisa.")
+        st.warning("Digite uma pergunta ou tema de pesquisa.")
     else:
-        with st.spinner("A processar metodologia PICO e a gerar strings de busca..."):
-            resultado = estruturar_pergunta_pesquisa(pergunta_livre)
-            
-            if resultado:
-                with open(CAMINHO_JSON_PERGUNTA, 'w', encoding='utf-8') as f:
-                    json.dump(resultado, f, indent=4, ensure_ascii=False)
-                
-                st.success("Configuração gerada e salva com sucesso (`research_question.json`)!")
-                
-                st.subheader("1. Estrutura PICO")
-                col1, col2, col3, col4 = st.columns(4)
-                col1.info(f"**População (P):**\n{resultado['pico']['population']}")
-                col2.success(f"**Intervenção (I):**\n{resultado['pico']['intervention']}")
-                col3.warning(f"**Comparação (C):**\n{resultado['pico']['comparison']}")
-                col4.error(f"**Desfecho (O):**\n{resultado['pico']['outcome']}")
-                
-                st.divider()
-                st.subheader("2. Estratégia de Busca Recomendada")
-                st.code(resultado['search_string'], language="sql")
-                
-                st.divider()
-                st.subheader("3. Critérios de Elegibilidade")
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.write("**Critérios de Inclusão:**")
-                    for inc in resultado['inclusion_criteria']:
-                        st.write(f"- ✅ {inc}")
-                with c2:
-                    st.write("**Critérios de Exclusão:**")
-                    for exc in resultado['exclusion_criteria']:
-                        st.write(f"- ❌ {exc}")
-            else:
-                st.error("Ocorreu um erro ao gerar a estrutura. Tente novamente.")
+        with st.spinner("A estruturar a pergunta e gerar a estratégia de busca..."):
+            resultado = estruturar_pergunta_pesquisa(pergunta_livre, project_id)
+
+        if resultado:
+            resultado["audit_questions"] = protocolo_atual.get("audit_questions", [])
+            versao = salvar_protocolo_projeto(
+                project_id,
+                pergunta_livre,
+                resultado,
+                motivo="Estruturação da pergunta pela IA com confirmação humana",
+            )
+            st.session_state[f"protocol_preview_{project_id}"] = resultado
+            st.success(f"Protocolo salvo como versão {versao}.")
+            protocolo_atual = resultado
+        else:
+            st.error("Não foi possível gerar a estrutura. Tente novamente.")
+
+protocolo_exibido = st.session_state.get(f"protocol_preview_{project_id}", protocolo_atual)
+
+if protocolo_exibido.get("pico"):
+    st.subheader("1. Estrutura PICO")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.info(f"**População (P):**\n{protocolo_exibido['pico'].get('population', '')}")
+    col2.success(f"**Intervenção (I):**\n{protocolo_exibido['pico'].get('intervention', '')}")
+    col3.warning(f"**Comparação (C):**\n{protocolo_exibido['pico'].get('comparison', '')}")
+    col4.error(f"**Desfecho (O):**\n{protocolo_exibido['pico'].get('outcome', '')}")
+
+    st.subheader("2. Critérios de elegibilidade")
+    inclusao, exclusao = st.columns(2)
+    with inclusao:
+        st.write("**Inclusão**")
+        for criterio in protocolo_exibido.get("inclusion_criteria", []):
+            st.write(f"- ✅ {criterio}")
+    with exclusao:
+        st.write("**Exclusão**")
+        for criterio in protocolo_exibido.get("exclusion_criteria", []):
+            st.write(f"- ❌ {criterio}")
 
 st.divider()
+st.subheader("3. Estratégia de busca e coleta")
 
-# ==========================================
-# SECÇÃO DE COLETA AUTOMATIZADA
-# ==========================================
-if os.path.exists(CAMINHO_JSON_PERGUNTA):
-    st.write("### 📌 Configuração Atual Ativa e Coleta")
-    with open(CAMINHO_JSON_PERGUNTA, 'r', encoding='utf-8') as f:
-        dados_salvos = json.load(f)
-        
-    termo_busca = dados_salvos.get("search_string", "")
-    
-    # Divide a tela em duas colunas para ficar elegante
-    col_json, col_coleta = st.columns([1, 1])
-    
-    with col_json:
-        st.json(dados_salvos)
-        
-    with col_coleta:
-        st.info("A sua estratégia de busca está pronta para ser executada nas bases de dados científicas (PubMed, OpenAlex, Semantic Scholar).")
-        
-        # --- NOVO BLOCO: CAMPO EDITÁVEL PARA A STRING DE BUSCA ---
-        st.markdown("### 🔧 Ajuste Fino da Estratégia")
-        string_manual = st.text_area(
-            "String de Busca Booleana (Edite livremente antes de coletar):",
-            value=termo_busca,
-            height=150,
-            help="Pode apagar o conteúdo gerado pela IA e colar a sua própria string de busca aqui."
-        )
-        
-        # O utilizador pode escolher o tamanho da amostra
-        qtd_artigos = st.slider("Máximo de artigos por fonte (API):", min_value=5, max_value=50, value=10, step=5)
-        st.write(f"*Total estimado: Até {qtd_artigos * 3} artigos combinados.*")
-        
-        # O Botão que aciona o Orquestrador
-        if st.button("🚀 Iniciar Coleta nas Bases de Dados", type="primary", use_container_width=True):
-            nova_string = string_manual.strip() # Captura e limpa os espaços
-            
-            if nova_string: 
-                # ==========================================================
-                # NOVO: SALVAR A STRING EDITADA DE VOLTA NO JSON
-                # ==========================================================
-                if nova_string != termo_busca:
-                    dados_salvos["search_string"] = nova_string
-                    with open(CAMINHO_JSON_PERGUNTA, 'w', encoding='utf-8') as f:
-                        json.dump(dados_salvos, f, indent=4, ensure_ascii=False)
-                # ==========================================================
-                
-                with st.spinner(f"A contactar APIs científicas e a recolher até {qtd_artigos} artigos por base. Isto pode demorar um pouco..."):
-                    try:
-                        # Agora enviamos a string validada
-                        qtd_salvos, qtd_encontrados = iniciar_recolha(nova_string, max_por_fonte=qtd_artigos)
-                        
-                        if qtd_encontrados == 0:
-                            st.warning("⚠️ A busca não encontrou nenhum artigo nas bases de dados. Tente ajustar a string acima para ser mais abrangente.")
-                        elif qtd_salvos == 0:
-                            st.info(f"ℹ️ Foram encontrados {qtd_encontrados} artigos nas APIs, mas **todos já existiam** na sua base de dados (Bloqueados pela regra de deduplicação).")
-                        else:
-                            st.success(f"✅ Coleta concluída com sucesso! Dos {qtd_encontrados} artigos encontrados, **{qtd_salvos} novos artigos** foram salvos na base de dados.")
-                            st.balloons()
-                            st.markdown("👉 **O próximo passo:** Vá à página **'Triagem'** no menu lateral para avaliar os novos artigos.")
-                            
-                    except Exception as e:
-                        st.error(f"Ocorreu um erro durante a coleta: {e}")
-            else:
-                st.error("A string de busca não pode estar vazia. Por favor, preencha o campo acima.")
+termo_busca = protocolo_exibido.get("search_string", "")
+if not termo_busca:
+    st.info("Estruture a pergunta antes de iniciar a coleta.")
+    st.stop()
+
+string_manual = st.text_area(
+    "String de busca booleana",
+    value=termo_busca,
+    height=150,
+    help="A alteração será registrada como uma nova versão do protocolo ao iniciar a coleta.",
+)
+qtd_artigos = st.slider(
+    "Máximo de artigos por fonte",
+    min_value=5,
+    max_value=50,
+    value=10,
+    step=5,
+)
+
+if st.button("🚀 Iniciar coleta nas três bases", type="primary", use_container_width=True):
+    nova_string = string_manual.strip()
+    if not nova_string:
+        st.error("A string de busca não pode estar vazia.")
+    else:
+        if nova_string != termo_busca:
+            protocolo_atualizado = dict(protocolo_exibido)
+            protocolo_atualizado["search_string"] = nova_string
+            salvar_protocolo_projeto(
+                project_id,
+                pergunta_livre,
+                protocolo_atualizado,
+                motivo="Ajuste manual da estratégia antes da coleta",
+            )
+            st.session_state[f"protocol_preview_{project_id}"] = protocolo_atualizado
+
+        with st.spinner("A consultar as bases e registrar a proveniência por fonte..."):
+            try:
+                qtd_salvos, qtd_encontrados = iniciar_recolha(
+                    nova_string,
+                    project_id=project_id,
+                    max_por_fonte=qtd_artigos,
+                )
+                if qtd_encontrados == 0:
+                    st.warning("Nenhum artigo foi encontrado. Ajuste a estratégia de busca.")
+                elif qtd_salvos == 0:
+                    st.info(
+                        f"Os {qtd_encontrados} registros já existiam neste projeto; "
+                        "a proveniência das fontes foi atualizada."
+                    )
+                else:
+                    st.success(
+                        f"Coleta concluída: {qtd_salvos} novos artigos em "
+                        f"{qtd_encontrados} registros recuperados."
+                    )
+            except Exception as erro:
+                st.error(f"Erro durante a coleta: {erro}")

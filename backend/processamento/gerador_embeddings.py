@@ -1,14 +1,14 @@
 import os
 import psycopg2
 from dotenv import load_dotenv
-from google import genai
 from google.genai import types
+from backend.app.database import resolver_project_id
+from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 load_dotenv()
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 NOME_MODELO_EMBEDDING = "gemini-embedding-001"
 DIMENSOES = 768
 
@@ -35,8 +35,9 @@ def criar_chunks(texto, max_palavras=150):
         chunks.append(chunk)
     return chunks
 
-def processar_indexacao_vetorial():
+def processar_indexacao_vetorial(project_id=None):
     """Lê os artigos aprovados e converte-os em vetores matemáticos no pgvector."""
+    project_id = resolver_project_id(project_id)
     conexao = get_conexao()
     cursor = conexao.cursor()
     
@@ -47,9 +48,10 @@ def processar_indexacao_vetorial():
         SELECT d.id, d.title, d.abstract 
         FROM deduplicated_papers d
         JOIN screening_decisions s ON d.id = s.paper_id
-        WHERE s.human_decision = 'Incluir'
+        WHERE d.project_id = %s
+        AND s.human_decision = 'Incluir'
         AND d.id NOT IN (SELECT paper_id FROM paper_chunks)
-    """)
+    """, (project_id,))
     artigos = cursor.fetchall()
     
     if not artigos:
@@ -67,7 +69,7 @@ def processar_indexacao_vetorial():
         
         for index, chunk_text in enumerate(chunks):
             # 1. Gera o Embedding (Vetor) usando a API do Gemini com compressão Matryoshka
-            resposta = client.models.embed_content(
+            resposta = get_gemini_client().models.embed_content(
                 model=NOME_MODELO_EMBEDDING,
                 contents=chunk_text,
                 config=types.EmbedContentConfig(output_dimensionality=DIMENSOES)
@@ -95,4 +97,4 @@ def processar_indexacao_vetorial():
     print("\n🎉 Indexação de todos os artigos concluída!")
 
 if __name__ == "__main__":
-    processar_indexacao_vetorial()
+    processar_indexacao_vetorial(resolver_project_id())
