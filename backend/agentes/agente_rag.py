@@ -1,8 +1,9 @@
 import os
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
-from google import genai
 from google.genai import types
+from backend.app.database import log_interacao_agente, resolver_project_id
+from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E MODELOS
@@ -10,7 +11,6 @@ from google.genai import types
 load_dotenv(find_dotenv())
 
 # Inicializar o cliente com a API oficial da Google
-cliente = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 NOME_MODELO_LLM = 'gemini-2.5-flash'
 NOME_MODELO_EMBEDDING = 'gemini-embedding-001'
 DIMENSOES = 768
@@ -28,14 +28,15 @@ def get_conexao():
 # ==========================================
 # 1. MOTOR DE BUSCA HÍBRIDA (BM25 + VETORES RRF)
 # ==========================================
-def buscar_contexto_hibrido(pergunta, limite=3):
+def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
     """
     Combina a busca semântica (pgvector) com a busca por palavras-chave (Full-Text Search)
     utilizando a fusão matemática RRF para mitigar falhas de recall.
     """
+    project_id = resolver_project_id(project_id)
     print("   [1/2] A converter pergunta em matemática...")
     # Transforma a pergunta num vetor usando o Gemini com compressão Matryoshka (768d)
-    resposta_emb = cliente.models.embed_content(
+    resposta_emb = get_gemini_client().models.embed_content(
         model=NOME_MODELO_EMBEDDING,
         contents=pergunta,
         config=types.EmbedContentConfig(output_dimensionality=DIMENSOES)
@@ -53,15 +54,19 @@ def buscar_contexto_hibrido(pergunta, limite=3):
                RANK() OVER (ORDER BY em.embedding <=> %s::vector) AS vector_rank
         FROM embeddings_metadata em
         JOIN paper_chunks pc ON em.chunk_id = pc.id
+        JOIN deduplicated_papers dp ON dp.id = pc.paper_id
+        WHERE dp.project_id = %s
         ORDER BY em.embedding <=> %s::vector
         LIMIT 20
     ),
     keyword_search AS (
-        SELECT id, paper_id, chunk_text,
-               RANK() OVER (ORDER BY ts_rank_cd(to_tsvector('english', chunk_text), plainto_tsquery('english', %s)) DESC) AS keyword_rank
-        FROM paper_chunks
-        WHERE to_tsvector('english', chunk_text) @@ plainto_tsquery('english', %s)
-        ORDER BY ts_rank_cd(to_tsvector('english', chunk_text), plainto_tsquery('english', %s)) DESC
+        SELECT pc.id, pc.paper_id, pc.chunk_text,
+               RANK() OVER (ORDER BY ts_rank_cd(to_tsvector('english', pc.chunk_text), plainto_tsquery('english', %s)) DESC) AS keyword_rank
+        FROM paper_chunks pc
+        JOIN deduplicated_papers dp ON dp.id = pc.paper_id
+        WHERE dp.project_id = %s
+          AND to_tsvector('english', pc.chunk_text) @@ plainto_tsquery('english', %s)
+        ORDER BY ts_rank_cd(to_tsvector('english', pc.chunk_text), plainto_tsquery('english', %s)) DESC
         LIMIT 20
     )
     SELECT
@@ -75,8 +80,8 @@ def buscar_contexto_hibrido(pergunta, limite=3):
     """
 
     cursor.execute(query, (
-        str(vetor_pergunta), str(vetor_pergunta),  # Parâmetros vetoriais
-        pergunta, pergunta, pergunta,              # Parâmetros de texto
+        str(vetor_pergunta), project_id, str(vetor_pergunta),
+        pergunta, project_id, pergunta, pergunta,
         limite                                     # Limite de RRF
     ))
     
@@ -89,17 +94,27 @@ def buscar_contexto_hibrido(pergunta, limite=3):
 # ==========================================
 # 2. O AGENTE INTELIGENTE (Orquestrador RAG)
 # ==========================================
-def responder_com_rag(pergunta):
+def responder_com_rag(pergunta, project_id=None):
+    project_id = resolver_project_id(project_id)
     print("\n🔍 INÍCIO DA RECUPERAÇÃO DE EVIDÊNCIAS")
-    evidencias = buscar_contexto_hibrido(pergunta, limite=4) # Aumentado ligeiramente para mais contexto
+    evidencias = buscar_contexto_hibrido(pergunta, project_id=project_id, limite=4)
     
     if not evidencias:
-        return "Não tenho dados suficientes nos artigos recolhidos para responder."
+        resposta_sem_contexto = "Não tenho dados suficientes nos artigos recolhidos para responder."
+        log_interacao_agente(
+            project_id,
+            "rag_agent",
+            {"question": pergunta},
+            {"answer": resposta_sem_contexto, "supporting_evidence": []},
+            {"provider": "Google", "model_name": NOME_MODELO_LLM, "temperature": 0.1},
+        )
+        return resposta_sem_contexto
 
     contexto_formatado = ""
     print("\n📑 EVIDÊNCIAS RECUPERADAS (TOP SCORE RRF):")
     for paper_id, texto_chunk, score in evidencias:
-        print(f" -> Artigo ID: {paper_id[:8]}... | Score Híbrido: {score:.4f}")
+        paper_id_texto = str(paper_id)
+        print(f" -> Artigo ID: {paper_id_texto[:8]}... | Score Híbrido: {score:.4f}")
         contexto_formatado += f"\n[Artigo ID: {paper_id} | Score RRF: {score:.4f}]\nTrecho: {texto_chunk}\n"
 
     print("\n🧠 A gerar síntese com IA baseada EXCLUSIVAMENTE no contexto...")
@@ -117,7 +132,7 @@ def responder_com_rag(pergunta):
     {contexto_formatado}
     """
 
-    resposta = cliente.models.generate_content(
+    resposta = get_gemini_client().models.generate_content(
         model=NOME_MODELO_LLM,
         contents=pergunta,
         config=types.GenerateContentConfig(
@@ -126,7 +141,25 @@ def responder_com_rag(pergunta):
         )
     )
     
-    return resposta.text
+    resposta_texto = resposta.text
+    log_interacao_agente(
+        project_id,
+        "rag_agent",
+        {"question": pergunta},
+        {
+            "answer": resposta_texto,
+            "supporting_evidence": [
+                {
+                    "paper_id": str(paper_id),
+                    "snippet": texto_chunk,
+                    "retrieval_score": float(score),
+                }
+                for paper_id, texto_chunk, score in evidencias
+            ],
+        },
+        {"provider": "Google", "model_name": NOME_MODELO_LLM, "temperature": 0.1},
+    )
+    return resposta_texto
 
 # ==========================================
 # 3. O TESTE FINAL LOCAL
@@ -139,7 +172,7 @@ if __name__ == "__main__":
     print(f"PERGUNTA: {pergunta_teste}")
     print("=" * 70)
     
-    resposta_final = responder_com_rag(pergunta_teste)
+    resposta_final = responder_com_rag(pergunta_teste, resolver_project_id())
     
     print("\n======================================================================")
     print("🤖 RESPOSTA DO AGENTE RAG AVANÇADO (HÍBRIDO):")

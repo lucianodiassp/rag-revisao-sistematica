@@ -2,15 +2,14 @@ import os
 import fitz  # PyMuPDF
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
-from google import genai
 from google.genai import types
+from backend.app.database import resolver_project_id
+from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 load_dotenv(find_dotenv())
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
 NOME_MODELO_EMBEDDING = "gemini-embedding-001"
 DIMENSOES = 768
 DIRETORIO_PDFS = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data/pdfs'))
@@ -63,20 +62,34 @@ def criar_chunks(texto, max_palavras=250, overlap=50):
             
     return chunks
 
-def processar_pdfs():
+def processar_pdfs(project_id=None):
+    project_id = resolver_project_id(project_id)
     print(f"📂 A verificar diretório: {DIRETORIO_PDFS}")
     if not os.path.exists(DIRETORIO_PDFS):
         os.makedirs(DIRETORIO_PDFS)
         print("📁 Pasta criada. Por favor, adicione os ficheiros PDF lá dentro.")
         return
 
-    arquivos_pdf = [f for f in os.listdir(DIRETORIO_PDFS) if f.endswith('.pdf')]
-    if not arquivos_pdf:
-        print("✅ Nenhum PDF encontrado na pasta para processar.")
-        return
-
     conexao = get_conexao()
     cursor = conexao.cursor()
+    cursor.execute("""
+        SELECT d.id
+        FROM deduplicated_papers d
+        JOIN screening_decisions s ON s.paper_id = d.id
+        WHERE d.project_id = %s AND s.human_decision = 'Incluir'
+    """, (project_id,))
+    ids_aprovados = {str(linha[0]) for linha in cursor.fetchall()}
+
+    arquivos_pdf = [
+        arquivo for arquivo in os.listdir(DIRETORIO_PDFS)
+        if arquivo.lower().endswith('.pdf')
+        and arquivo[:-4] in ids_aprovados
+    ]
+    if not arquivos_pdf:
+        cursor.close()
+        conexao.close()
+        print("✅ Nenhum PDF aprovado deste projeto está pendente de processamento.")
+        return
 
     for arquivo in arquivos_pdf:
         # O nome do arquivo deve ser o UUID exato da tabela deduplicated_papers
@@ -106,7 +119,7 @@ def processar_pdfs():
         for index, chunk_text in enumerate(chunks):
             try:
                 # 1. Gera a coordenada matemática do trecho
-                resposta = client.models.embed_content(
+                resposta = get_gemini_client().models.embed_content(
                     model=NOME_MODELO_EMBEDDING,
                     contents=chunk_text,
                     config=types.EmbedContentConfig(output_dimensionality=DIMENSOES)
@@ -138,4 +151,4 @@ def processar_pdfs():
     print("🎉 Processamento de PDFs concluído!")
 
 if __name__ == "__main__":
-    processar_pdfs()
+    processar_pdfs(resolver_project_id())

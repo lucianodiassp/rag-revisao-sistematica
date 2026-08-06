@@ -8,6 +8,7 @@ from dotenv import load_dotenv, find_dotenv
 # Ajuste de Caminho para podermos importar funções do backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.processamento.leitor_pdf import processar_pdfs
+from frontend.project_selector import selecionar_projeto_ativo
 
 # ==========================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -30,17 +31,18 @@ def get_conexao():
         password=os.environ["DB_PASSWORD"]
     )
 
-def carregar_artigos_aprovados():
+def carregar_artigos_aprovados(project_id):
     """Busca apenas os artigos que o humano decidiu 'Incluir'"""
     conexao = get_conexao()
     query = """
         SELECT d.id, d.title
         FROM deduplicated_papers d
         JOIN screening_decisions s ON d.id = s.paper_id
-        WHERE s.human_decision = 'Incluir'
+        WHERE d.project_id = %s
+          AND s.human_decision = 'Incluir'
         ORDER BY d.title ASC
     """
-    df = pd.read_sql(query, conexao)
+    df = pd.read_sql(query, conexao, params=(project_id,))
     conexao.close()
     return df
 
@@ -48,6 +50,9 @@ def carregar_artigos_aprovados():
 # INTERFACE VISUAL
 # ==========================================
 st.title("📂 Gestão de arquivos e Vetorização")
+projeto = selecionar_projeto_ativo()
+project_id = str(projeto["id"])
+st.caption(f"Projeto ativo: **{projeto['title']}**")
 st.markdown("""
 Faça o upload dos documentos na íntegra para os artigos aprovados e acione a indexação 
 vetorial para alimentar o cérebro do motor RAG.
@@ -55,7 +60,7 @@ vetorial para alimentar o cérebro do motor RAG.
 st.divider()
 
 # Carrega os dados reais do banco
-df_aprovados = carregar_artigos_aprovados()
+df_aprovados = carregar_artigos_aprovados(project_id)
 
 if df_aprovados.empty:
     st.info("Nenhum artigo aprovado encontrado. Realize a triagem de artigos primeiro.")
@@ -125,7 +130,7 @@ else:
         with st.spinner("O sistema está a ler, fatiar e vetorizar os documentos na íntegra... Isto pode demorar alguns minutos consoante o tamanho dos artigos."):
             try:
                 # Invoca a função do leitor_pdf.py diretamente
-                processar_pdfs()
+                processar_pdfs(project_id)
                 st.success("🎉 Processamento concluído com sucesso! Os textos completos já estão indexados no PostgreSQL com pgvector.")
             except Exception as e:
                 st.error(f"⚠️ Ocorreu um erro durante a vetorização: {e}")

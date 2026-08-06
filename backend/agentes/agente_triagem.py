@@ -4,19 +4,16 @@ import psycopg2
 import uuid
 import time
 from dotenv import load_dotenv
-from google import genai
 from google.genai import types
 from google.genai.errors import APIError
+from backend.app.database import obter_projeto, resolver_project_id
+from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
 # ==========================================
 load_dotenv()
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 NOME_MODELO = "gemini-2.5-flash"
-
-# Novo caminho para ler o JSON dinâmico gerado pelo Front-end
-CAMINHO_JSON_PERGUNTA = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../research_question.json'))
 
 def get_conexao():
     """Estabelece a conexão estritamente via variáveis de ambiente."""
@@ -28,13 +25,14 @@ def get_conexao():
         password=os.environ["DB_PASSWORD"]
     )
 
-def buscar_artigos_sem_analise():
+def buscar_artigos_sem_analise(project_id):
     conexao = get_conexao()
     cursor = conexao.cursor()
     cursor.execute("""
         SELECT id, title, abstract 
         FROM deduplicated_papers 
-        WHERE id NOT IN (SELECT paper_id FROM screening_decisions)
+        WHERE project_id = %s
+          AND id NOT IN (SELECT paper_id FROM screening_decisions)
           AND abstract IS NOT NULL 
           AND abstract != ''
           AND abstract NOT IN (
@@ -42,30 +40,24 @@ def buscar_artigos_sem_analise():
               'Abstract extraído do índice (simplificado para este exemplo).',
               'Abstract via PubMed E-Summary (Requer E-Fetch para texto completo).'
           );
-    """)
+    """, (project_id,))
     artigos = cursor.fetchall()
     conexao.close()
     return artigos
 
-def carregar_criterios_dinamicos():
-    """Lê as regras atualizadas do ficheiro JSON."""
-    if not os.path.exists(CAMINHO_JSON_PERGUNTA):
-        # Se não encontrar o arquivo, cai para um padrão genérico para não quebrar
-        return "Critérios não encontrados no sistema.", "Critérios de exclusão não encontrados."
-    
-    with open(CAMINHO_JSON_PERGUNTA, 'r', encoding='utf-8') as f:
-        dados = json.load(f)
-    
+def carregar_criterios_dinamicos(project_id):
+    """Lê os critérios versionados do projeto no PostgreSQL."""
+    dados = obter_projeto(project_id).get("criteria_jsonb") or {}
     inclusao = "\n".join([f"- {c}" for c in dados.get("inclusion_criteria", [])])
     exclusao = "\n".join([f"- {c}" for c in dados.get("exclusion_criteria", [])])
     
     return inclusao, exclusao
 
-def triar_artigo_com_ia(titulo, resumo, tentativa=1):
+def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1):
     """Submete o artigo ao Gemini com critérios injetados dinamicamente e rate limit."""
     
     # Busca os critérios do JSON
-    criterios_inclusao, criterios_exclusao = carregar_criterios_dinamicos()
+    criterios_inclusao, criterios_exclusao = carregar_criterios_dinamicos(project_id)
     
     prompt = f"""
     Você é um agente especialista em triagem de artigos científicos para uma Revisão Sistemática.
@@ -91,7 +83,7 @@ def triar_artigo_com_ia(titulo, resumo, tentativa=1):
     """
     
     try:
-        resposta = client.models.generate_content(
+        resposta = get_gemini_client().models.generate_content(
             model=NOME_MODELO,
             contents=prompt,
             config=types.GenerateContentConfig(
@@ -106,7 +98,7 @@ def triar_artigo_com_ia(titulo, resumo, tentativa=1):
             tempo_espera = 60
             print(f"   ⏳ Limite atingido (429). A aguardar {tempo_espera}s antes da tentativa {tentativa + 1}/3...")
             time.sleep(tempo_espera)
-            return triar_artigo_com_ia(titulo, resumo, tentativa + 1)
+            return triar_artigo_com_ia(project_id, titulo, resumo, tentativa + 1)
         else:
             print(f"❌ Falha persistente na API: {e}")
             return None
@@ -114,9 +106,10 @@ def triar_artigo_com_ia(titulo, resumo, tentativa=1):
         print(f"❌ Erro estrutural ao processar o artigo: {e}")
         return None
 
-def executar_pipeline_triagem_ui():
+def executar_pipeline_triagem_ui(project_id=None):
     """Executa a triagem emitindo atualizações de estado (yield) para a interface gráfica."""
-    artigos = buscar_artigos_sem_analise()
+    project_id = resolver_project_id(project_id)
+    artigos = buscar_artigos_sem_analise(project_id)
     
     if not artigos:
         yield {"status": "concluido", "atual": 0, "total": 0, "msg": "Nenhum artigo novo para analisar."}
@@ -129,7 +122,7 @@ def executar_pipeline_triagem_ui():
     for i, (paper_id, titulo, abstract) in enumerate(artigos, 1):
         yield {"status": "processando", "atual": i, "total": total, "msg": f"🧠 A analisar {i}/{total}: '{titulo[:40]}...'"}
         
-        resultado_ia = triar_artigo_com_ia(titulo, abstract)
+        resultado_ia = triar_artigo_com_ia(project_id, titulo, abstract)
         
         if resultado_ia:
             decisao_id = str(uuid.uuid4())
@@ -152,12 +145,13 @@ def executar_pipeline_triagem_ui():
             
             cursor.execute("""
                 INSERT INTO agent_interactions 
-                (id, agent_name, input_jsonb, output_jsonb, model_jsonb)
-                VALUES (%s, %s, %s, %s, %s)
+                (id, project_id, agent_name, input_jsonb, output_jsonb, model_jsonb)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (
                 str(uuid.uuid4()),
+                project_id,
                 "screening_agent",
-                json.dumps({"paper_id": paper_id, "title": titulo}),
+                json.dumps({"project_id": project_id, "paper_id": str(paper_id), "title": titulo}),
                 json.dumps(resultado_ia),
                 json.dumps({"provider": "Google", "model_name": NOME_MODELO})
             ))
@@ -173,5 +167,5 @@ def executar_pipeline_triagem_ui():
     yield {"status": "concluido", "atual": total, "total": total, "msg": "🎉 Triagem automática concluída!"}
 
 if __name__ == "__main__":
-    for status in executar_pipeline_triagem_ui():
+    for status in executar_pipeline_triagem_ui(resolver_project_id()):
         print(status["msg"])

@@ -2,14 +2,14 @@ import os
 import json
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
-from google import genai
 from google.genai import types
+from backend.app.database import log_interacao_agente, resolver_project_id
+from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
 # ==========================================
 load_dotenv(find_dotenv())
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 NOME_MODELO = "gemini-2.5-flash"
 
 def get_conexao():
@@ -21,7 +21,7 @@ def get_conexao():
         password=os.environ["DB_PASSWORD"]
     )
 
-def coletar_metricas_prisma():
+def coletar_metricas_prisma(project_id):
     """Recolhe os números para o fluxograma de auditoria."""
     conexao = get_conexao()
     cursor = conexao.cursor()
@@ -29,56 +29,74 @@ def coletar_metricas_prisma():
     metricas = {}
     
     # 1. Total de artigos únicos na base
-    cursor.execute("SELECT COUNT(*) FROM deduplicated_papers;")
+    cursor.execute("SELECT COUNT(*) FROM deduplicated_papers WHERE project_id = %s;", (project_id,))
     metricas['total_unicos'] = cursor.fetchone()[0]
     
     # 2. Total processado pela IA (Triagem)
-    cursor.execute("SELECT COUNT(*) FROM screening_decisions;")
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM screening_decisions s
+        JOIN deduplicated_papers p ON p.id = s.paper_id
+        WHERE p.project_id = %s
+    """, (project_id,))
     metricas['triados_ia'] = cursor.fetchone()[0]
     
     # 3. Total aprovado pelo Humano
-    cursor.execute("SELECT COUNT(*) FROM screening_decisions WHERE human_decision = 'Incluir';")
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM screening_decisions s
+        JOIN deduplicated_papers p ON p.id = s.paper_id
+        WHERE p.project_id = %s AND s.human_decision = 'Incluir'
+    """, (project_id,))
     metricas['aprovados_humano'] = cursor.fetchone()[0]
     
     # 4. Total de evidências extraídas
-    cursor.execute("SELECT COUNT(*) FROM extracted_evidence;")
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM extracted_evidence e
+        JOIN deduplicated_papers p ON p.id = e.paper_id
+        WHERE p.project_id = %s
+    """, (project_id,))
     metricas['evidencias_extraidas'] = cursor.fetchone()[0]
     
     cursor.close()
     conexao.close()
     return metricas
 
-def coletar_evidencias():
+def coletar_evidencias(project_id):
     """Recolhe os dados JSON estruturados para enviar ao LLM."""
     conexao = get_conexao()
     cursor = conexao.cursor()
     
     cursor.execute("""
-        SELECT p.title, e.extraction_jsonb 
+        SELECT p.id, p.title, e.extraction_jsonb
         FROM extracted_evidence e
-        JOIN deduplicated_papers p ON p.id = e.paper_id;
-    """)
+        JOIN deduplicated_papers p ON p.id = e.paper_id
+        WHERE p.project_id = %s;
+    """, (project_id,))
     resultados = cursor.fetchall()
     conexao.close()
     
     evidencias = []
-    for titulo, jsonb_data in resultados:
+    for paper_id, titulo, jsonb_data in resultados:
         if isinstance(jsonb_data, str):
             jsonb_data = json.loads(jsonb_data)
         
         evidencias.append({
+            "paper_id": str(paper_id),
             "titulo": titulo,
             "dados": jsonb_data
         })
     return evidencias
 
-def gerar_relatorio_final():
+def gerar_relatorio_final(project_id=None):
     """Orquestra a coleta de dados e a geração do texto pelo Gemini."""
+    project_id = resolver_project_id(project_id)
     print("📊 A recolher métricas PRISMA...")
-    metricas = coletar_metricas_prisma()
+    metricas = coletar_metricas_prisma(project_id)
     
     print("📚 A recolher evidências extraídas...")
-    evidencias = coletar_evidencias()
+    evidencias = coletar_evidencias(project_id)
     
     if not evidencias:
         return {"metricas": metricas, "relatorio_md": "Não há evidências suficientes para gerar o relatório. Por favor, extraia evidências primeiro na Matriz."}
@@ -102,10 +120,11 @@ def gerar_relatorio_final():
     3. Destaque os 'Principais Resultados' de forma agregada (quais são as tendências ou consensos?).
     4. Identifique as 'Limitações' mais comuns relatadas pelos autores.
     5. Mantenha um tom estritamente académico, imparcial e científico. Não invente dados, baseie-se APENAS no JSON fornecido.
+    6. Ao apresentar um achado, cite o paper_id correspondente entre colchetes.
     """
     
     try:
-        resposta = client.models.generate_content(
+        resposta = get_gemini_client().models.generate_content(
             model=NOME_MODELO,
             contents=prompt,
             config=types.GenerateContentConfig(
@@ -115,6 +134,14 @@ def gerar_relatorio_final():
         texto_relatorio = resposta.text
     except Exception as e:
         texto_relatorio = f"Erro ao contactar a API do Gemini: {e}"
+
+    log_interacao_agente(
+        project_id,
+        "report_agent",
+        {"metrics": metricas, "paper_ids": [item["paper_id"] for item in evidencias]},
+        {"report_markdown": texto_relatorio},
+        {"provider": "Google", "model_name": NOME_MODELO, "temperature": 0.2},
+    )
         
     return {
         "metricas": metricas,
@@ -122,6 +149,6 @@ def gerar_relatorio_final():
     }
 
 if __name__ == "__main__":
-    resultado = gerar_relatorio_final()
+    resultado = gerar_relatorio_final(resolver_project_id())
     print("\n✅ Relatório Gerado com Sucesso!\n")
     print(resultado['relatorio_md'][:500] + "...\n")

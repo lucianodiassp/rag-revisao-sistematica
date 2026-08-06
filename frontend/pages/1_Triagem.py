@@ -9,6 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 
 # Importação da função geradora (UI-ready) do backend
 from backend.agentes.agente_triagem import executar_pipeline_triagem_ui
+from frontend.project_selector import selecionar_projeto_ativo
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
@@ -25,7 +26,7 @@ def get_conexao():
         password=os.environ["DB_PASSWORD"]
     )
 
-def buscar_artigo_pendente():
+def buscar_artigo_pendente(project_id):
     """Busca 1 artigo triado pela IA, mas que ainda aguarda a validação do Humano."""
     try:
         conexao = get_conexao()
@@ -36,9 +37,10 @@ def buscar_artigo_pendente():
             SELECT d.id, d.title, d.abstract, s.suggested_decision, s.rationale_jsonb
             FROM deduplicated_papers d
             JOIN screening_decisions s ON d.id = s.paper_id
-            WHERE s.human_decision IS NULL
+            WHERE d.project_id = %s
+              AND s.human_decision IS NULL
             LIMIT 1;
-        """)
+        """, (project_id,))
         artigo = cursor.fetchone()
         conexao.close()
         return artigo
@@ -46,7 +48,7 @@ def buscar_artigo_pendente():
         st.error(f"Erro ao conectar ao banco de dados: {e}")
         return None
 
-def salvar_decisao_humana(paper_id, human_decision, justification):
+def salvar_decisao_humana(project_id, paper_id, human_decision, justification):
     """Atualiza a linha no banco de dados com a decisão final humana."""
     try:
         conexao = get_conexao()
@@ -56,7 +58,11 @@ def salvar_decisao_humana(paper_id, human_decision, justification):
             UPDATE screening_decisions 
             SET human_decision = %s, justification = %s, reviewed_at = NOW()
             WHERE paper_id = %s
-        """, (human_decision, justification, paper_id))
+              AND EXISTS (
+                  SELECT 1 FROM deduplicated_papers p
+                  WHERE p.id = screening_decisions.paper_id AND p.project_id = %s
+              )
+        """, (human_decision, justification, paper_id, project_id))
         
         conexao.commit()
         conexao.close()
@@ -67,8 +73,11 @@ def salvar_decisao_humana(paper_id, human_decision, justification):
 # INTERFACE GRÁFICA (STREAMLIT)
 # ==========================================
 st.set_page_config(page_title="Triagem de Artigos", page_icon="🧑‍⚕️", layout="wide")
+projeto = selecionar_projeto_ativo()
+project_id = str(projeto["id"])
 
 st.title("🧑‍⚕️ Triagem Humana (Human-in-the-Loop)")
+st.caption(f"Projeto ativo: **{projeto['title']}**")
 
 # --- CABEÇALHO COM BOTÃO DE AÇÃO INTERATIVO ---
 col1, col2 = st.columns([2, 1])
@@ -82,7 +91,7 @@ with col2:
         
         try:
             # Consome o gerador do backend passo a passo em tempo real
-            for passo in executar_pipeline_triagem_ui():
+            for passo in executar_pipeline_triagem_ui(project_id):
                 if passo["total"] > 0:
                     # Calcula e atualiza a barra de progresso (0 a 100)
                     percentagem = int((passo["atual"] / passo["total"]) * 100)
@@ -102,7 +111,7 @@ with col2:
 
 st.divider()
 
-artigo_atual = buscar_artigo_pendente()
+artigo_atual = buscar_artigo_pendente(project_id)
 
 if artigo_atual:
     paper_id, titulo, abstract, sugestao_ia, rationale_ia = artigo_atual
@@ -149,7 +158,7 @@ if artigo_atual:
             if decisao != sugestao_ia and not justificativa:
                 st.warning("⚠️ Você discordou da IA. Por favor, insira uma observação justificando sua escolha.")
             else:
-                salvar_decisao_humana(paper_id, decisao, justificativa)
+                salvar_decisao_humana(project_id, paper_id, decisao, justificativa)
                 st.success("✅ Decisão updated no banco de dados!")
                 st.rerun()
 else:

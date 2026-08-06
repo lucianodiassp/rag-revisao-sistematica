@@ -1,21 +1,38 @@
-from database import log_interacao_agente, salvar_artigo_coletado
+from backend.app.database import (
+    log_interacao_agente,
+    resolver_project_id,
+    salvar_artigo_coletado,
+)
+from backend.coleta.orquestrador_coleta import gerar_id_deterministico
 
-print("--- Iniciando testes de inserção no banco ---")
 
-# 1. Testando a função que a Pessoa 2 (Coleta) vai usar
+project_id = resolver_project_id()
+artigo = {
+    "titulo": "O impacto do RAG na automação de revisões",
+    "abstract": "Artigo de teste inserido via script Python.",
+    "fontes_dict": {
+        "sources": ["TesteLocal"],
+        "external_ids": {"doi": "10.0000/teste-rag"},
+        "metadata": {},
+    },
+}
+paper_id = gerar_id_deterministico(artigo, project_id)
+
 salvar_artigo_coletado(
-    id_artigo="11111111-2222-3333-4444-555555555555", # <-- UUID válido inventado para o teste
-    titulo="O impacto do RAG na automação de revisões",
-    abstract="Este é um artigo de teste inserido via script Python.",
-    fontes_dict={"sources": ["OpenAlex", "TesteLocal"]}
+    project_id=project_id,
+    id_artigo=paper_id,
+    titulo=artigo["titulo"],
+    abstract=artigo["abstract"],
+    fontes_dict=artigo["fontes_dict"],
+    fonte="TesteLocal",
 )
 
-# 2. Testando a função que a Pessoa 5 (Agentes) vai usar
 log_interacao_agente(
-    nome_agente="agente_teste_python",
-    input_dict={"artigo_id": "11111111-2222-3333-4444-555555555555", "acao": "analisar_inclusao"},
-    output_dict={"decisao": "include", "confianca": 0.99},
-    modelo_dict={"provider": "ollama", "model": "llama3"}
+    project_id,
+    "agente_teste_python",
+    {"paper_id": paper_id, "acao": "analisar_inclusao"},
+    {"decisao": "include", "confianca": 0.99},
+    {"provider": "teste", "model_name": "modelo-local"},
 )
 
-print("\n--- Testes finalizados! Verifique as mensagens de sucesso acima. ---")
+print(f"✅ Teste concluído no projeto {project_id}.")
