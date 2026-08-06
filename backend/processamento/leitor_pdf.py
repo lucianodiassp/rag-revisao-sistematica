@@ -3,6 +3,7 @@ import fitz  # PyMuPDF
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
 from google.genai import types
+from psycopg2.extras import Json
 from backend.app.database import resolver_project_id
 from backend.app.gemini_client import get_gemini_client
 
@@ -23,18 +24,27 @@ def get_conexao():
         password=os.environ["DB_PASSWORD"]
     )
 
-def extrair_texto_pdf(caminho_pdf):
-    """Extrai texto do PDF página a página usando PyMuPDF."""
-    texto_completo = ""
+def extrair_paginas_pdf(caminho_pdf):
+    """Extrai o texto sem perder o número da página de origem."""
     try:
-        documento = fitz.open(caminho_pdf)
-        for pagina in documento:
-            texto_completo += pagina.get_text("text") + "\n"
-        documento.close()
-        return texto_completo.strip()
+        paginas = []
+        with fitz.open(caminho_pdf) as documento:
+            for numero, pagina in enumerate(documento, start=1):
+                texto = pagina.get_text("text").strip()
+                if texto:
+                    paginas.append({"page_number": numero, "text": texto})
+        return paginas
     except Exception as e:
         print(f"❌ Erro ao ler {caminho_pdf}: {e}")
         return None
+
+
+def extrair_texto_pdf(caminho_pdf):
+    """Mantém compatibilidade com chamadas antigas que esperam texto contínuo."""
+    paginas = extrair_paginas_pdf(caminho_pdf)
+    if paginas is None:
+        return None
+    return "\n".join(pagina["text"] for pagina in paginas).strip()
 
 def criar_chunks(texto, max_palavras=250, overlap=50):
     """
@@ -61,6 +71,24 @@ def criar_chunks(texto, max_palavras=250, overlap=50):
             break
             
     return chunks
+
+
+def criar_chunks_por_pagina(paginas, max_palavras=250, overlap=50):
+    """Cria chunks que nunca atravessam páginas e anexa sua proveniência."""
+    resultado = []
+    for pagina in paginas or []:
+        for indice_pagina, texto in enumerate(
+            criar_chunks(pagina["text"], max_palavras=max_palavras, overlap=overlap),
+            start=1,
+        ):
+            resultado.append(
+                {
+                    "chunk_text": texto,
+                    "page_number": pagina["page_number"],
+                    "page_chunk_index": indice_pagina,
+                }
+            )
+    return resultado
 
 def processar_pdfs(project_id=None):
     project_id = resolver_project_id(project_id)
@@ -96,28 +124,46 @@ def processar_pdfs(project_id=None):
         paper_id = arquivo.replace(".pdf", "")
         caminho_completo = os.path.join(DIRETORIO_PDFS, arquivo)
 
-        # Verifica se o PDF já foi vetorizado antes (evita duplicação cara)
-        cursor.execute("SELECT COUNT(*) FROM paper_chunks WHERE paper_id = %s AND chunk_type LIKE 'full_text_part_%%'", (paper_id,))
-        ja_processado = cursor.fetchone()[0] > 0
+        # Um índice antigo sem página precisa ser reconstruído uma única vez.
+        cursor.execute("""
+            SELECT COUNT(*), COUNT(*) FILTER (
+                WHERE metadata_jsonb->>'source_type' = 'pdf'
+                  AND metadata_jsonb ? 'page_start'
+            )
+            FROM paper_chunks
+            WHERE paper_id = %s AND chunk_type LIKE 'full_text_part_%%'
+        """, (paper_id,))
+        total_chunks, chunks_rastreaveis = cursor.fetchone()
+        ja_processado = total_chunks > 0 and total_chunks == chunks_rastreaveis
 
         if ja_processado:
-            print(f"⏩ PDF {paper_id[:8]}... já processado anteriormente. Saltando.")
+            print(f"⏩ PDF {paper_id[:8]}... já possui índice com páginas. Saltando.")
             continue
+
+
+        if total_chunks:
+            print(f"♻️ PDF {paper_id[:8]}... possui índice legado; reconstruindo com páginas.")
+            cursor.execute("""
+                DELETE FROM paper_chunks
+                WHERE paper_id = %s AND chunk_type LIKE 'full_text_part_%%'
+            """, (paper_id,))
 
         print(f"📖 A ler e extrair texto de: {arquivo}...")
-        texto_pdf = extrair_texto_pdf(caminho_completo)
+        paginas = extrair_paginas_pdf(caminho_completo)
         
-        if not texto_pdf:
+        if not paginas:
+            conexao.rollback()
             continue
 
-        print(f"🔪 A fatiar o texto completo de {paper_id[:8]}...")
-        chunks = criar_chunks(texto_pdf, max_palavras=250)
+        print(f"🔪 A fatiar {len(paginas)} páginas de {paper_id[:8]} sem perder a origem...")
+        chunks = criar_chunks_por_pagina(paginas, max_palavras=250)
         
         print(f"🧠 A gerar embeddings para {len(chunks)} chunks com a IA do Google...")
         chunks_inseridos = 0
         
-        for index, chunk_text in enumerate(chunks):
+        for index, chunk in enumerate(chunks):
             try:
+                chunk_text = chunk["chunk_text"]
                 # 1. Gera a coordenada matemática do trecho
                 resposta = get_gemini_client().models.embed_content(
                     model=NOME_MODELO_EMBEDDING,
@@ -128,9 +174,23 @@ def processar_pdfs(project_id=None):
                 
                 # 2. Insere o pedaço de texto na base
                 cursor.execute("""
-                    INSERT INTO paper_chunks (paper_id, chunk_type, chunk_text)
-                    VALUES (%s, %s, %s) RETURNING id
-                """, (paper_id, f"full_text_part_{index+1}", chunk_text))
+                    INSERT INTO paper_chunks
+                        (paper_id, chunk_type, chunk_text, metadata_jsonb)
+                    VALUES (%s, %s, %s, %s) RETURNING id
+                """, (
+                    paper_id,
+                    f"full_text_part_{index+1}",
+                    chunk_text,
+                    Json({
+                        "source_type": "pdf",
+                        "file_name": arquivo,
+                        "page_start": chunk["page_number"],
+                        "page_end": chunk["page_number"],
+                        "page_chunk_index": chunk["page_chunk_index"],
+                        "document_chunk_index": index + 1,
+                        "traceability_version": 1,
+                    }),
+                ))
                 chunk_id = cursor.fetchone()[0]
                 
                 # 3. Insere a matemática no pgvector
@@ -142,7 +202,15 @@ def processar_pdfs(project_id=None):
                 chunks_inseridos += 1
             except Exception as e:
                 print(f"⚠️ Erro ao vetorizar chunk {index}: {e}")
-                
+
+        if chunks_inseridos != len(chunks):
+            conexao.rollback()
+            print(
+                f"   ❌ Indexação incompleta ({chunks_inseridos}/{len(chunks)}). "
+                "As alterações deste PDF foram desfeitas para preservar o índice anterior."
+            )
+            continue
+
         conexao.commit()
         print(f"   💾 Sucesso! {chunks_inseridos} trechos indexados para o artigo {paper_id[:8]}.\n")
 

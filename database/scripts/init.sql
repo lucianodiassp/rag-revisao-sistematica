@@ -105,9 +105,27 @@ CREATE TABLE screening_decisions (
 -- Matriz de evidências estruturada
 CREATE TABLE extracted_evidence (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    paper_id UUID REFERENCES deduplicated_papers(id) ON DELETE CASCADE,
+    paper_id UUID UNIQUE REFERENCES deduplicated_papers(id) ON DELETE CASCADE,
     extraction_jsonb JSONB NOT NULL,
-    human_review_status VARCHAR(50) DEFAULT 'pending'
+    schema_version VARCHAR(50) NOT NULL DEFAULT 'traceable-v1',
+    human_review_status VARCHAR(50) DEFAULT 'pending',
+    human_review_jsonb JSONB,
+    review_notes TEXT,
+    extracted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Liga cada campo extraído ao trecho literal e à página de origem.
+CREATE TABLE evidence_field_sources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    extraction_id UUID NOT NULL REFERENCES extracted_evidence(id) ON DELETE CASCADE,
+    field_name VARCHAR(50) NOT NULL,
+    evidence_order INTEGER NOT NULL DEFAULT 0,
+    chunk_id UUID NOT NULL REFERENCES paper_chunks(id) ON DELETE CASCADE,
+    page_number INTEGER,
+    quote TEXT NOT NULL,
+    quote_validated BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Métricas e experimentos (Avaliação Quantitativa)
@@ -127,3 +145,5 @@ CREATE INDEX idx_agent_interactions_project ON agent_interactions(project_id);
 CREATE INDEX idx_evaluation_runs_project ON evaluation_runs(project_id);
 CREATE INDEX idx_paper_chunks_paper ON paper_chunks(paper_id);
 CREATE INDEX idx_embeddings_chunk ON embeddings_metadata(chunk_id);
+CREATE INDEX idx_evidence_sources_extraction ON evidence_field_sources(extraction_id);
+CREATE INDEX idx_evidence_sources_chunk ON evidence_field_sources(chunk_id);

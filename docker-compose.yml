@@ -15,7 +15,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql # Mapeamento para auto-executar o schema
-      - ./database/scripts/002_project_isolation.sql:/docker-entrypoint-initdb.d/99_project_isolation.sql:ro
+      - ./database/scripts/002_project_isolation.sql:/docker-entrypoint-initdb.d/z98_project_isolation.sql:ro
+      - ./database/scripts/003_traceable_evidence.sql:/docker-entrypoint-initdb.d/z99_traceable_evidence.sql:ro
     networks:
       - rag_network
 

@@ -121,8 +121,9 @@ else:
     st.header("🧠 Central de Indexação Vetorial Avançada")
     st.markdown("""
     Clique no botão abaixo para acionar o processador do sistema. O motor irá abrir cada PDF armazenado, 
-    extrair o texto completo, dividi-lo em blocos lógicos e gerar os *embeddings* de 768 dimensões com a IA do Google.
-    *(Apenas arquivos novos ou modificados serão processados, evitando duplicidade e poupando tokens).*
+    extrair o texto completo, dividi-lo em blocos lógicos, registrar a página de cada trecho e gerar os
+    *embeddings* de 768 dimensões com a IA do Google. Índices antigos sem página serão atualizados
+    automaticamente; PDFs que já possuem rastreabilidade serão ignorados para evitar custo duplicado.
     """)
 
     # Botão de ignição do backend
@@ -131,6 +132,6 @@ else:
             try:
                 # Invoca a função do leitor_pdf.py diretamente
                 processar_pdfs(project_id)
-                st.success("🎉 Processamento concluído com sucesso! Os textos completos já estão indexados no PostgreSQL com pgvector.")
+                st.success("🎉 Processamento concluído! Os textos estão indexados com a página de origem de cada trecho.")
             except Exception as e:
                 st.error(f"⚠️ Ocorreu um erro durante a vetorização: {e}")

@@ -89,10 +89,12 @@ Serviços disponibilizados:
 
 #### Atualizar um banco criado por uma versão anterior
 
-Em instalações que já possuem o volume `postgres_data`, execute uma vez:
+Em instalações que já possuem o volume `postgres_data`, aplique as migrações uma vez:
 
 ```bash
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/99_project_isolation.sql
+docker compose up -d --force-recreate db
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z98_project_isolation.sql
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z99_traceable_evidence.sql
 ```
 
 A migração preserva os dados existentes, associa registros antigos a um projeto
@@ -213,19 +215,34 @@ Os artigos devem ser classificados como:
 
 ---
 
-### Passo 3: Indexação Vetorial
+### Passo 3: Indexação Vetorial e páginas de origem
 
-Após a triagem, gere os embeddings apenas para os artigos aprovados:
+Após a triagem, envie os documentos na página **Gestão de PDFs** e execute o botão
+de processamento e vetorização. A mesma operação pode ser iniciada pelo terminal:
 
 ```bash
-python backend/processamento/gerador_embeddings.py
+python backend/processamento/leitor_pdf.py
 ```
 
 Os vetores gerados serão armazenados no PostgreSQL utilizando a extensão `pgvector`.
+Cada chunk do PDF também registra a página de origem. Índices criados por versões
+anteriores são reconstruídos automaticamente na próxima execução da indexação.
 
 ---
 
-### Passo 4: Auditoria do Sistema RAG
+### Passo 4: Extração e revisão da Matriz de Evidências
+
+Na página **2. Matriz de Evidências**, execute a extração dos PDFs. Para cada campo,
+o sistema exige uma citação literal vinculada a um chunk e à página correspondente.
+Citações que não existem no trecho indicado são descartadas automaticamente.
+
+Confira as fontes apresentadas, corrija os valores quando necessário e registre a
+decisão humana. A saída original da IA e a versão revisada são preservadas. Somente
+evidências com status **Aprovada** ou **Corrigida e aprovada** alimentam o relatório.
+
+---
+
+### Passo 5: Auditoria do Sistema RAG
 
 Execute o agente avaliador:
 
@@ -242,7 +259,7 @@ O objetivo dessa etapa é detectar possíveis alucinações e avaliar a qualidad
 
 ---
 
-### Passo 5: Geração da Síntese e do Relatório Final
+### Passo 6: Geração da Síntese e do Relatório Final
 
 Após a geração dos embeddings e a conclusão da auditoria, acesse novamente a interface:
 
