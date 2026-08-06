@@ -2,9 +2,8 @@ import os
 import json
 import time
 import pandas as pd
-from dotenv import load_dotenv, find_dotenv
-from google.genai import types
-from backend.app.gemini_client import get_gemini_client
+from backend.app.ai_config import TASK_EVALUATION, get_generation_config
+from backend.app.ai_service import generate_content
 
 # 1. Ajuste de Caminho para importar o nosso Agente RAG
 import sys
@@ -16,12 +15,6 @@ from backend.app.database import (
     resolver_project_id,
     salvar_execucao_avaliacao,
 )
-
-# ==========================================
-# CONFIGURAÇÃO DE AMBIENTE DO JUIZ
-# ==========================================
-load_dotenv(find_dotenv())
-NOME_MODELO_JUIZ = 'gemini-2.5-flash'
 
 # ==========================================
 # CONJUNTO DE TESTES (GROUND TRUTH / FALLBACK)
@@ -82,13 +75,10 @@ def avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa=1):
     """
     
     try:
-        resposta_avaliacao = get_gemini_client().models.generate_content(
-            model=NOME_MODELO_JUIZ,
+        resposta_avaliacao = generate_content(
+            TASK_EVALUATION,
             contents=prompt_juiz,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.0,
-            ),
+            response_mime_type="application/json",
         )
         return json.loads(resposta_avaliacao.text)
     except Exception as e:
@@ -136,7 +126,7 @@ def executar_auditoria(project_id=None):
             "evaluation_judge",
             {"question": pergunta, "rag_answer": resposta_gerada, "context": contexto_texto},
             avaliacao,
-            {"provider": "Google", "model_name": NOME_MODELO_JUIZ, "temperature": 0.0},
+            get_generation_config(TASK_EVALUATION).metadata(),
         )
         
         # Pausa generosa para não estourar os limites gratuitos da Google
@@ -152,7 +142,10 @@ def executar_auditoria(project_id=None):
         project_id,
         "rag_llm_judge",
         metricas,
-        {"questions": perguntas_ativas, "judge_model": NOME_MODELO_JUIZ},
+        {
+            "questions": perguntas_ativas,
+            "judge_model": get_generation_config(TASK_EVALUATION).model,
+        },
     )
     
     print("=" * 60)

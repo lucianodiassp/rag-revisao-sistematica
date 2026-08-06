@@ -2,15 +2,14 @@ import os
 import json
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
-from google.genai import types
+from backend.app.ai_config import TASK_REPORT, get_generation_config
+from backend.app.ai_service import generate_content
 from backend.app.database import log_interacao_agente, resolver_project_id
-from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
 # ==========================================
 load_dotenv(find_dotenv())
-NOME_MODELO = "gemini-2.5-flash"
 
 def get_conexao():
     return psycopg2.connect(
@@ -174,12 +173,9 @@ def gerar_relatorio_final(project_id=None):
     """
     
     try:
-        resposta = get_gemini_client().models.generate_content(
-            model=NOME_MODELO,
+        resposta = generate_content(
+            TASK_REPORT,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.2, # Baixa temperatura para manter o rigor factual
-            ),
         )
         texto_relatorio = resposta.text
     except Exception as e:
@@ -190,7 +186,7 @@ def gerar_relatorio_final(project_id=None):
         "report_agent",
         {"metrics": metricas, "paper_ids": [item["paper_id"] for item in evidencias]},
         {"report_markdown": texto_relatorio},
-        {"provider": "Google", "model_name": NOME_MODELO, "temperature": 0.2},
+        get_generation_config(TASK_REPORT).metadata(),
     )
         
     return {

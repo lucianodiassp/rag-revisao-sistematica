@@ -1,19 +1,18 @@
 import os
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
-from google.genai import types
+from backend.app.ai_config import (
+    TASK_RAG,
+    get_embedding_config,
+    get_generation_config,
+)
+from backend.app.ai_service import generate_content, generate_embedding
 from backend.app.database import log_interacao_agente, resolver_project_id
-from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E MODELOS
 # ==========================================
 load_dotenv(find_dotenv())
-
-# Inicializar o cliente com a API oficial da Google
-NOME_MODELO_LLM = 'gemini-2.5-flash'
-NOME_MODELO_EMBEDDING = 'gemini-embedding-001'
-DIMENSOES = 768
 
 def get_conexao():
     """Estabelece a conexão estritamente via variáveis de ambiente."""
@@ -36,12 +35,8 @@ def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
     project_id = resolver_project_id(project_id)
     print("   [1/2] A converter pergunta em matemática...")
     # Transforma a pergunta num vetor usando o Gemini com compressão Matryoshka (768d)
-    resposta_emb = get_gemini_client().models.embed_content(
-        model=NOME_MODELO_EMBEDDING,
-        contents=pergunta,
-        config=types.EmbedContentConfig(output_dimensionality=DIMENSOES)
-    )
-    vetor_pergunta = resposta_emb.embeddings[0].values
+    embedding_config = get_embedding_config()
+    vetor_pergunta = generate_embedding(pergunta)
 
     conexao = get_conexao()
     cursor = conexao.cursor()
@@ -56,6 +51,8 @@ def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
         JOIN paper_chunks pc ON em.chunk_id = pc.id
         JOIN deduplicated_papers dp ON dp.id = pc.paper_id
         WHERE dp.project_id = %s
+          AND em.model_name = %s
+          AND em.dimensions = %s
         ORDER BY em.embedding <=> %s::vector
         LIMIT 20
     ),
@@ -80,7 +77,8 @@ def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
     """
 
     cursor.execute(query, (
-        str(vetor_pergunta), project_id, str(vetor_pergunta),
+        str(vetor_pergunta), project_id,
+        embedding_config.model, embedding_config.dimensions, str(vetor_pergunta),
         pergunta, project_id, pergunta, pergunta,
         limite                                     # Limite de RRF
     ))
@@ -106,7 +104,7 @@ def responder_com_rag(pergunta, project_id=None):
             "rag_agent",
             {"question": pergunta},
             {"answer": resposta_sem_contexto, "supporting_evidence": []},
-            {"provider": "Google", "model_name": NOME_MODELO_LLM, "temperature": 0.1},
+            get_generation_config(TASK_RAG).metadata(),
         )
         return resposta_sem_contexto
 
@@ -132,13 +130,10 @@ def responder_com_rag(pergunta, project_id=None):
     {contexto_formatado}
     """
 
-    resposta = get_gemini_client().models.generate_content(
-        model=NOME_MODELO_LLM,
+    resposta = generate_content(
+        TASK_RAG,
         contents=pergunta,
-        config=types.GenerateContentConfig(
-            system_instruction=prompt_sistema,
-            temperature=0.1
-        )
+        system_instruction=prompt_sistema,
     )
     
     resposta_texto = resposta.text
@@ -157,7 +152,7 @@ def responder_com_rag(pergunta, project_id=None):
                 for paper_id, texto_chunk, score in evidencias
             ],
         },
-        {"provider": "Google", "model_name": NOME_MODELO_LLM, "temperature": 0.1},
+        get_generation_config(TASK_RAG).metadata(),
     )
     return resposta_texto
 

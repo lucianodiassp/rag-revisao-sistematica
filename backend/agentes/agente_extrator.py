@@ -5,10 +5,11 @@ import uuid
 
 import psycopg2
 from dotenv import find_dotenv, load_dotenv
-from google.genai import types
 from google.genai.errors import APIError
 from psycopg2.extras import Json
 
+from backend.app.ai_config import TASK_EXTRACTION, get_generation_config
+from backend.app.ai_service import generate_content
 from backend.app.database import resolver_project_id
 from backend.app.evidence_utils import (
     FIELD_TYPES,
@@ -17,11 +18,9 @@ from backend.app.evidence_utils import (
     listar_fontes_extracao,
     validar_extracao_rastreavel,
 )
-from backend.app.gemini_client import get_gemini_client
 
 
 load_dotenv(find_dotenv())
-NOME_MODELO = "gemini-2.5-flash"
 MAXIMO_CARACTERES_CONTEXTO = 100_000
 
 
@@ -155,13 +154,10 @@ TRECHOS DO PDF:
 {_montar_contexto(chunks)}
 """
     try:
-        resposta = get_gemini_client().models.generate_content(
-            model=NOME_MODELO,
+        resposta = generate_content(
+            TASK_EXTRACTION,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.0,
-            ),
+            response_mime_type="application/json",
         )
         resposta_json = json.loads(resposta.text)
         resposta_json["document_scope"] = {"truncated": contexto_truncado}
@@ -325,7 +321,7 @@ def executar_pipeline_extracao(project_id=None):
                         "context_truncated": truncado,
                     }),
                     Json({"extraction_id": extracao_id, "extraction": dados_extraidos}),
-                    Json({"provider": "Google", "model_name": NOME_MODELO, "temperature": 0.0}),
+                    Json(get_generation_config(TASK_EXTRACTION).metadata()),
                 ),
             )
             conexao.commit()
