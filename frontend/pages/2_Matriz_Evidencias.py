@@ -1,127 +1,234 @@
 import os
 import sys
-import json
-import psycopg2
+
 import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv, find_dotenv
 
-# Adiciona o caminho raiz para podermos importar o agente extrator
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-from backend.agentes.agente_extrator import executar_pipeline_extracao
-from frontend.project_selector import selecionar_projeto_ativo
 
-# ==========================================
-# CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
-# ==========================================
-load_dotenv(find_dotenv())
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-def get_conexao():
-    """Estabelece a conexão estritamente via variáveis de ambiente."""
-    # Se DB_USER ou DB_PASSWORD não existirem no .env, o sistema falha com segurança
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"), # Host e Port podem ter fallback pois não são sensíveis
-        port=os.getenv("DB_PORT", "5432"),
-        dbname=os.getenv("DB_NAME", "rag_systematic_review"),
-        user=os.environ["DB_USER"],         # Usa os.environ para forçar erro se não existir
-        password=os.environ["DB_PASSWORD"]  # Força a leitura exclusiva do .env
-    )
+from backend.agentes.agente_extrator import (  # noqa: E402
+    carregar_extracoes_projeto,
+    executar_pipeline_extracao,
+    salvar_revisao_humana,
+)
+from backend.app.evidence_utils import FIELD_TYPES, achatar_extracao  # noqa: E402
+from frontend.project_selector import selecionar_projeto_ativo  # noqa: E402
 
-def carregar_matriz_evidencias(project_id):
-    """Busca as evidências extraídas e cruza com o título do artigo."""
-    try:
-        conexao = get_conexao()
-        cursor = conexao.cursor()
-        
-        # AQUI ESTÁ A CORREÇÃO: O 'ORDER BY' foi removido da query.
-        cursor.execute("""
-            SELECT p.title, e.extraction_jsonb, e.human_review_status
-            FROM extracted_evidence e
-            JOIN deduplicated_papers p ON p.id = e.paper_id
-            WHERE p.project_id = %s;
-        """, (project_id,))
-        
-        resultados = cursor.fetchall()
-        conexao.close()
-        
-        # Transformar os dados SQL brutos numa lista de dicionários para o Pandas
-        dados_formatados = []
-        for titulo, jsonb_data, status in resultados:
-            # O PostgreSQL pode retornar o JSONB já como dicionário Python ou como string
-            if isinstance(jsonb_data, str):
-                jsonb_data = json.loads(jsonb_data)
-                
-            dados_formatados.append({
-                "Título do Artigo": titulo,
-                "Objetivo": jsonb_data.get("objective", "N/A"),
-                "Método": jsonb_data.get("method", "N/A"),
-                "Dataset": jsonb_data.get("dataset", "N/A"),
-                "Métricas": ", ".join(jsonb_data.get("metrics", [])),
-                "Principais Resultados": jsonb_data.get("main_results", "N/A"),
-                "Limitações": ", ".join(jsonb_data.get("limitations", [])),
-                "Status da Extração": status.capitalize()
-            })
-            
-        return dados_formatados
-    except Exception as e:
-        st.error(f"Erro ao ligar à base de dados: {e}")
-        return []
 
-# ==========================================
-# INTERFACE GRÁFICA (STREAMLIT)
-# ==========================================
+ROTULOS = {
+    "objective": "Objetivo",
+    "method": "Método",
+    "dataset": "Dataset / amostra",
+    "metrics": "Métricas",
+    "main_results": "Principais resultados",
+    "limitations": "Limitações",
+}
+STATUS = {
+    "pending": "Pendente",
+    "approved": "Aprovada",
+    "corrected": "Corrigida e aprovada",
+    "rejected": "Rejeitada",
+}
+
+
+def _fontes_por_campo(extracao):
+    fontes = {}
+    for campo in FIELD_TYPES:
+        bloco = extracao.get(campo) or {}
+        fontes[campo] = bloco.get("evidence", []) if isinstance(bloco, dict) else []
+    return fontes
+
+
+def _texto_lista(valor):
+    return "\n".join(valor or []) if isinstance(valor, list) else str(valor or "")
+
+
+def _montar_dataframe(extracoes):
+    linhas = []
+    for item in extracoes:
+        dados = item.get("human_review_jsonb") or achatar_extracao(item["extraction_jsonb"])
+        fontes = _fontes_por_campo(item["extraction_jsonb"])
+        status_exibicao = (
+            STATUS.get(item["human_review_status"], item["human_review_status"])
+            if item.get("schema_version") == "traceable-v1"
+            else "Legada — reindexar PDF"
+        )
+        linhas.append(
+            {
+                "Título do Artigo": item["title"],
+                "Objetivo": dados.get("objective", "Não reportado"),
+                "Método": dados.get("method", "Não reportado"),
+                "Dataset": dados.get("dataset", "Não reportado"),
+                "Métricas": "; ".join(dados.get("metrics", [])),
+                "Principais Resultados": dados.get("main_results", "Não reportado"),
+                "Limitações": "; ".join(dados.get("limitations", [])),
+                "Fontes validadas": sum(len(itens) for itens in fontes.values()),
+                "Status": status_exibicao,
+            }
+        )
+    return pd.DataFrame(linhas)
+
+
 st.set_page_config(page_title="Matriz de Evidências", page_icon="📊", layout="wide")
 projeto = selecionar_projeto_ativo()
 project_id = str(projeto["id"])
 
-st.title("📊 Matriz de Evidências")
+st.title("📊 Matriz de Evidências Rastreáveis")
 st.caption(f"Projeto ativo: **{projeto['title']}**")
 
-# Layout do cabeçalho com botão de ação para automatizar a extração
-col1, col2 = st.columns([3, 1])
-
-with col1:
-    st.markdown("""
-    Aqui estão os dados estruturados extraídos automaticamente pela Inteligência Artificial dos artigos que você aprovou na Triagem.
-    Estes dados estão prontos para compor o **Relatório Final da Revisão Sistemática**.
-    """)
-
-with col2:
-    # O botão mágico de automatização
-    if st.button("🔄 Extrair Novas Evidências", type="primary", use_container_width=True):
-        with st.spinner("A IA está a ler e a estruturar os novos artigos. Pode demorar alguns instantes..."):
-            executar_pipeline_extracao(project_id)
-        st.success("Extração concluída com sucesso!")
-        st.rerun() # Recarrega a página para exibir os novos dados
+col_texto, col_acao = st.columns([3, 1])
+with col_texto:
+    st.markdown(
+        "A extração usa o **texto integral dos PDFs**. Cada informação precisa estar "
+        "ligada a um trecho literal e à página de origem antes de aparecer para revisão. "
+        "Somente itens aprovados nesta tela serão usados no relatório final."
+    )
+with col_acao:
+    if st.button("🔄 Extrair dos PDFs", type="primary", use_container_width=True):
+        with st.spinner("Lendo os artigos e validando as citações literais..."):
+            try:
+                resumo = executar_pipeline_extracao(project_id)
+                st.success(f"{resumo['extraidos']} artigo(s) extraído(s) com rastreabilidade.")
+                if resumo["sem_pdf_rastreavel"]:
+                    st.warning(
+                        f"{resumo['sem_pdf_rastreavel']} artigo(s) aprovado(s) ainda precisam "
+                        "ter o PDF indexado na página Gestão de PDFs."
+                    )
+                if resumo["falhas"]:
+                    st.warning(f"{resumo['falhas']} extração(ões) não puderam ser concluídas.")
+            except Exception as erro:
+                st.error(f"Não foi possível executar a extração: {erro}")
 
 st.divider()
+extracoes = carregar_extracoes_projeto(project_id)
 
-# Carrega e converte os dados para um DataFrame do Pandas
-dados = carregar_matriz_evidencias(project_id)
+if not extracoes:
+    st.info(
+        "Ainda não há evidências. Aprove os artigos na Triagem, envie e indexe os PDFs "
+        "na Gestão de PDFs e depois execute a extração nesta página."
+    )
+    st.stop()
 
-if dados:
-    df = pd.DataFrame(dados)
-    
-    # 1. Mostrar a Tabela de forma interativa no Streamlit
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        height=400
-    )
-    
-    st.divider()
-    
-    # 2. Configurar o Download em formato CSV (Requisito RF14)
-    st.write("### 📥 Exportação de Dados")
-    csv = df.to_csv(index=False).encode('utf-8')
-    
-    st.download_button(
-        label="Download Matriz de Evidências (CSV)",
-        data=csv,
-        file_name="matriz_evidencias_revisao.csv",
-        mime="text/csv",
-        type="primary"
-    )
-else:
-    st.info("Ainda não há evidências extraídas. Vá à página de Triagem, aprove os artigos que desejar e depois volte aqui para clicar no botão 'Extrair Novas Evidências'.")
+contagens = {status: 0 for status in STATUS}
+for item in extracoes:
+    contagens[item["human_review_status"]] = contagens.get(item["human_review_status"], 0) + 1
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Pendentes", contagens.get("pending", 0))
+col2.metric("Aprovadas", contagens.get("approved", 0))
+col3.metric("Corrigidas", contagens.get("corrected", 0))
+col4.metric("Rejeitadas", contagens.get("rejected", 0))
+
+st.dataframe(_montar_dataframe(extracoes), use_container_width=True, hide_index=True, height=320)
+
+st.divider()
+st.subheader("Revisão humana")
+st.caption("Confira os valores e abra as fontes para comparar cada trecho com a página indicada.")
+
+for item in extracoes:
+    status_atual = item["human_review_status"]
+    rastreavel = item.get("schema_version") == "traceable-v1"
+    status_rotulo = STATUS.get(status_atual, status_atual) if rastreavel else "Legada — reindexar PDF"
+    titulo_expansor = f"{status_rotulo} · {item['title']}"
+    with st.expander(titulo_expansor, expanded=status_atual == "pending" and rastreavel):
+        extracao_ia = item["extraction_jsonb"]
+        valores_ia = achatar_extracao(extracao_ia)
+        valores_atuais = item.get("human_review_jsonb") or valores_ia
+        fontes = _fontes_por_campo(extracao_ia)
+
+        if not rastreavel:
+            st.warning(
+                "Esta extração foi criada pelo fluxo antigo, sem PDF, página e trecho literal. "
+                "Na página Gestão de PDFs, execute a indexação; depois volte e clique em "
+                "Extrair dos PDFs. O registro será atualizado sem misturar projetos."
+            )
+            st.caption("O conteúdo legado permanece disponível abaixo apenas para consulta histórica.")
+            st.json(valores_ia)
+            continue
+
+        for campo, rotulo in ROTULOS.items():
+            bloco = extracao_ia.get(campo) or {}
+            confianca = bloco.get("confidence", 0) if isinstance(bloco, dict) else 0
+            with st.container(border=True):
+                st.markdown(f"**{rotulo}** · confiança da IA: `{confianca:.0%}`")
+                if fontes[campo]:
+                    for fonte in fontes[campo]:
+                        pagina = fonte.get("page") or "não identificada"
+                        st.caption(f"Página {pagina} · chunk {fonte['chunk_id'][:8]}")
+                        st.markdown(f"> {fonte['quote']}")
+                else:
+                    st.caption("Nenhuma fonte literal validada; o campo deve permanecer como não reportado.")
+
+        with st.form(f"revisao_{item['id']}"):
+            st.markdown("#### Valores finais da matriz")
+            objetivo = st.text_area(
+                "Objetivo", value=str(valores_atuais.get("objective", "")), key=f"obj_{item['id']}"
+            )
+            metodo = st.text_area(
+                "Método", value=str(valores_atuais.get("method", "")), key=f"met_{item['id']}"
+            )
+            dataset = st.text_area(
+                "Dataset / amostra", value=str(valores_atuais.get("dataset", "")), key=f"dat_{item['id']}"
+            )
+            metricas = st.text_area(
+                "Métricas (uma por linha)",
+                value=_texto_lista(valores_atuais.get("metrics", [])),
+                key=f"metrics_{item['id']}",
+            )
+            resultados = st.text_area(
+                "Principais resultados",
+                value=str(valores_atuais.get("main_results", "")),
+                key=f"res_{item['id']}",
+            )
+            limitacoes = st.text_area(
+                "Limitações (uma por linha)",
+                value=_texto_lista(valores_atuais.get("limitations", [])),
+                key=f"lim_{item['id']}",
+            )
+            decisao_padrao = 1 if status_atual == "rejected" else 0
+            decisao = st.radio(
+                "Decisão",
+                ["Aprovar para o relatório", "Rejeitar extração"],
+                index=decisao_padrao,
+                horizontal=True,
+                key=f"dec_{item['id']}",
+            )
+            notas = st.text_area(
+                "Notas da revisão (opcional)",
+                value=item.get("review_notes") or "",
+                key=f"notas_{item['id']}",
+            )
+            salvar = st.form_submit_button("💾 Registrar revisão", type="primary")
+
+        if salvar:
+            dados_revisados = {
+                "objective": objetivo.strip() or "Não reportado",
+                "method": metodo.strip() or "Não reportado",
+                "dataset": dataset.strip() or "Não reportado",
+                "metrics": [valor.strip() for valor in metricas.splitlines() if valor.strip()],
+                "main_results": resultados.strip() or "Não reportado",
+                "limitations": [valor.strip() for valor in limitacoes.splitlines() if valor.strip()],
+            }
+            if decisao == "Rejeitar extração":
+                novo_status = "rejected"
+            else:
+                novo_status = "corrected" if dados_revisados != valores_ia else "approved"
+            salvar_revisao_humana(project_id, item["id"], dados_revisados, novo_status, notas)
+            st.success("Revisão registrada com data, status e versão humana.")
+            st.rerun()
+
+st.divider()
+st.subheader("📥 Exportação de dados")
+df_exportacao = _montar_dataframe(extracoes)
+csv_exportacao = df_exportacao.to_csv(
+    index=False,
+    sep=";",
+    lineterminator="\n",
+).encode("utf-8-sig")
+st.download_button(
+    label="Download Matriz de Evidências (CSV)",
+    data=csv_exportacao,
+    file_name="matriz_evidencias_rastreaveis.csv",
+    mime="text/csv; charset=utf-8",
+    type="primary",
+)

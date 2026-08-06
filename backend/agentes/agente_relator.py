@@ -58,34 +58,76 @@ def coletar_metricas_prisma(project_id):
         WHERE p.project_id = %s
     """, (project_id,))
     metricas['evidencias_extraidas'] = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM extracted_evidence e
+        JOIN deduplicated_papers p ON p.id = e.paper_id
+        WHERE p.project_id = %s
+          AND e.human_review_status IN ('approved', 'corrected')
+          AND e.schema_version = 'traceable-v1'
+          AND EXISTS (
+              SELECT 1 FROM evidence_field_sources efs
+              WHERE efs.extraction_id = e.id AND efs.quote_validated = TRUE
+          )
+    """, (project_id,))
+    metricas['evidencias_aprovadas'] = cursor.fetchone()[0]
     
     cursor.close()
     conexao.close()
     return metricas
 
 def coletar_evidencias(project_id):
-    """Recolhe os dados JSON estruturados para enviar ao LLM."""
+    """Recolhe somente a versão humana aprovada e suas fontes literais."""
     conexao = get_conexao()
     cursor = conexao.cursor()
     
     cursor.execute("""
-        SELECT p.id, p.title, e.extraction_jsonb
+        SELECT e.id, p.id, p.title, e.human_review_jsonb, e.human_review_status
         FROM extracted_evidence e
         JOIN deduplicated_papers p ON p.id = e.paper_id
-        WHERE p.project_id = %s;
+        WHERE p.project_id = %s
+          AND e.human_review_status IN ('approved', 'corrected')
+          AND e.human_review_jsonb IS NOT NULL
+          AND e.schema_version = 'traceable-v1'
+          AND EXISTS (
+              SELECT 1 FROM evidence_field_sources efs
+              WHERE efs.extraction_id = e.id AND efs.quote_validated = TRUE
+          )
+        ORDER BY p.title;
     """, (project_id,))
     resultados = cursor.fetchall()
+
+    ids_extracoes = [linha[0] for linha in resultados]
+    fontes_por_extracao = {str(extracao_id): [] for extracao_id in ids_extracoes}
+    if ids_extracoes:
+        cursor.execute("""
+            SELECT extraction_id, field_name, page_number, quote, chunk_id
+            FROM evidence_field_sources
+            WHERE extraction_id = ANY(%s::uuid[])
+              AND quote_validated = TRUE
+            ORDER BY extraction_id, field_name, evidence_order
+        """, (ids_extracoes,))
+        for extracao_id, campo, pagina, quote, chunk_id in cursor.fetchall():
+            fontes_por_extracao[str(extracao_id)].append({
+                "field": campo,
+                "page": pagina,
+                "quote": quote,
+                "chunk_id": str(chunk_id),
+            })
     conexao.close()
     
     evidencias = []
-    for paper_id, titulo, jsonb_data in resultados:
+    for extracao_id, paper_id, titulo, jsonb_data, status in resultados:
         if isinstance(jsonb_data, str):
             jsonb_data = json.loads(jsonb_data)
         
         evidencias.append({
             "paper_id": str(paper_id),
             "titulo": titulo,
-            "dados": jsonb_data
+            "status_revisao": status,
+            "dados_revisados": jsonb_data,
+            "fontes_literais": fontes_por_extracao[str(extracao_id)],
         })
     return evidencias
 
@@ -99,7 +141,13 @@ def gerar_relatorio_final(project_id=None):
     evidencias = coletar_evidencias(project_id)
     
     if not evidencias:
-        return {"metricas": metricas, "relatorio_md": "Não há evidências suficientes para gerar o relatório. Por favor, extraia evidências primeiro na Matriz."}
+        return {
+            "metricas": metricas,
+            "relatorio_md": (
+                "Não há evidências **aprovadas pela revisão humana** para gerar o relatório. "
+                "Revise e aprove ao menos uma extração na Matriz de Evidências."
+            ),
+        }
     
     print("🧠 A solicitar síntese ao Gemini...")
     
@@ -111,7 +159,8 @@ def gerar_relatorio_final(project_id=None):
     - Artigos únicos analisados: {metricas['total_unicos']}
     - Artigos aprovados para extração: {metricas['aprovados_humano']}
     
-    Abaixo estão os dados estruturados extraídos dos artigos aprovados:
+    Abaixo estão apenas os dados aprovados ou corrigidos por revisão humana, junto
+    com as citações literais validadas contra o PDF:
     {json.dumps(evidencias, indent=2, ensure_ascii=False)}
     
     Sua tarefa:
@@ -120,7 +169,8 @@ def gerar_relatorio_final(project_id=None):
     3. Destaque os 'Principais Resultados' de forma agregada (quais são as tendências ou consensos?).
     4. Identifique as 'Limitações' mais comuns relatadas pelos autores.
     5. Mantenha um tom estritamente académico, imparcial e científico. Não invente dados, baseie-se APENAS no JSON fornecido.
-    6. Ao apresentar um achado, cite o paper_id correspondente entre colchetes.
+    6. Ao apresentar um achado, cite a fonte no formato [paper_id, p. página].
+    7. Não apresente um achado quando não houver uma fonte literal compatível no campo correspondente.
     """
     
     try:
