@@ -4,16 +4,15 @@ import psycopg2
 import uuid
 import time
 from dotenv import load_dotenv
-from google.genai import types
 from google.genai.errors import APIError
+from backend.app.ai_config import TASK_SCREENING, get_generation_config
+from backend.app.ai_service import generate_content
 from backend.app.database import obter_projeto, resolver_project_id
-from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
 # ==========================================
 load_dotenv()
-NOME_MODELO = "gemini-2.5-flash"
 
 def get_conexao():
     """Estabelece a conexão estritamente via variáveis de ambiente."""
@@ -83,13 +82,10 @@ def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1):
     """
     
     try:
-        resposta = get_gemini_client().models.generate_content(
-            model=NOME_MODELO,
+        resposta = generate_content(
+            TASK_SCREENING,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.0,
-            ),
+            response_mime_type="application/json",
         )
         return json.loads(resposta.text)
     
@@ -133,8 +129,8 @@ def executar_pipeline_triagem_ui(project_id=None):
                 "confidence": resultado_ia.get("confidence", 0.5),
                 "justification": justificativa_ia,
                 "agent_name": "screening_agent",
-                "model_provider": "Google",
-                "model_name": NOME_MODELO
+                "model_provider": get_generation_config(TASK_SCREENING).provider,
+                "model_name": get_generation_config(TASK_SCREENING).model,
             }
             
             cursor.execute("""
@@ -153,7 +149,7 @@ def executar_pipeline_triagem_ui(project_id=None):
                 "screening_agent",
                 json.dumps({"project_id": project_id, "paper_id": str(paper_id), "title": titulo}),
                 json.dumps(resultado_ia),
-                json.dumps({"provider": "Google", "model_name": NOME_MODELO})
+                json.dumps(get_generation_config(TASK_SCREENING).metadata())
             ))
             conexao.commit()
             

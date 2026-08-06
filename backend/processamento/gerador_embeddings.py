@@ -1,16 +1,14 @@
 import os
 import psycopg2
 from dotenv import load_dotenv
-from google.genai import types
+from backend.app.ai_config import get_embedding_config
+from backend.app.ai_service import generate_embedding
 from backend.app.database import resolver_project_id
-from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 load_dotenv()
-NOME_MODELO_EMBEDDING = "gemini-embedding-001"
-DIMENSOES = 768
 
 def get_conexao():
     return psycopg2.connect(
@@ -38,6 +36,7 @@ def criar_chunks(texto, max_palavras=150):
 def processar_indexacao_vetorial(project_id=None):
     """Lê os artigos aprovados e converte-os em vetores matemáticos no pgvector."""
     project_id = resolver_project_id(project_id)
+    embedding_config = get_embedding_config()
     conexao = get_conexao()
     cursor = conexao.cursor()
     
@@ -69,12 +68,7 @@ def processar_indexacao_vetorial(project_id=None):
         
         for index, chunk_text in enumerate(chunks):
             # 1. Gera o Embedding (Vetor) usando a API do Gemini com compressão Matryoshka
-            resposta = get_gemini_client().models.embed_content(
-                model=NOME_MODELO_EMBEDDING,
-                contents=chunk_text,
-                config=types.EmbedContentConfig(output_dimensionality=DIMENSOES)
-            )
-            vetor = resposta.embeddings[0].values
+            vetor = generate_embedding(chunk_text)
             
             # 2. Insere o Chunk textual na base de dados
             cursor.execute("""
@@ -87,7 +81,12 @@ def processar_indexacao_vetorial(project_id=None):
             cursor.execute("""
                 INSERT INTO embeddings_metadata (chunk_id, model_name, dimensions, embedding)
                 VALUES (%s, %s, %s, %s)
-            """, (chunk_id, NOME_MODELO_EMBEDDING, DIMENSOES, str(vetor)))
+            """, (
+                chunk_id,
+                embedding_config.model,
+                embedding_config.dimensions,
+                str(vetor),
+            ))
             
         conexao.commit()
         print("   💾 Embeddings guardados com sucesso!")

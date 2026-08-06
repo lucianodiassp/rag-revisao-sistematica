@@ -2,17 +2,15 @@ import os
 import fitz  # PyMuPDF
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
-from google.genai import types
 from psycopg2.extras import Json
+from backend.app.ai_config import get_embedding_config
+from backend.app.ai_service import generate_embedding
 from backend.app.database import resolver_project_id
-from backend.app.gemini_client import get_gemini_client
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 load_dotenv(find_dotenv())
-NOME_MODELO_EMBEDDING = "gemini-embedding-001"
-DIMENSOES = 768
 DIRETORIO_PDFS = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data/pdfs'))
 
 def get_conexao():
@@ -92,6 +90,7 @@ def criar_chunks_por_pagina(paginas, max_palavras=250, overlap=50):
 
 def processar_pdfs(project_id=None):
     project_id = resolver_project_id(project_id)
+    embedding_config = get_embedding_config()
     print(f"📂 A verificar diretório: {DIRETORIO_PDFS}")
     if not os.path.exists(DIRETORIO_PDFS):
         os.makedirs(DIRETORIO_PDFS)
@@ -129,12 +128,27 @@ def processar_pdfs(project_id=None):
             SELECT COUNT(*), COUNT(*) FILTER (
                 WHERE metadata_jsonb->>'source_type' = 'pdf'
                   AND metadata_jsonb ? 'page_start'
+            ), COUNT(*) FILTER (
+                WHERE EXISTS (
+                    SELECT 1 FROM embeddings_metadata em
+                    WHERE em.chunk_id = paper_chunks.id
+                      AND em.model_name = %s
+                      AND em.dimensions = %s
+                )
             )
             FROM paper_chunks
             WHERE paper_id = %s AND chunk_type LIKE 'full_text_part_%%'
-        """, (paper_id,))
-        total_chunks, chunks_rastreaveis = cursor.fetchone()
-        ja_processado = total_chunks > 0 and total_chunks == chunks_rastreaveis
+        """, (
+            embedding_config.model,
+            embedding_config.dimensions,
+            paper_id,
+        ))
+        total_chunks, chunks_rastreaveis, chunks_compativeis = cursor.fetchone()
+        ja_processado = (
+            total_chunks > 0
+            and total_chunks == chunks_rastreaveis
+            and total_chunks == chunks_compativeis
+        )
 
         if ja_processado:
             print(f"⏩ PDF {paper_id[:8]}... já possui índice com páginas. Saltando.")
@@ -142,7 +156,21 @@ def processar_pdfs(project_id=None):
 
 
         if total_chunks:
-            print(f"♻️ PDF {paper_id[:8]}... possui índice legado; reconstruindo com páginas.")
+            motivo = (
+                "modelo de embedding diferente"
+                if chunks_rastreaveis == total_chunks and chunks_compativeis != total_chunks
+                else "índice legado sem páginas"
+            )
+            print(f"♻️ PDF {paper_id[:8]}... possui {motivo}; reconstruindo.")
+            cursor.execute("""
+                UPDATE extracted_evidence
+                SET schema_version = 'legacy-v0',
+                    human_review_status = 'pending',
+                    human_review_jsonb = NULL,
+                    review_notes = 'Revisão invalidada por reindexação do PDF',
+                    reviewed_at = NULL
+                WHERE paper_id = %s
+            """, (paper_id,))
             cursor.execute("""
                 DELETE FROM paper_chunks
                 WHERE paper_id = %s AND chunk_type LIKE 'full_text_part_%%'
@@ -165,12 +193,7 @@ def processar_pdfs(project_id=None):
             try:
                 chunk_text = chunk["chunk_text"]
                 # 1. Gera a coordenada matemática do trecho
-                resposta = get_gemini_client().models.embed_content(
-                    model=NOME_MODELO_EMBEDDING,
-                    contents=chunk_text,
-                    config=types.EmbedContentConfig(output_dimensionality=DIMENSOES)
-                )
-                vetor = resposta.embeddings[0].values
+                vetor = generate_embedding(chunk_text)
                 
                 # 2. Insere o pedaço de texto na base
                 cursor.execute("""
@@ -197,7 +220,12 @@ def processar_pdfs(project_id=None):
                 cursor.execute("""
                     INSERT INTO embeddings_metadata (chunk_id, model_name, dimensions, embedding)
                     VALUES (%s, %s, %s, %s)
-                """, (chunk_id, NOME_MODELO_EMBEDDING, DIMENSOES, str(vetor)))
+                """, (
+                    chunk_id,
+                    embedding_config.model,
+                    embedding_config.dimensions,
+                    str(vetor),
+                ))
                 
                 chunks_inseridos += 1
             except Exception as e:

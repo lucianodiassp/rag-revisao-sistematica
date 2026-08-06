@@ -1,12 +1,8 @@
-import os
 import json
-from dotenv import load_dotenv, find_dotenv
-from google.genai import types
+from backend.app.ai_config import TASK_FORMULATION, get_generation_config
+from backend.app.ai_service import generate_content
 from backend.app.database import log_interacao_agente
-from backend.app.gemini_client import get_gemini_client
 
-load_dotenv(find_dotenv())
-NOME_MODELO = 'gemini-2.5-flash'
 
 def estruturar_pergunta_pesquisa(pergunta_livre, project_id=None):
     """Transforma uma pergunta livre na estrutura PICO e gera a estratégia de busca."""
@@ -31,13 +27,10 @@ def estruturar_pergunta_pesquisa(pergunta_livre, project_id=None):
     """
     
     try:
-        resposta = get_gemini_client().models.generate_content(
-            model=NOME_MODELO,
+        resposta = generate_content(
+            TASK_FORMULATION,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.2, # Baixa temperatura para manter o rigor metodológico
-            ),
+            response_mime_type="application/json",
         )
         resultado = json.loads(resposta.text)
         if project_id:
@@ -46,7 +39,7 @@ def estruturar_pergunta_pesquisa(pergunta_livre, project_id=None):
                 "question_formulation_agent",
                 {"question": pergunta_livre},
                 resultado,
-                {"provider": "Google", "model_name": NOME_MODELO, "temperature": 0.2},
+                get_generation_config(TASK_FORMULATION).metadata(),
             )
         return resultado
     except Exception as e:

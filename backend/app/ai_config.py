@@ -1,0 +1,216 @@
+import os
+from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+PROVIDER_GOOGLE_GEMINI = "google_gemini"
+DEFAULT_GENERATION_MODEL = "gemini-2.5-flash"
+DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
+CURRENT_VECTOR_DIMENSIONS = 768
+
+TASK_FORMULATION = "formulation"
+TASK_SCREENING = "screening"
+TASK_RAG = "rag"
+TASK_EVALUATION = "evaluation"
+TASK_EXTRACTION = "extraction"
+TASK_REPORT = "report"
+
+GENERATION_TASKS = (
+    TASK_FORMULATION,
+    TASK_SCREENING,
+    TASK_RAG,
+    TASK_EVALUATION,
+    TASK_EXTRACTION,
+    TASK_REPORT,
+)
+
+TASK_MODEL_ENV = {
+    TASK_FORMULATION: "AI_FORMULATION_MODEL",
+    TASK_SCREENING: "AI_SCREENING_MODEL",
+    TASK_RAG: "AI_RAG_MODEL",
+    TASK_EVALUATION: "AI_EVALUATION_MODEL",
+    TASK_EXTRACTION: "AI_EXTRACTION_MODEL",
+    TASK_REPORT: "AI_REPORT_MODEL",
+}
+TASK_TEMPERATURE_ENV = {
+    TASK_FORMULATION: "AI_FORMULATION_TEMPERATURE",
+    TASK_SCREENING: "AI_SCREENING_TEMPERATURE",
+    TASK_RAG: "AI_RAG_TEMPERATURE",
+    TASK_EVALUATION: "AI_EVALUATION_TEMPERATURE",
+    TASK_EXTRACTION: "AI_EXTRACTION_TEMPERATURE",
+    TASK_REPORT: "AI_REPORT_TEMPERATURE",
+}
+TASK_DEFAULT_TEMPERATURE = {
+    TASK_FORMULATION: 0.2,
+    TASK_SCREENING: 0.0,
+    TASK_RAG: 0.1,
+    TASK_EVALUATION: 0.0,
+    TASK_EXTRACTION: 0.0,
+    TASK_REPORT: 0.2,
+}
+
+
+def load_project_environment():
+    """Carrega configurações locais conhecidas sem sobrescrever o ambiente do SO."""
+    backend_dir = Path(__file__).resolve().parents[1]
+    project_root = backend_dir.parent
+    for env_path in (project_root / ".env", backend_dir / ".env"):
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+
+
+load_project_environment()
+
+
+def _normalizar_provider(valor):
+    aliases = {
+        "google": PROVIDER_GOOGLE_GEMINI,
+        "gemini": PROVIDER_GOOGLE_GEMINI,
+        "google_gemini": PROVIDER_GOOGLE_GEMINI,
+    }
+    normalizado = str(valor or PROVIDER_GOOGLE_GEMINI).strip().lower()
+    return aliases.get(normalizado, normalizado)
+
+
+def _ler_inteiro(nome, padrao):
+    try:
+        valor = int(os.getenv(nome, str(padrao)))
+    except ValueError as erro:
+        raise RuntimeError(f"{nome} deve ser um número inteiro.") from erro
+    if valor <= 0:
+        raise RuntimeError(f"{nome} deve ser maior que zero.")
+    return valor
+
+
+def _ler_temperatura(nome, padrao):
+    valor = os.getenv(nome)
+    if valor is None or not valor.strip():
+        return padrao
+    if valor.strip().lower() in {"none", "null", "disabled", "off"}:
+        return None
+    try:
+        temperatura = float(valor)
+    except ValueError as erro:
+        raise RuntimeError(f"{nome} deve ser um número ou 'none'.") from erro
+    if not 0 <= temperatura <= 2:
+        raise RuntimeError(f"{nome} deve estar entre 0 e 2.")
+    return temperatura
+
+
+def model_supports_sampling_parameters(provider, model):
+    """Evita enviar parâmetros removidos por modelos Gemini mais recentes."""
+    if provider != PROVIDER_GOOGLE_GEMINI:
+        return True
+    modelo = str(model).lower()
+    sem_amostragem = (
+        "gemini-3.5-",
+        "gemini-3.6-",
+    )
+    return not (modelo.startswith(sem_amostragem) or modelo == "gemini-flash-latest")
+
+
+@dataclass(frozen=True)
+class GenerationTaskConfig:
+    task: str
+    provider: str
+    model: str
+    temperature: float | None
+
+    @property
+    def effective_temperature(self):
+        if not model_supports_sampling_parameters(self.provider, self.model):
+            return None
+        return self.temperature
+
+    def metadata(self):
+        return {
+            "provider": self.provider,
+            "model_name": self.model,
+            "temperature": self.effective_temperature,
+            "configuration_source": "central_ai_config",
+            "task": self.task,
+        }
+
+
+@dataclass(frozen=True)
+class EmbeddingConfig:
+    provider: str
+    model: str
+    dimensions: int
+
+    def metadata(self):
+        return {
+            "provider": self.provider,
+            "model_name": self.model,
+            "dimensions": self.dimensions,
+            "configuration_source": "central_ai_config",
+            "task": "embedding",
+        }
+
+
+@dataclass(frozen=True)
+class AISettings:
+    provider: str
+    api_key: str | None = field(repr=False)
+    generation: dict[str, GenerationTaskConfig]
+    embedding: EmbeddingConfig
+
+
+@lru_cache(maxsize=1)
+def get_ai_settings():
+    provider = _normalizar_provider(os.getenv("AI_PROVIDER"))
+    modelo_padrao = os.getenv(
+        "AI_DEFAULT_GENERATION_MODEL",
+        DEFAULT_GENERATION_MODEL,
+    ).strip()
+    if not modelo_padrao:
+        raise RuntimeError("AI_DEFAULT_GENERATION_MODEL não pode ficar vazio.")
+
+    geracao = {}
+    for tarefa in GENERATION_TASKS:
+        modelo = os.getenv(TASK_MODEL_ENV[tarefa], modelo_padrao).strip()
+        if not modelo:
+            raise RuntimeError(f"{TASK_MODEL_ENV[tarefa]} não pode ficar vazio.")
+        geracao[tarefa] = GenerationTaskConfig(
+            task=tarefa,
+            provider=provider,
+            model=modelo,
+            temperature=_ler_temperatura(
+                TASK_TEMPERATURE_ENV[tarefa],
+                TASK_DEFAULT_TEMPERATURE[tarefa],
+            ),
+        )
+
+    embedding = EmbeddingConfig(
+        provider=provider,
+        model=os.getenv("AI_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL).strip(),
+        dimensions=_ler_inteiro("AI_EMBEDDING_DIMENSIONS", CURRENT_VECTOR_DIMENSIONS),
+    )
+    if not embedding.model:
+        raise RuntimeError("AI_EMBEDDING_MODEL não pode ficar vazio.")
+
+    return AISettings(
+        provider=provider,
+        api_key=os.getenv("GEMINI_API_KEY"),
+        generation=geracao,
+        embedding=embedding,
+    )
+
+
+def get_generation_config(task):
+    try:
+        return get_ai_settings().generation[task]
+    except KeyError as erro:
+        raise ValueError(f"Tarefa de IA desconhecida: {task}") from erro
+
+
+def get_embedding_config():
+    return get_ai_settings().embedding
+
+
+def clear_ai_settings_cache():
+    """Permite recarregar a configuração após mudanças futuras pela interface."""
+    get_ai_settings.cache_clear()

@@ -16,7 +16,7 @@ Este projeto é um **Sistema de Apoio à Decisão (SAD)** de código aberto, bas
 - **Frontend:** Streamlit, com páginas de configuração, gestão de PDFs, auditoria e geração do relatório final.
 - **Backend:** Python, com arquitetura modularizada por agentes inteligentes.
 - **Banco de Dados:** PostgreSQL com a extensão `pgvector`, utilizada para buscas por similaridade semântica.
-- **Inteligência Artificial:** Google Gemini, utilizando o modelo `gemini-2.5-flash` como LLM e os modelos `text-embedding-004` ou `gemini-embedding-001` para vetorização em 768 dimensões.
+- **Inteligência Artificial:** configuração centralizada por função, atualmente com adaptador Google Gemini e embeddings de 768 dimensões. Os identificadores dos modelos podem ser alterados sem editar os agentes.
 
 ---
 
@@ -138,19 +138,54 @@ pip install -r requirements.txt
 
 ### 4. Configurar as Variáveis de Ambiente
 
-Crie um arquivo chamado `.env` na raiz do projeto:
+Copie `backend/.env.example` para `backend/.env` e informe suas credenciais:
+
+```powershell
+Copy-Item backend\.env.example backend\.env
+```
+
+Configuração mínima:
 
 ```env
-GEMINI_API_KEY="sua-chave-api-do-google-aqui"
-
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=rag_systematic_review
 DB_USER=rag_user
 DB_PASSWORD=rag_password
+
+GEMINI_API_KEY="sua-chave-api-do-google-aqui"
+AI_PROVIDER=google_gemini
+AI_DEFAULT_GENERATION_MODEL=gemini-3.6-flash
+AI_EMBEDDING_MODEL=gemini-embedding-2
+AI_EMBEDDING_DIMENSIONS=768
 ```
 
 > ⚠️ Não publique o arquivo `.env` nem suas chaves de API em repositórios públicos. Verifique se o arquivo está incluído no `.gitignore`.
+
+#### Configuração central de modelos
+
+Todos os agentes consultam `backend/app/ai_config.py`; não existem mais modelos
+fixos espalhados pelo pipeline. `AI_DEFAULT_GENERATION_MODEL` atende todas as
+funções, mas os seguintes overrides podem ser definidos quando necessário:
+
+- `AI_FORMULATION_MODEL`
+- `AI_SCREENING_MODEL`
+- `AI_RAG_MODEL`
+- `AI_EVALUATION_MODEL`
+- `AI_EXTRACTION_MODEL`
+- `AI_REPORT_MODEL`
+
+Os parâmetros de temperatura também podem ser ajustados com variáveis equivalentes,
+como `AI_REPORT_TEMPERATURE`. A camada central omite automaticamente esses parâmetros
+para modelos Gemini que não os aceitam.
+
+Por compatibilidade, instalações existentes sem as novas variáveis continuam usando
+`gemini-2.5-flash` e `gemini-embedding-001`. Novas instalações devem partir dos
+modelos definidos em `backend/.env.example`.
+
+> ⚠️ Alterar `AI_EMBEDDING_MODEL` exige executar novamente a indexação na página
+> **Gestão de PDFs**. O sistema identifica vetores incompatíveis, reindexa o documento
+> de forma transacional e devolve a extração relacionada para revisão humana.
 
 ---
 
