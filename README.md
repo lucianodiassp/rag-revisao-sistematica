@@ -1,95 +1,250 @@
-# 🧠 RAG Acadêmico: Automação de Revisões Sistemáticas da Literatura
+# RAG para Revisão Sistemática da Literatura
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-blue)
-![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B)
-![Gemini AI](https://img.shields.io/badge/AI-Google_Gemini-orange)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1.svg)
+![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
+![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-## 🎯 Sobre o Projeto
+Aplicação local para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
+multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
+de evidências, revisão humana, auditoria e síntese final.
 
-Este projeto é um **Sistema de Apoio à Decisão (SAD)** de código aberto, baseado na arquitetura **RAG (Retrieval-Augmented Generation)**, desenvolvido para automatizar e conferir rigor científico ao processo de **Revisão Sistemática da Literatura (RSL)**.
+O sistema foi projetado para manter o pesquisador no controle das decisões críticas.
+A IA sugere, extrai e sintetiza; inclusão de artigos, aprovação das evidências e uso
+do relatório permanecem sob responsabilidade humana.
 
----
+## Sumário
 
-## 🏗️ Raio-X da Arquitetura
+- [Visão geral](#visão-geral)
+- [Principais funcionalidades](#principais-funcionalidades)
+- [Arquitetura](#arquitetura)
+- [Instalação local](#instalação-local)
+- [Atualização de um banco existente](#atualização-de-um-banco-existente)
+- [Configuração segura](#configuração-segura)
+- [Fluxo de uso](#fluxo-de-uso)
+- [Testes](#testes)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Segurança, dados e backup](#segurança-dados-e-backup)
+- [Solução de problemas](#solução-de-problemas)
+- [Limites atuais](#limites-atuais)
 
-- **Frontend:** Streamlit, com páginas de configuração, gestão de PDFs, auditoria e geração do relatório final.
-- **Backend:** Python, com arquitetura modularizada por agentes inteligentes.
-- **Banco de Dados:** PostgreSQL com a extensão `pgvector`, utilizada para buscas por similaridade semântica.
-- **Inteligência Artificial:** configuração centralizada por função, atualmente com adaptador Google Gemini e embeddings de 768 dimensões. Os identificadores dos modelos podem ser alterados sem editar os agentes.
+## Visão geral
 
----
+O projeto combina PostgreSQL, `pgvector`, Streamlit e agentes de IA para cobrir o
+fluxo de uma revisão dentro de projetos isolados. Cada projeto possui pergunta,
+protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, interações de
+agentes, auditorias e relatórios próprios.
 
-## 🚀 Principais Funcionalidades
+O perfil atual de implantação é **local e de usuário único**. As tabelas de
+configuração já possuem campos de escopo para uma evolução futura, mas autenticação,
+autorização e isolamento entre usuários ainda não fazem parte desta versão.
 
-### 1. Orquestrador de Coleta Tripla
+## Principais funcionalidades
 
-- Integração simultânea com três importantes bases de dados científicas: **PubMed**, **OpenAlex** e **Semantic Scholar**.
-- **Degradação elegante (*graceful degradation*):** o sistema detecta a presença de chaves de API no arquivo `.env` para utilizar limites de requisição ampliados. Quando as chaves não estão disponíveis, utiliza automaticamente as rotas públicas com limites reduzidos.
-- Sanitização das consultas para evitar falhas de interpretação em APIs que não oferecem suporte completo a expressões booleanas.
+### Projetos isolados e protocolo versionado
 
-### 2. Ingestão e Engenharia Vetorial de PDFs
+- Criação e seleção de múltiplos projetos de pesquisa.
+- Isolamento do corpus e dos resultados por `project_id`.
+- Versionamento da pergunta, PICO, critérios, estratégia de busca e perguntas de auditoria.
+- Identificador estável de artigo por projeto, baseado no DOI normalizado ou no título normalizado.
+- Consolidação de duplicatas com preservação da proveniência das diferentes fontes.
 
-- Desduplicação dos artigos no banco de dados por meio do DOI (*Digital Object Identifier*).
-- Extração integral de texto utilizando a biblioteca `PyMuPDF`, incluindo suporte a artigos estruturados em múltiplas colunas.
-- Segmentação de texto (*chunking*) com janela deslizante e sobreposição (*overlap*), reduzindo a perda de contexto entre parágrafos, fórmulas e sequências de raciocínio.
-- Armazenamento dos vetores diretamente no PostgreSQL utilizando o tipo `vector(768)`.
+### Coleta bibliográfica configurável
 
-### 3. Motor de Busca Híbrida com RRF
+- Integração com **OpenAlex**, **Semantic Scholar** e **PubMed**.
+- Ativação ou desativação individual de cada fonte.
+- Chaves opcionais armazenadas de forma cifrada, com `.env` como fallback.
+- E-mail, identificação da aplicação, timeout e tentativas configuráveis.
+- Teste de acesso sem persistir artigos.
+- Retry limitado para falhas transitórias e respostas `429`.
+- Registro da configuração pública usada na busca, sem segredos ou e-mail literal.
 
-- Implementação do algoritmo **Reciprocal Rank Fusion (RRF)** diretamente no PostgreSQL.
-- Combinação de:
-  - **Busca lexical**, utilizando pesquisa textual para localizar palavras-chave, siglas e expressões exatas.
-  - **Busca semântica**, utilizando `pgvector` para identificar conteúdos conceitualmente relacionados.
-- Prompt de sistema orientado à redução de alucinações: o modelo deve evitar respostas quando não houver evidências suficientes nos fragmentos recuperados dos PDFs armazenados.
+### Configuração central de IA
 
-### 4. Agentes de Síntese e Auditoria
+- Adaptador atual para Google Gemini.
+- Credencial cifrada no banco, com `backend/.env` como fallback.
+- Validação da chave pela listagem de modelos, sem gerar conteúdo.
+- Modelo e temperatura configuráveis para formulação, triagem, RAG, auditoria,
+  extração e relatório.
+- Modelo de embedding configurável dentro do schema atual de 768 dimensões.
+- Histórico de alterações sem exposição da chave.
 
-- **Agente Avaliador (*LLM-as-a-Judge*):** analisa as respostas produzidas pelo sistema RAG e avalia o rigor científico utilizando as perguntas registradas no protocolo versionado do projeto ativo.
-- **Agente Relator:** coleta métricas do fluxo de trabalho, informações do processo PRISMA e dados tabulados em JSON para elaborar a seção de **Resultados e Discussão** em linguagem acadêmica.
-- O agente relator utiliza temperatura `0.2`, buscando maior consistência e rigor factual nas respostas.
+### Triagem humana assistida
 
----
+- Sugestão de inclusão ou exclusão, com confiança e justificativa.
+- Decisão humana obrigatória: **Incluir** ou **Excluir**.
+- Somente artigos incluídos seguem para PDFs, RAG e extração.
 
-## ⚙️ Como Executar o Projeto Localmente
+### PDFs e indexação vetorial rastreável
+
+- Associação do PDF ao UUID do artigo incluído.
+- Extração de texto por página com PyMuPDF.
+- Remoção de caracteres NUL inválidos encontrados em alguns PDFs.
+- Chunking por página, com sobreposição e preservação da origem.
+- Embeddings armazenados em `vector(768)` no PostgreSQL.
+- Indexação transacional por documento: uma falha desfaz apenas o PDF afetado.
+- Relatório por artigo com status, chunks e motivo de falha.
+- Detecção de índice legado ou incompatível com o modelo ativo.
+
+### RAG híbrido e respostas fundamentadas
+
+- Recuperação semântica por distância vetorial.
+- Recuperação lexical pelo Full-Text Search do PostgreSQL.
+- Fusão dos rankings com **Reciprocal Rank Fusion (RRF)**.
+- Filtro pelo projeto ativo e pelo modelo de embedding configurado.
+- Recusa quando não há contexto suficiente e citação do UUID do artigo.
+- Registro da pergunta, resposta, evidências recuperadas e configuração do modelo.
+
+### Matriz de evidências rastreáveis
+
+- Extração de objetivo, método, dataset/amostra, métricas, resultados e limitações.
+- Cada valor precisa possuir citação literal, `chunk_id` e página de origem.
+- Citações inexistentes no trecho indicado são descartadas.
+- Revisão humana com estados pendente, aprovada, corrigida e rejeitada.
+- Preservação da saída original e da versão revisada.
+- Funil separado para PDF associado, indexado, extraído e revisado.
+- Exportação CSV em UTF-8 com BOM, preservando acentuação no Excel.
+
+### Auditoria e relatório final
+
+- Perguntas de auditoria configuráveis e versionadas no protocolo.
+- Avaliação `LLM-as-a-Judge` de fidelidade e relevância.
+- Persistência das execuções e métricas no projeto ativo.
+- Síntese somente com evidências rastreáveis aprovadas ou corrigidas.
+- Citações no formato `[paper_id, p. página]` e download em Markdown.
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    A["Projeto e protocolo"] --> B["Coleta multifonte"]
+    B --> C["Desduplicação e proveniência"]
+    C --> D["Triagem assistida + decisão humana"]
+    D --> E["PDFs incluídos"]
+    E --> F["Chunks por página + embeddings"]
+    F --> G["RAG híbrido: vetorial + lexical + RRF"]
+    F --> H["Extração rastreável"]
+    H --> I["Revisão humana da matriz"]
+    G --> J["Auditoria LLM-as-a-Judge"]
+    I --> K["Síntese e relatório final"]
+    J --> K
+```
+
+| Camada | Tecnologia e responsabilidade |
+|---|---|
+| Interface | Streamlit multipágina |
+| Aplicação | Python, agentes e serviços de configuração |
+| Banco | PostgreSQL 16 com `pgvector` |
+| IA | Google Gemini com configuração central por função |
+| Coleta | OpenAlex, Semantic Scholar e NCBI E-utilities/PubMed |
+| Documentos | PyMuPDF para leitura e segmentação por página |
+| Segurança local | Fernet e chave-mestra fora do banco |
+
+## Instalação local
 
 ### Pré-requisitos
 
-Antes de iniciar, verifique se os seguintes componentes estão instalados:
+- Git.
+- Python 3.10 ou superior.
+- Docker Desktop em execução.
+- No Windows, Docker configurado para containers Linux; WSL 2 é recomendado.
 
-- **Docker Desktop**, com o WSL 2 habilitado em ambientes Windows.
-- **Git**.
-- **Python 3.10 ou superior**.
-
----
-
-### 1. Clonar o Repositório
-
-Execute os comandos abaixo:
+### 1. Clonar o repositório
 
 ```bash
 git clone https://github.com/lucianodiassp/rag-revisao-sistematica.git
 cd rag-revisao-sistematica
 ```
 
----
+### 2. Criar o ambiente Python
 
-### 2. Subir a Infraestrutura
+Windows PowerShell:
 
-Inicie os containers do PostgreSQL e do pgAdmin:
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Linux ou macOS:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Criar o arquivo de ambiente
+
+Windows PowerShell:
+
+```powershell
+Copy-Item backend\.env.example backend\.env
+```
+
+Linux ou macOS:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Configuração mínima de infraestrutura:
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=rag_systematic_review
+DB_USER=rag_user
+DB_PASSWORD=rag_password
+```
+
+Para a primeira execução, informe uma chave Gemini no arquivo ou cadastre-a depois
+pela página **Configuração de IA**:
+
+```env
+GEMINI_API_KEY="sua-chave-api-do-google-aqui"
+```
+
+Os modelos iniciais e as variáveis opcionais estão em
+[`backend/.env.example`](backend/.env.example). Como a disponibilidade varia entre
+contas, use a tela de IA para testar a chave e consultar os modelos liberados antes
+de executar o pipeline completo.
+
+> Nunca publique `backend/.env`. O arquivo é ignorado pelo Git.
+
+### 4. Subir PostgreSQL e pgAdmin
 
 ```bash
 docker compose up -d
+docker compose ps
 ```
 
-Serviços disponibilizados:
+| Serviço | Endereço/porta |
+|---|---|
+| PostgreSQL + pgvector | `localhost:5432` |
+| pgAdmin | [http://localhost:5050](http://localhost:5050) |
 
-- **PostgreSQL com pgvector:** porta `5432`.
-- **pgAdmin:** [http://localhost:5050](http://localhost:5050).
+Credenciais de desenvolvimento do pgAdmin:
 
-#### Atualizar um banco criado por uma versão anterior
+- E-mail: `admin@rag.com`
+- Senha: `admin`
 
-Em instalações que já possuem o volume `postgres_data`, aplique as migrações uma vez:
+Substitua essas credenciais antes de qualquer implantação compartilhada.
+
+### 5. Iniciar a aplicação
+
+```bash
+python -m streamlit run frontend/app.py
+```
+
+Acesse [http://localhost:8501](http://localhost:8501).
+
+## Atualização de um banco existente
+
+Os scripts de `docker-entrypoint-initdb.d` são executados automaticamente somente
+quando o volume do PostgreSQL é criado. Se já existe o volume
+`rag_postgres_data`, recrie apenas o container e aplique as migrações uma vez:
 
 ```bash
 docker compose up -d --force-recreate db
@@ -99,278 +254,234 @@ docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-e
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql
 ```
 
-A migração preserva os dados existentes, associa registros antigos a um projeto
-legado quando necessário e passa a exigir isolamento por projeto. Em bancos novos,
-ela é aplicada automaticamente na primeira inicialização.
+As migrações são idempotentes e preservam os dados. A migração de isolamento cria
+um projeto legado quando encontra registros da versão anterior.
 
-#### Credenciais padrão do pgAdmin
+## Configuração segura
 
-- **Usuário:** `admin@rag.com`
-- **Senha:** `admin`
+### Configuração de IA
 
-> ⚠️ As credenciais padrão devem ser alteradas antes da implantação do sistema em um ambiente de produção.
+Na página **4. Configuração de IA** é possível:
 
----
+1. Testar e salvar uma nova chave Gemini.
+2. Importar a chave presente em `backend/.env`.
+3. Consultar os modelos liberados para a credencial.
+4. Selecionar modelos e temperaturas por função.
+5. Configurar o modelo de embedding.
+6. Consultar a configuração efetiva e o histórico.
 
-### 3. Preparar o Ambiente Python
+Trocar o modelo de embedding exige nova indexação dos PDFs. O sistema identifica o
+índice incompatível, reconstrói o documento de forma transacional e devolve a
+extração afetada para revisão humana.
 
-Crie e ative um ambiente virtual.
+### Fontes bibliográficas
 
-#### Windows — PowerShell
+Na página **6. Fontes Bibliográficas** é possível configurar OpenAlex, Semantic
+Scholar e PubMed individualmente. Chaves são opcionais quando a API permite acesso
+sem autenticação.
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
+O banco cifrado tem precedência. Na ausência de configuração persistida, são usados
+os valores de `backend/.env`, incluindo:
 
-#### Linux ou macOS
+- `OPENALEX_API_KEY`
+- `SEMANTIC_SCHOLAR_API_KEY`
+- `PUBMED_API_KEY`
+- `BIBLIOGRAPHIC_CONTACT_EMAIL`
+- `BIBLIOGRAPHIC_TIMEOUT_SECONDS`
+- `BIBLIOGRAPHIC_MAX_RETRIES`
+- variáveis específicas listadas em `backend/.env.example`
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
+### Chave-mestra local
 
-Instale as dependências do projeto:
+As credenciais são cifradas com Fernet antes de chegar ao PostgreSQL. A chave-mestra
+fica no diretório privado de dados do usuário, fora do repositório e do banco. O
+caminho efetivo aparece nas telas de configuração.
 
-```bash
-pip install -r requirements.txt
-```
+Variáveis avançadas para recuperação ou gestão externa:
 
----
+- `AI_LOCAL_MASTER_KEY_PATH`
+- `AI_LOCAL_MASTER_KEY`
 
-### 4. Configurar as Variáveis de Ambiente
+Ao restaurar o banco em outro computador sem a chave-mestra correspondente,
+recadastre as credenciais pelas telas de configuração.
 
-Copie `backend/.env.example` para `backend/.env` e informe suas credenciais:
+## Fluxo de uso
 
-```powershell
-Copy-Item backend\.env.example backend\.env
-```
+### 1. Configurar a instalação
 
-Configuração mínima:
+- Abra **4. Configuração de IA**, valide a chave e selecione modelos disponíveis.
+- Abra **6. Fontes Bibliográficas**, habilite as fontes e teste os acessos.
 
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=rag_systematic_review
-DB_USER=rag_user
-DB_PASSWORD=rag_password
+### 2. Criar o projeto e o protocolo
 
-GEMINI_API_KEY="sua-chave-api-do-google-aqui"
-AI_PROVIDER=google_gemini
-AI_CONFIG_DATABASE_ENABLED=true
-AI_DEFAULT_GENERATION_MODEL=gemini-3.6-flash
-AI_EMBEDDING_MODEL=gemini-embedding-2
-AI_EMBEDDING_DIMENSIONS=768
-```
+- Abra **0. Configuração da Pesquisa**.
+- Crie ou selecione um projeto.
+- Informe a pergunta e solicite a estruturação PICO.
+- Revise critérios e estratégia de busca.
+- Inicie a coleta nas fontes habilitadas.
 
-> ⚠️ Não publique o arquivo `.env` nem suas chaves de API em repositórios públicos. Verifique se o arquivo está incluído no `.gitignore`.
+### 3. Realizar a triagem
 
-#### Configuração central de modelos
+- Abra **1. Triagem**.
+- Execute a sugestão da IA quando desejado.
+- Registre a decisão humana para cada artigo.
 
-Todos os agentes consultam `backend/app/ai_config.py`; não existem mais modelos
-fixos espalhados pelo pipeline. `AI_DEFAULT_GENERATION_MODEL` atende todas as
-funções, mas os seguintes overrides podem ser definidos quando necessário:
+### 4. Associar e indexar PDFs
 
-- `AI_FORMULATION_MODEL`
-- `AI_SCREENING_MODEL`
-- `AI_RAG_MODEL`
-- `AI_EVALUATION_MODEL`
-- `AI_EXTRACTION_MODEL`
-- `AI_REPORT_MODEL`
+- Abra **5. Gestão de PDFs**.
+- Envie o PDF de cada artigo incluído.
+- Execute o processamento e acompanhe o resultado por documento.
+- Confirme no funil a diferença entre PDF armazenado e PDF indexado.
 
-Os parâmetros de temperatura também podem ser ajustados com variáveis equivalentes,
-como `AI_REPORT_TEMPERATURE`. A camada central omite automaticamente esses parâmetros
-para modelos Gemini que não os aceitam.
+### 5. Consultar o corpus pelo RAG
 
-Por compatibilidade, instalações existentes sem as novas variáveis continuam usando
-`gemini-2.5-flash` e `gemini-embedding-001`. Novas instalações devem partir dos
-modelos definidos em `backend/.env.example`.
+- Retorne à página inicial **Assistente de Revisão Sistemática**.
+- Faça perguntas sobre o texto integral indexado.
+- Confira os UUIDs citados na resposta.
 
-> ⚠️ Alterar `AI_EMBEDDING_MODEL` exige executar novamente a indexação na página
-> **Gestão de PDFs**. O sistema identifica vetores incompatíveis, reindexa o documento
-> de forma transacional e devolve a extração relacionada para revisão humana.
+### 6. Extrair e revisar evidências
 
-#### Configuração local pela interface
+- Abra **2. Matriz de Evidências**.
+- Execute a extração dos PDFs indexados.
+- Compare citação, página e PDF em cada campo.
+- Aprove, corrija ou rejeite cada extração.
+- Baixe a matriz em CSV quando necessário.
 
-A página **4. Configuração de IA** permite, em uma instalação local de usuário único:
+### 7. Auditar e gerar o relatório
 
-- importar a chave existente de `backend/.env` ou cadastrar uma nova;
-- validar a credencial por meio da listagem de modelos, sem gerar conteúdo;
-- consultar os modelos liberados para a chave;
-- escolher modelos distintos para formulação, triagem, RAG, auditoria, extração e relatório;
-- configurar o modelo de embedding e registrar a necessidade de reindexação;
-- consultar o histórico de alterações sem expor credenciais.
+- Abra **3. Relatório Final**.
+- Configure as perguntas de auditoria.
+- Execute o juiz e analise fidelidade e relevância.
+- Gere a síntese após aprovar ou corrigir as evidências.
+- Baixe o relatório em Markdown.
 
-A chave de API é cifrada antes de ser armazenada no PostgreSQL. A chave-mestra é
-gerada no diretório privado de dados do usuário do sistema operacional e não faz
-parte do repositório nem do banco. Em uma restauração feita em outro computador,
-cadastre novamente a chave de API pela interface.
+### Execução opcional pelo terminal
 
-Enquanto nenhuma configuração for salva no banco, o sistema continua usando
-`backend/.env`. Depois da configuração pela tela, o banco cifrado passa a ter
-precedência; o `.env` permanece disponível como fallback de compatibilidade.
+Quando houver mais de um projeto, defina `PROJECT_ID` antes de executar módulos
+diretamente.
 
-#### Configuração central das fontes bibliográficas
-
-A página **6. Fontes Bibliográficas** centraliza OpenAlex, Semantic Scholar e
-PubMed. Para cada fonte é possível:
-
-- ativar ou desativar sua participação na coleta;
-- configurar e-mail de contato, identificação da aplicação, timeout e tentativas;
-- cadastrar, importar ou remover uma chave de API opcional;
-- testar o acesso com uma consulta mínima que não salva artigos;
-- consultar a origem efetiva da configuração e o histórico de alterações.
-
-As chaves utilizam a mesma proteção cifrada da configuração de IA. Enquanto uma
-fonte não possuir configuração no banco, são aceitas como fallback as variáveis
-`OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`, `PUBMED_API_KEY` e as opções
-documentadas em `backend/.env.example`. A proveniência de cada busca registra a
-fonte e a configuração pública utilizada, mas nunca a chave.
-
----
-
-## 🔄 Fluxo de Operação: *Human-in-the-Loop*
-
-Diferentemente de sistemas totalmente automatizados, esta plataforma exige validação humana em etapas críticas. As etapas abaixo representam o fluxo completo de operação.
-
-### Projeto ativo e rastreabilidade
-
-Antes de operar o pipeline, crie ou selecione um projeto na página
-**Configuração Pesquisa**. A seleção é compartilhada entre as páginas da sessão e
-limita coleta, triagem, PDFs, RAG, auditoria e relatório ao corpus desse projeto.
-Cada alteração da pergunta, dos critérios ou da estratégia de busca gera uma nova
-versão auditável do protocolo no PostgreSQL.
-
-Ao executar módulos diretamente pelo terminal, defina `PROJECT_ID` quando houver
-mais de um projeto cadastrado:
+Windows PowerShell:
 
 ```powershell
 $env:PROJECT_ID = "uuid-do-projeto"
+python backend\coleta\orquestrador_coleta.py
+python backend\processamento\leitor_pdf.py
+python backend\agentes\agente_avaliador.py
 ```
 
-### Passo 1: Coleta de Artigos
+Linux ou macOS:
 
-Realize a busca de artigos nas bases **PubMed**, **OpenAlex** e **Semantic Scholar**, utilizando uma estratégia de busca estruturada, como PICO.
-
-No Windows PowerShell, execute:
-
-```powershell
-$env:PYTHONIOENCODING = "utf-8"
+```bash
+export PROJECT_ID="uuid-do-projeto"
 python backend/coleta/orquestrador_coleta.py
-```
-
-Em ambientes Linux ou macOS, execute:
-
-```bash
-PYTHONIOENCODING=utf-8 python backend/coleta/orquestrador_coleta.py
-```
-
----
-
-### Passo 2: Triagem Manual no Streamlit
-
-Inicie a interface web:
-
-```bash
-python -m streamlit run frontend/app.py
-```
-
-Acesse:
-
-[http://localhost:8501](http://localhost:8501)
-
-No menu lateral, selecione a opção **1. Triagem**.
-
-A inteligência artificial poderá sugerir a inclusão ou exclusão dos artigos, mas o veredito final deverá ser realizado por um avaliador humano.
-
-Os artigos devem ser classificados como:
-
-- **Incluir**
-- **Excluir**
-
----
-
-### Passo 3: Indexação Vetorial e páginas de origem
-
-Após a triagem, envie os documentos na página **Gestão de PDFs** e execute o botão
-de processamento e vetorização. A mesma operação pode ser iniciada pelo terminal:
-
-```bash
 python backend/processamento/leitor_pdf.py
-```
-
-Os vetores gerados serão armazenados no PostgreSQL utilizando a extensão `pgvector`.
-Cada chunk do PDF também registra a página de origem. Índices criados por versões
-anteriores são reconstruídos automaticamente na próxima execução da indexação.
-
----
-
-### Passo 4: Extração e revisão da Matriz de Evidências
-
-Na página **2. Matriz de Evidências**, execute a extração dos PDFs. Para cada campo,
-o sistema exige uma citação literal vinculada a um chunk e à página correspondente.
-Citações que não existem no trecho indicado são descartadas automaticamente.
-
-Confira as fontes apresentadas, corrija os valores quando necessário e registre a
-decisão humana. A saída original da IA e a versão revisada são preservadas. Somente
-evidências com status **Aprovada** ou **Corrigida e aprovada** alimentam o relatório.
-
----
-
-### Passo 5: Auditoria do Sistema RAG
-
-Execute o agente avaliador:
-
-```bash
 python backend/agentes/agente_avaliador.py
 ```
 
-O agente realizará consultas automáticas ao mecanismo de busca e atribuirá métricas como:
+## Testes
 
-- **Fidelidade (*Faithfulness*)**
-- **Relevância (*Relevance*)**
+Execute a suíte automatizada:
 
-O objetivo dessa etapa é detectar possíveis alucinações e avaliar a qualidade das respostas geradas pelo sistema.
+```bash
+python -m unittest discover -s tests -v
+```
 
----
+A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
+isolamento por projeto, indexação de PDFs e evidências rastreáveis.
 
-### Passo 6: Geração da Síntese e do Relatório Final
+Os testes SQL de integração ficam em `tests/*.sql`. Exemplo no PowerShell:
 
-Após a geração dos embeddings e a conclusão da auditoria, acesse novamente a interface:
+```powershell
+Get-Content tests\project_isolation_integration.sql |
+  docker compose exec -T db psql -U rag_user -d rag_systematic_review -v ON_ERROR_STOP=1
+```
 
-[http://localhost:8501](http://localhost:8501)
+Esses scripts usam transações com `ROLLBACK` e não devem deixar dados de teste
+persistidos. O roteiro funcional está em
+[`docs/roteiro_testes.md`](docs/roteiro_testes.md).
 
-No menu lateral, selecione a opção **3. Relatório Final** para gerar o documento consolidado da revisão sistemática.
+## Estrutura do projeto
 
----
+```text
+rag-revisao-sistematica/
+├── backend/
+│   ├── agentes/                 # Formulação, triagem, RAG, extração, auditoria e relatório
+│   ├── app/                     # Banco, configurações, segurança e utilitários
+│   ├── coleta/                  # Coletores e orquestrador das fontes
+│   ├── processamento/           # PDFs, chunks, embeddings e recuperação
+│   └── .env.example
+├── database/scripts/            # Schema, migrações e consultas de auditoria
+├── docs/                        # Blueprint e roteiro de testes funcionais
+├── frontend/
+│   ├── app.py                   # Chat RAG
+│   └── pages/                   # Fluxo multipágina do Streamlit
+├── tests/                       # Testes unitários e SQL de integração
+├── data/pdfs/                   # PDFs locais, ignorados pelo Git
+├── docker-compose.yml
+└── requirements.txt
+```
 
-## 🛑 Como Parar os Serviços Docker
+## Segurança, dados e backup
 
-Para desligar os containers sem remover os dados armazenados:
+### Arquivos e dados locais
+
+- `backend/.env` contém segredos de fallback e é ignorado pelo Git.
+- `data/pdfs/*.pdf` é ignorado pelo Git.
+- O volume `rag_postgres_data` contém o PostgreSQL.
+- A chave-mestra local não está no banco nem no repositório.
+- CSV e relatório Markdown são gerados para download pela interface.
+
+### Backup mínimo
+
+Para recuperar a revisão em outra máquina, considere separadamente:
+
+1. dump do banco PostgreSQL;
+2. diretório `data/pdfs`;
+3. chave-mestra local, caso as credenciais cifradas precisem ser reutilizadas.
+
+Sem a chave-mestra, mantenha o banco e os PDFs e recadastre somente as chaves das APIs.
+
+### Parar os serviços
+
+Sem remover o banco:
 
 ```bash
 docker compose down
 ```
 
-Para desligar os containers e remover também os volumes:
+Removendo também o volume PostgreSQL:
 
 ```bash
 docker compose down -v
 ```
 
-> ⚠️ **Atenção:** o comando `docker compose down -v` removerá permanentemente os dados armazenados nos volumes do PostgreSQL.
+> `docker compose down -v` remove permanentemente o banco do volume. Os PDFs da
+> pasta `data/pdfs` não são removidos por esse comando.
 
----
+## Solução de problemas
 
-## 🧪 Validação e Testes com Usuários
+| Sintoma | Verificação recomendada |
+|---|---|
+| `dockerDesktopLinuxEngine` não encontrado | Inicie o Docker Desktop e confirme o uso de containers Linux. |
+| Página informa migração ausente | Execute [Atualização de um banco existente](#atualização-de-um-banco-existente). |
+| Modelo Gemini indisponível | Abra **Configuração de IA**, teste a chave e escolha um modelo listado para a conta. |
+| Erro `429` em uma API | Aguarde a renovação do limite, reduza chamadas ou use uma credencial com cota adequada. |
+| PDF armazenado, mas não indexado | Execute a vetorização e consulte o motivo individual apresentado na página. |
+| Vários projetos ao executar um script | Defina `PROJECT_ID` explicitamente. |
+| Credencial cifrada não pode ser aberta | Restaure a chave-mestra correta ou cadastre novamente a credencial. |
+| Acentos incorretos no CSV | Use o arquivo da interface; ele é exportado como UTF-8 com BOM. |
 
-Para testadores e avaliadores da plataforma, foi preparado um roteiro com cenários práticos para orientar a utilização do sistema e registrar o feedback de forma estruturada.
+## Limites atuais
 
-👉 **[Acesse o Roteiro de Testes Funcionais — UAT](docs/roteiro_testes.md)**
+- Instalação local de usuário único, sem login ou autorização.
+- Adaptador de IA implementado apenas para Google Gemini.
+- Schema vetorial fixado em 768 dimensões.
+- Coleta dependente da disponibilidade, cobertura e limites das APIs externas.
+- PDFs baseados somente em imagem exigem OCR, ainda não integrado.
+- Relatório e decisões produzidos com IA exigem revisão científica humana.
+- O sistema não substitui protocolo metodológico, avaliação de risco de viés ou
+  julgamento do pesquisador.
 
----
+## Licença
 
-## 📄 Licença
-
-Este projeto é disponibilizado como software de código aberto. Consulte o arquivo `LICENSE` para conhecer as condições de utilização, modificação e distribuição.
-
+Distribuído sob a licença MIT. Consulte [`LICENSE`](LICENSE).
