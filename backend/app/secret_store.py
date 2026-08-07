@@ -37,8 +37,8 @@ def _ler_ou_criar_chave(criar=False):
         return _validar_chave(caminho.read_bytes().strip())
     if not criar:
         raise RuntimeError(
-            "A chave-mestra local não foi encontrada. Salve uma credencial pela tela "
-            "Configuração de IA ou restaure o arquivo de chave-mestra."
+            "A chave-mestra local não foi encontrada. Salve uma credencial por uma "
+            "tela de configuração ou restaure o arquivo de chave-mestra."
         )
 
     caminho.parent.mkdir(parents=True, exist_ok=True)

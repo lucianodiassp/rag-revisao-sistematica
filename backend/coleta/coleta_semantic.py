@@ -1,16 +1,22 @@
-import os
 import requests
 import uuid
 import time
-from dotenv import load_dotenv
 
-# Carrega as variáveis do ficheiro .env
-load_dotenv()
+from backend.app.bibliographic_config import (
+    SOURCE_SEMANTIC_SCHOLAR,
+    get_source_config,
+)
+from backend.coleta.http_utils import safe_request_error
 
 def recolher_artigos_semantic(query_term, max_resultados=100):
     """
     Pesquisa artigos no Semantic Scholar com mecanismo de retry e suporte a API Key (Premium Tier).
     """
+    config = get_source_config(SOURCE_SEMANTIC_SCHOLAR)
+    if not config.enabled:
+        print("⏭️ Semantic Scholar está desativada na configuração de fontes bibliográficas.")
+        return []
+
     # 1. LIMPADOR DE QUERY PARA SEMANTIC SCHOLAR
     # Remove operadores booleanos para evitar que o motor falhe a busca
     query_limpa = query_term.replace("(", "").replace(")", "").replace('"', '').replace("*", "")
@@ -31,19 +37,20 @@ def recolher_artigos_semantic(query_term, max_resultados=100):
     # ==========================================================
     # CONFIGURAÇÃO DE CABEÇALHOS E AUTENTICAÇÃO
     # ==========================================================
-    headers = {
-        "User-Agent": "Projeto-Academico-RAG/1.0 (mailto:luciano.oliveira@ensino.ipt.br)"
-    }
+    user_agent = config.tool_name
+    if config.contact_email:
+        user_agent = f"{user_agent} (mailto:{config.contact_email})"
+    headers = {"User-Agent": user_agent}
     
-    api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
+    api_key = config.api_key
     if api_key:
         headers["x-api-key"] = api_key.strip()
-        print("🔑 Chave de API do Semantic Scholar detectada. Usando limite expandido (100 req/s).")
+        print("🔑 Chave de API do Semantic Scholar detectada. Usando acesso autenticado.")
     else:
-        print("ℹ️ Chave do Semantic Scholar não encontrada no .env. Executando no modo estrito (1 req/s).")
+        print("ℹ️ Semantic Scholar configurada sem chave de API; aplicando espera conservadora.")
     # ==========================================================
 
-    max_tentativas = 3
+    max_tentativas = config.max_retries
     
     for tentativa in range(1, max_tentativas + 1):
         try:
@@ -53,12 +60,25 @@ def recolher_artigos_semantic(query_term, max_resultados=100):
             else:
                 time.sleep(2) 
             
-            response = requests.get(url, params=params, headers=headers)
+            response = requests.get(
+                url,
+                params=params,
+                headers=headers,
+                timeout=config.timeout_seconds,
+            )
             
             # Se o servidor nos der o Erro 429, fazemos uma pausa longa e tentamos novamente
             if response.status_code == 429:
-                print(f"   ⚠️ Servidor ocupado (Erro 429). A aguardar 5 segundos... (Tentativa {tentativa}/{max_tentativas})")
-                time.sleep(5)
+                try:
+                    espera = max(1, min(int(response.headers.get("Retry-After", 5)), 60))
+                except (TypeError, ValueError):
+                    espera = 5
+                print(
+                    "   ⚠️ Limite temporário da API (Erro 429). "
+                    f"A aguardar {espera} segundos... "
+                    f"(Tentativa {tentativa}/{max_tentativas})"
+                )
+                time.sleep(espera)
                 continue 
                 
             response.raise_for_status() 
@@ -112,7 +132,10 @@ def recolher_artigos_semantic(query_term, max_resultados=100):
             return artigos_formatados
 
         except requests.exceptions.RequestException as e:
-            print(f"❌ Erro ao contactar o Semantic Scholar na tentativa {tentativa}: {e}")
+            print(
+                "❌ Erro ao contactar o Semantic Scholar na tentativa "
+                f"{tentativa}: {safe_request_error(e, api_key)}"
+            )
             if tentativa == max_tentativas:
                 return [] 
             time.sleep(3)

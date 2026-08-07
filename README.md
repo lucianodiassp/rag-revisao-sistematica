@@ -96,6 +96,7 @@ docker compose up -d --force-recreate db
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z98_project_isolation.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z99_traceable_evidence.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz100_ai_configuration.sql
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql
 ```
 
 A migração preserva os dados existentes, associa registros antigos a um projeto
@@ -208,6 +209,23 @@ cadastre novamente a chave de API pela interface.
 Enquanto nenhuma configuração for salva no banco, o sistema continua usando
 `backend/.env`. Depois da configuração pela tela, o banco cifrado passa a ter
 precedência; o `.env` permanece disponível como fallback de compatibilidade.
+
+#### Configuração central das fontes bibliográficas
+
+A página **6. Fontes Bibliográficas** centraliza OpenAlex, Semantic Scholar e
+PubMed. Para cada fonte é possível:
+
+- ativar ou desativar sua participação na coleta;
+- configurar e-mail de contato, identificação da aplicação, timeout e tentativas;
+- cadastrar, importar ou remover uma chave de API opcional;
+- testar o acesso com uma consulta mínima que não salva artigos;
+- consultar a origem efetiva da configuração e o histórico de alterações.
+
+As chaves utilizam a mesma proteção cifrada da configuração de IA. Enquanto uma
+fonte não possuir configuração no banco, são aceitas como fallback as variáveis
+`OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`, `PUBMED_API_KEY` e as opções
+documentadas em `backend/.env.example`. A proveniência de cada busca registra a
+fonte e a configuração pública utilizada, mas nunca a chave.
 
 ---
 

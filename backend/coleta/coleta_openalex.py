@@ -1,11 +1,9 @@
-import os
 import requests
 import json
 import uuid
-from dotenv import load_dotenv
 
-# Garante que as variáveis do arquivo .env sejam carregadas
-load_dotenv()
+from backend.app.bibliographic_config import SOURCE_OPENALEX, get_source_config
+from backend.coleta.http_utils import get_with_retry, safe_request_error
 
 def reconstruir_abstract_openalex(inverted_index):
     """
@@ -43,6 +41,10 @@ def recolher_artigos_openalex(query_term, max_resultados=10):
     Pesquisa artigos no OpenAlex utilizando autenticação via API Key
     e formata-os para o contrato de dados do sistema.
     """
+    config = get_source_config(SOURCE_OPENALEX)
+    if not config.enabled:
+        print("⏭️ OpenAlex está desativada na configuração de fontes bibliográficas.")
+        return []
     print(f"🔍 A iniciar pesquisa no OpenAlex por: '{query_term}'")
     
     # 1. TRATAMENTO DE ERRO 400: Removemos wildcards (*) que quebram o Elasticsearch do OpenAlex.
@@ -54,20 +56,26 @@ def recolher_artigos_openalex(query_term, max_resultados=10):
     params = {
         "search": query_limpa,
         "per-page": max_resultados,
-        "mailto": "equipa_rag@teu_dominio.com" 
     }
+    if config.contact_email:
+        params["mailto"] = config.contact_email
 
     # 2. AUTENTICAÇÃO CORRIGIDA: O OpenAlex exige a chave nos parâmetros da URL (Query Parameter)
-    api_key = os.getenv("OPENALEX_API_KEY")
+    api_key = config.api_key
     if api_key:
         params["api_key"] = api_key.strip()
-        print("🔑 Chave de API do OpenAlex detectada. Usando Premium Tier.")
+        print("🔑 Chave de API do OpenAlex detectada. Usando acesso autenticado.")
     else:
-        print("ℹ️ Chave de API do OpenAlex não encontrada no .env. Executando no modo gratuito.")
+        print("ℹ️ OpenAlex configurada sem chave de API.")
 
     try:
         # A requisição agora passa limpa e autenticada apenas com os params
-        response = requests.get(url, params=params)
+        response = get_with_retry(
+            url,
+            config,
+            params=params,
+            headers={"User-Agent": config.tool_name},
+        )
         response.raise_for_status() 
         dados_brutos = response.json()
         
@@ -126,7 +134,7 @@ def recolher_artigos_openalex(query_term, max_resultados=10):
         return artigos_formatados
 
     except requests.exceptions.RequestException as e:
-        print(f"❌ Erro ao contactar o OpenAlex: {e}")
+        print(f"❌ Erro ao contactar o OpenAlex: {safe_request_error(e, api_key)}")
         return []
 
 if __name__ == "__main__":

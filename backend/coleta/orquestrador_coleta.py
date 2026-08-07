@@ -10,6 +10,12 @@ from backend.app.database import (  # noqa: E402
     resolver_project_id,
     salvar_artigo_coletado,
 )
+from backend.app.bibliographic_config import (  # noqa: E402
+    SOURCE_OPENALEX,
+    SOURCE_PUBMED,
+    SOURCE_SEMANTIC_SCHOLAR,
+    get_source_config,
+)
 from backend.app.project_utils import gerar_id_artigo  # noqa: E402
 from backend.coleta.coleta_openalex import recolher_artigos_openalex  # noqa: E402
 from backend.coleta.coleta_pubmed import recolher_artigos_pubmed  # noqa: E402
@@ -26,21 +32,38 @@ def iniciar_recolha(query, project_id=None, max_por_fonte=5):
     print(f"🚀 A iniciar a coleta do projeto {project_id}: '{query}'")
     print("=======================================================\n")
 
-    fontes = [
-        ("OpenAlex", recolher_artigos_openalex),
-        ("PubMed", recolher_artigos_pubmed),
-        ("Semantic Scholar", recolher_artigos_semantic),
+    fontes_disponiveis = [
+        (SOURCE_OPENALEX, "OpenAlex", recolher_artigos_openalex),
+        (SOURCE_PUBMED, "PubMed", recolher_artigos_pubmed),
+        (SOURCE_SEMANTIC_SCHOLAR, "Semantic Scholar", recolher_artigos_semantic),
     ]
+    fontes = []
+    for source_code, nome_fonte, coletor in fontes_disponiveis:
+        config = get_source_config(source_code)
+        if config.enabled:
+            fontes.append((source_code, nome_fonte, coletor, config))
+        else:
+            print(f"⏭️ {nome_fonte} desativada; a fonte não será consultada.")
+    if not fontes:
+        raise RuntimeError(
+            "Nenhuma fonte bibliográfica está habilitada. "
+            "Ative ao menos uma fonte na tela de configuração."
+        )
     resultados_por_fonte = []
 
-    for indice, (nome_fonte, coletor) in enumerate(fontes, 1):
-        print(f"[Fonte {indice}] A contactar {nome_fonte}...")
+    for indice, (source_code, nome_fonte, coletor, config) in enumerate(fontes, 1):
+        print(f"[Fonte {indice}/{len(fontes)}] A contactar {nome_fonte}...")
         artigos = coletor(query, max_resultados=max_por_fonte)
         busca_id = registrar_busca(
             project_id,
             nome_fonte,
             query,
-            {"max_resultados": max_por_fonte, "resultados_retornados": len(artigos)},
+            {
+                "source_code": source_code,
+                "max_resultados": max_por_fonte,
+                "resultados_retornados": len(artigos),
+                "source_configuration": config.public_metadata(),
+            },
         )
         resultados_por_fonte.append((nome_fonte, busca_id, artigos))
 

@@ -18,6 +18,7 @@ services:
       - ./database/scripts/002_project_isolation.sql:/docker-entrypoint-initdb.d/z98_project_isolation.sql:ro
       - ./database/scripts/003_traceable_evidence.sql:/docker-entrypoint-initdb.d/z99_traceable_evidence.sql:ro
       - ./database/scripts/004_ai_configuration.sql:/docker-entrypoint-initdb.d/zz100_ai_configuration.sql:ro
+      - ./database/scripts/005_bibliographic_sources.sql:/docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql:ro
     networks:
       - rag_network
 
