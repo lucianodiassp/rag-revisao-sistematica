@@ -7,6 +7,7 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from backend.agentes.agente_formulador import estruturar_pergunta_pesquisa  # noqa: E402
+from backend.app.bibliographic_config import get_bibliographic_settings  # noqa: E402
 from backend.app.database import (  # noqa: E402
     criar_projeto,
     salvar_protocolo_projeto,
@@ -124,7 +125,24 @@ qtd_artigos = st.slider(
     step=5,
 )
 
-if st.button("🚀 Iniciar coleta nas três bases", type="primary", use_container_width=True):
+fontes_ativas = [
+    config.label
+    for config in get_bibliographic_settings().values()
+    if config.enabled
+]
+if fontes_ativas:
+    st.caption(f"Fontes habilitadas: **{', '.join(fontes_ativas)}**")
+else:
+    st.warning(
+        "Nenhuma fonte bibliográfica está habilitada. Configure as fontes antes de iniciar a coleta."
+    )
+
+if st.button(
+    "🚀 Iniciar coleta nas fontes habilitadas",
+    type="primary",
+    use_container_width=True,
+    disabled=not fontes_ativas,
+):
     nova_string = string_manual.strip()
     if not nova_string:
         st.error("A string de busca não pode estar vazia.")

@@ -2,24 +2,46 @@ import requests
 import uuid
 import xml.etree.ElementTree as ET
 
+from backend.app.bibliographic_config import SOURCE_PUBMED, get_source_config
+from backend.coleta.http_utils import get_with_retry, safe_request_error
+
+
+def _adicionar_identificacao_pubmed(params, config):
+    params = dict(params)
+    if config.api_key:
+        params["api_key"] = config.api_key.strip()
+    if config.contact_email:
+        params["email"] = config.contact_email
+    if config.tool_name:
+        params["tool"] = config.tool_name
+    return params
+
 def recolher_artigos_pubmed(query_term, max_resultados=10):
     """
     Pesquisa artigos no PubMed (NCBI) e formata-os para o contrato de dados da equipa,
     extraindo o Abstract real por meio do serviço E-Fetch.
     """
+    config = get_source_config(SOURCE_PUBMED)
+    if not config.enabled:
+        print("⏭️ PubMed está desativada na configuração de fontes bibliográficas.")
+        return []
     print(f"🔍 A iniciar pesquisa no PubMed por: '{query_term}'")
     
     # 1. Pesquisa para obter os IDs (PMIDs)
     search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-    search_params = {
+    search_params = _adicionar_identificacao_pubmed({
         "db": "pubmed",
         "term": query_term,
         "retmax": max_resultados,
         "retmode": "json"
-    }
+    }, config)
 
     try:
-        search_resp = requests.get(search_url, params=search_params)
+        search_resp = get_with_retry(
+            search_url,
+            config,
+            params=search_params,
+        )
         search_resp.raise_for_status()
         id_list = search_resp.json().get("esearchresult", {}).get("idlist", [])
 
@@ -31,25 +53,33 @@ def recolher_artigos_pubmed(query_term, max_resultados=10):
 
         # 2. Obter os detalhes dos artigos usando os IDs encontrados (Metadados em JSON)
         summary_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-        summary_params = {
+        summary_params = _adicionar_identificacao_pubmed({
             "db": "pubmed",
             "id": ",".join(id_list),
             "retmode": "json"
-        }
+        }, config)
 
-        summary_resp = requests.get(summary_url, params=summary_params)
+        summary_resp = get_with_retry(
+            summary_url,
+            config,
+            params=summary_params,
+        )
         summary_resp.raise_for_status()
         summary_data = summary_resp.json().get("result", {})
 
         # 3. Chamada ao E-Fetch para obter os Abstracts Reais (Retorno obrigatório em XML)
         fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-        fetch_params = {
+        fetch_params = _adicionar_identificacao_pubmed({
             "db": "pubmed",
             "id": ",".join(id_list),
             "retmode": "xml"
-        }
+        }, config)
         
-        fetch_resp = requests.get(fetch_url, params=fetch_params)
+        fetch_resp = get_with_retry(
+            fetch_url,
+            config,
+            params=fetch_params,
+        )
         fetch_resp.raise_for_status()
         
         # Mapeamento de Abstracts: PMID -> Texto do Abstract
@@ -123,7 +153,7 @@ def recolher_artigos_pubmed(query_term, max_resultados=10):
         return artigos_formatados
 
     except requests.exceptions.RequestException as e:
-        print(f"❌ Erro ao contactar o PubMed: {e}")
+        print(f"❌ Erro ao contactar o PubMed: {safe_request_error(e, config.api_key)}")
         return []
     except ET.ParseError as e:
         print(f"❌ Erro ao processar o XML de abstracts do PubMed: {e}")
