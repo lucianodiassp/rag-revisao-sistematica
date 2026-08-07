@@ -18,6 +18,7 @@ class AIConfigTests(unittest.TestCase):
 
     def test_modelo_padrao_e_override_por_funcao(self):
         ambiente = {
+            "AI_CONFIG_DATABASE_ENABLED": "false",
             "AI_PROVIDER": "gemini",
             "AI_DEFAULT_GENERATION_MODEL": "modelo-padrao",
             "AI_EXTRACTION_MODEL": "modelo-extrator",
@@ -34,6 +35,7 @@ class AIConfigTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
+                "AI_CONFIG_DATABASE_ENABLED": "false",
                 "AI_DEFAULT_GENERATION_MODEL": "gemini-3.6-flash",
                 "AI_REPORT_TEMPERATURE": "0.2",
             },
@@ -46,7 +48,11 @@ class AIConfigTests(unittest.TestCase):
 
     def test_chave_nao_aparece_na_representacao_ou_metadados(self):
         segredo = "chave-super-secreta"
-        with patch.dict(os.environ, {"GEMINI_API_KEY": segredo}, clear=True):
+        with patch.dict(
+            os.environ,
+            {"GEMINI_API_KEY": segredo, "AI_CONFIG_DATABASE_ENABLED": "false"},
+            clear=True,
+        ):
             clear_ai_settings_cache()
             settings = get_ai_settings()
             self.assertNotIn(segredo, repr(settings))
@@ -57,6 +63,7 @@ class AIConfigTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
+                "AI_CONFIG_DATABASE_ENABLED": "false",
                 "AI_REPORT_MODEL": "gemini-2.5-flash",
                 "AI_REPORT_TEMPERATURE": "0.35",
             },
@@ -75,10 +82,65 @@ class AIConfigTests(unittest.TestCase):
             self.assertEqual(chamada["config"].temperature, 0.35)
 
     def test_dimensao_invalida_e_rejeitada(self):
-        with patch.dict(os.environ, {"AI_EMBEDDING_DIMENSIONS": "zero"}, clear=True):
+        with patch.dict(
+            os.environ,
+            {"AI_EMBEDDING_DIMENSIONS": "zero", "AI_CONFIG_DATABASE_ENABLED": "false"},
+            clear=True,
+        ):
             clear_ai_settings_cache()
             with self.assertRaisesRegex(RuntimeError, "número inteiro"):
                 get_ai_settings()
+
+    def test_banco_sobrescreve_modelo_e_chave_sem_expor_segredo(self):
+        modelos = {
+            "report": {
+                "task_type": "report",
+                "provider_code": "google_gemini",
+                "credential_id": "cred-1",
+                "model_name": "modelo-do-banco",
+                "parameters_jsonb": {"temperature": 0.4},
+                "embedding_dimensions": None,
+            },
+            "embedding": {
+                "task_type": "embedding",
+                "provider_code": "google_gemini",
+                "credential_id": "cred-1",
+                "model_name": "embedding-do-banco",
+                "parameters_jsonb": {},
+                "embedding_dimensions": 768,
+            },
+        }
+        credencial = {
+            "id": "cred-1",
+            "provider_code": "google_gemini",
+            "encrypted_secret": "cifrado",
+        }
+        with patch.dict(
+            os.environ,
+            {"GEMINI_API_KEY": "chave-env", "AI_CONFIG_DATABASE_ENABLED": "true"},
+            clear=True,
+        ), patch(
+            "backend.app.ai_config_repository.configuration_tables_available",
+            return_value=True,
+        ), patch(
+            "backend.app.ai_config_repository.get_installation_model_settings",
+            return_value=modelos,
+        ), patch(
+            "backend.app.ai_config_repository.get_installation_credential",
+            return_value=credencial,
+        ), patch(
+            "backend.app.secret_store.decrypt_secret",
+            return_value="chave-decifrada",
+        ):
+            clear_ai_settings_cache()
+            settings = get_ai_settings()
+
+            self.assertEqual(settings.api_key, "chave-decifrada")
+            self.assertEqual(settings.credential_source, "encrypted_database")
+            self.assertEqual(settings.generation[TASK_REPORT].model, "modelo-do-banco")
+            self.assertEqual(settings.generation[TASK_REPORT].source, "database")
+            self.assertEqual(settings.embedding.model, "embedding-do-banco")
+            self.assertNotIn("chave-decifrada", repr(settings))
 
 
 if __name__ == "__main__":

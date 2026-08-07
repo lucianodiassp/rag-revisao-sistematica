@@ -118,6 +118,7 @@ class GenerationTaskConfig:
     provider: str
     model: str
     temperature: float | None
+    source: str = "environment"
 
     @property
     def effective_temperature(self):
@@ -130,7 +131,7 @@ class GenerationTaskConfig:
             "provider": self.provider,
             "model_name": self.model,
             "temperature": self.effective_temperature,
-            "configuration_source": "central_ai_config",
+            "configuration_source": self.source,
             "task": self.task,
         }
 
@@ -140,13 +141,14 @@ class EmbeddingConfig:
     provider: str
     model: str
     dimensions: int
+    source: str = "environment"
 
     def metadata(self):
         return {
             "provider": self.provider,
             "model_name": self.model,
             "dimensions": self.dimensions,
-            "configuration_source": "central_ai_config",
+            "configuration_source": self.source,
             "task": "embedding",
         }
 
@@ -157,10 +159,89 @@ class AISettings:
     api_key: str | None = field(repr=False)
     generation: dict[str, GenerationTaskConfig]
     embedding: EmbeddingConfig
+    credential_id: str | None = None
+    credential_source: str = "environment"
 
 
-@lru_cache(maxsize=1)
-def get_ai_settings():
+def _database_configuration_enabled():
+    return os.getenv("AI_CONFIG_DATABASE_ENABLED", "true").strip().lower() not in {
+        "0", "false", "no", "off",
+    }
+
+
+def _apply_database_overrides(settings):
+    """Aplica o escopo local da instalação, mantendo .env como fallback seguro."""
+    if not _database_configuration_enabled():
+        return settings
+
+    try:
+        from backend.app.ai_config_repository import (
+            configuration_tables_available,
+            get_installation_credential,
+            get_installation_model_settings,
+        )
+
+        if not configuration_tables_available():
+            return settings
+        modelos_banco = get_installation_model_settings()
+        credencial = get_installation_credential()
+    except Exception:
+        # O aplicativo continua inicializável antes da migração ou se o banco estiver offline.
+        return settings
+
+    provider = settings.provider
+    api_key = settings.api_key
+    credential_id = None
+    credential_source = "environment"
+    if credencial:
+        from backend.app.secret_store import decrypt_secret
+
+        api_key = decrypt_secret(credencial["encrypted_secret"])
+        provider = credencial["provider_code"]
+        credential_id = str(credencial["id"])
+        credential_source = "encrypted_database"
+
+    geracao = {}
+    for tarefa, configuracao in settings.generation.items():
+        salvo = modelos_banco.get(tarefa)
+        if not salvo:
+            geracao[tarefa] = configuracao
+            continue
+        parametros = salvo.get("parameters_jsonb") or {}
+        geracao[tarefa] = GenerationTaskConfig(
+            task=tarefa,
+            provider=salvo["provider_code"],
+            model=salvo["model_name"],
+            temperature=parametros.get("temperature", configuracao.temperature),
+            source="database",
+        )
+
+    embedding_salvo = modelos_banco.get("embedding")
+    if embedding_salvo:
+        embedding = EmbeddingConfig(
+            provider=embedding_salvo["provider_code"],
+            model=embedding_salvo["model_name"],
+            dimensions=(
+                embedding_salvo.get("embedding_dimensions")
+                or settings.embedding.dimensions
+            ),
+            source="database",
+        )
+    else:
+        embedding = settings.embedding
+
+    return AISettings(
+        provider=provider,
+        api_key=api_key,
+        generation=geracao,
+        embedding=embedding,
+        credential_id=credential_id,
+        credential_source=credential_source,
+    )
+
+
+def get_environment_ai_settings():
+    """Monta a configuração de fallback sem consultar credenciais persistidas."""
     provider = _normalizar_provider(os.getenv("AI_PROVIDER"))
     modelo_padrao = os.getenv(
         "AI_DEFAULT_GENERATION_MODEL",
@@ -198,6 +279,11 @@ def get_ai_settings():
         generation=geracao,
         embedding=embedding,
     )
+
+
+@lru_cache(maxsize=1)
+def get_ai_settings():
+    return _apply_database_overrides(get_environment_ai_settings())
 
 
 def get_generation_config(task):

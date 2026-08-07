@@ -13,6 +13,10 @@ from backend.agentes.agente_extrator import (  # noqa: E402
     salvar_revisao_humana,
 )
 from backend.app.evidence_utils import FIELD_TYPES, achatar_extracao  # noqa: E402
+from backend.processamento.leitor_pdf import (  # noqa: E402
+    carregar_status_pdfs,
+    resumir_status_fluxo,
+)
 from frontend.project_selector import selecionar_projeto_ativo  # noqa: E402
 
 
@@ -92,13 +96,34 @@ with col_acao:
                 st.success(f"{resumo['extraidos']} artigo(s) extraído(s) com rastreabilidade.")
                 if resumo["sem_pdf_rastreavel"]:
                     st.warning(
-                        f"{resumo['sem_pdf_rastreavel']} artigo(s) aprovado(s) ainda precisam "
-                        "ter o PDF indexado na página Gestão de PDFs."
+                        f"{resumo['sem_pdf_rastreavel']} artigo(s) aprovado(s) ainda não "
+                        "possuem indexação rastreável. Confira a página Gestão de PDFs."
                     )
                 if resumo["falhas"]:
                     st.warning(f"{resumo['falhas']} extração(ões) não puderam ser concluídas.")
             except Exception as erro:
                 st.error(f"Não foi possível executar a extração: {erro}")
+
+st.divider()
+st.subheader("Andamento do fluxo de evidências")
+status_artigos = carregar_status_pdfs(project_id)
+funil = resumir_status_fluxo(status_artigos)
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Artigos incluídos", funil["incluidos"])
+col2.metric("PDFs associados", funil["pdfs_associados"])
+col3.metric("PDFs indexados", funil["indexados"])
+col4.metric("Artigos extraídos", funil["extraidos"])
+
+col5, col6, col7, col8 = st.columns(4)
+col5.metric("Sem PDF", funil["sem_pdf"])
+col6.metric("Aguardando indexação", funil["aguardando_indexacao"])
+col7.metric("Aguardando extração", funil["aguardando_extracao"])
+col8.metric("Revisados", funil["revisados"])
+st.caption(
+    "Os números representam etapas do mesmo fluxo e não categorias que precisam ser "
+    "somadas. Um artigo extraído também está incluído, possui PDF e está indexado."
+)
 
 st.divider()
 extracoes = carregar_extracoes_projeto(project_id)
@@ -113,6 +138,8 @@ if not extracoes:
 contagens = {status: 0 for status in STATUS}
 for item in extracoes:
     contagens[item["human_review_status"]] = contagens.get(item["human_review_status"], 0) + 1
+st.subheader("Situação da revisão humana")
+st.caption("Estes contadores consideram somente os artigos que já passaram pela extração.")
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Pendentes", contagens.get("pending", 0))
 col2.metric("Aprovadas", contagens.get("approved", 0))

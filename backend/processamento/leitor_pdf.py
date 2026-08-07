@@ -22,15 +22,154 @@ def get_conexao():
         password=os.environ["DB_PASSWORD"]
     )
 
+
+def carregar_status_pdfs(project_id=None):
+    """Retorna o estágio real de cada artigo incluído no fluxo de evidências."""
+    project_id = resolver_project_id(project_id)
+    embedding_config = get_embedding_config()
+
+    with get_conexao() as conexao, conexao.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT d.id, d.title,
+                   COUNT(pc.id) FILTER (
+                       WHERE pc.chunk_type LIKE 'full_text_part_%%'
+                   ) AS total_chunks,
+                   COUNT(pc.id) FILTER (
+                       WHERE pc.chunk_type LIKE 'full_text_part_%%'
+                         AND pc.metadata_jsonb->>'source_type' = 'pdf'
+                         AND pc.metadata_jsonb ? 'page_start'
+                   ) AS chunks_rastreaveis,
+                   COUNT(pc.id) FILTER (
+                       WHERE pc.chunk_type LIKE 'full_text_part_%%'
+                         AND EXISTS (
+                             SELECT 1
+                             FROM embeddings_metadata em
+                             WHERE em.chunk_id = pc.id
+                               AND em.model_name = %s
+                               AND em.dimensions = %s
+                         )
+                   ) AS chunks_compativeis,
+                   e.schema_version,
+                   e.human_review_status
+            FROM deduplicated_papers d
+            LEFT JOIN paper_chunks pc ON pc.paper_id = d.id
+            LEFT JOIN extracted_evidence e ON e.paper_id = d.id
+            WHERE d.project_id = %s
+              AND EXISTS (
+                  SELECT 1
+                  FROM screening_decisions s
+                  WHERE s.paper_id = d.id
+                    AND s.human_decision = 'Incluir'
+              )
+            GROUP BY d.id, d.title, e.schema_version, e.human_review_status
+            ORDER BY d.title
+            """,
+            (embedding_config.model, embedding_config.dimensions, project_id),
+        )
+        linhas = cursor.fetchall()
+
+    arquivos = set()
+    if os.path.exists(DIRETORIO_PDFS):
+        arquivos = {
+            arquivo[:-4]
+            for arquivo in os.listdir(DIRETORIO_PDFS)
+            if arquivo.lower().endswith(".pdf")
+        }
+
+    resultado = []
+    for (
+        paper_id,
+        titulo,
+        total_chunks,
+        chunks_rastreaveis,
+        chunks_compativeis,
+        schema_version,
+        human_review_status,
+    ) in linhas:
+        paper_id = str(paper_id)
+        pdf_associado = paper_id in arquivos
+        indexado = (
+            total_chunks > 0
+            and total_chunks == chunks_rastreaveis
+            and total_chunks == chunks_compativeis
+        )
+        if not pdf_associado:
+            situacao = "awaiting_pdf"
+        elif indexado:
+            situacao = "indexed"
+        elif total_chunks:
+            situacao = "needs_reindex"
+        else:
+            situacao = "awaiting_index"
+
+        resultado.append(
+            {
+                "paper_id": paper_id,
+                "title": titulo,
+                "pdf_associado": pdf_associado,
+                "indexado": indexado,
+                "situacao": situacao,
+                "total_chunks": total_chunks,
+                "chunks_rastreaveis": chunks_rastreaveis,
+                "chunks_compativeis": chunks_compativeis,
+                "schema_version": schema_version,
+                "human_review_status": human_review_status,
+            }
+        )
+    return resultado
+
+
+def resumir_status_fluxo(status_artigos):
+    """Consolida o funil sem confundir indexação, extração e revisão humana."""
+    status_artigos = list(status_artigos)
+    extraidos = [
+        item for item in status_artigos
+        if item.get("schema_version") == "traceable-v1"
+    ]
+    return {
+        "incluidos": len(status_artigos),
+        "pdfs_associados": sum(bool(item.get("pdf_associado")) for item in status_artigos),
+        "sem_pdf": sum(not item.get("pdf_associado") for item in status_artigos),
+        "indexados": sum(bool(item.get("indexado")) for item in status_artigos),
+        "aguardando_indexacao": sum(
+            bool(item.get("pdf_associado")) and not item.get("indexado")
+            for item in status_artigos
+        ),
+        "extraidos": len(extraidos),
+        "aguardando_extracao": sum(
+            bool(item.get("indexado"))
+            and item.get("schema_version") != "traceable-v1"
+            for item in status_artigos
+        ),
+        "revisados": sum(
+            item.get("human_review_status") in {"approved", "corrected", "rejected"}
+            for item in extraidos
+        ),
+    }
+
+
+def sanitizar_texto_pdf(texto):
+    """Remove caracteres NUL que o PostgreSQL não aceita em campos textuais."""
+    return (texto or "").replace("\x00", "")
+
 def extrair_paginas_pdf(caminho_pdf):
     """Extrai o texto sem perder o número da página de origem."""
     try:
         paginas = []
+        caracteres_nulos_removidos = 0
         with fitz.open(caminho_pdf) as documento:
             for numero, pagina in enumerate(documento, start=1):
-                texto = pagina.get_text("text").strip()
+                texto_extraido = pagina.get_text("text")
+                caracteres_nulos_removidos += texto_extraido.count("\x00")
+                texto = sanitizar_texto_pdf(texto_extraido).strip()
                 if texto:
                     paginas.append({"page_number": numero, "text": texto})
+        if caracteres_nulos_removidos:
+            print(
+                f"🧹 {caracteres_nulos_removidos} caractere(s) NUL inválido(s) "
+                "removido(s) do texto extraído."
+            )
         return paginas
     except Exception as e:
         print(f"❌ Erro ao ler {caminho_pdf}: {e}")
@@ -91,36 +230,53 @@ def criar_chunks_por_pagina(paginas, max_palavras=250, overlap=50):
 def processar_pdfs(project_id=None):
     project_id = resolver_project_id(project_id)
     embedding_config = get_embedding_config()
+    resumo = {
+        "total_aprovados": 0,
+        "pdfs_encontrados": 0,
+        "processados": 0,
+        "ignorados": 0,
+        "falhas": 0,
+        "resultados": [],
+    }
     print(f"📂 A verificar diretório: {DIRETORIO_PDFS}")
     if not os.path.exists(DIRETORIO_PDFS):
         os.makedirs(DIRETORIO_PDFS)
         print("📁 Pasta criada. Por favor, adicione os ficheiros PDF lá dentro.")
-        return
+        return resumo
 
     conexao = get_conexao()
     cursor = conexao.cursor()
     cursor.execute("""
-        SELECT d.id
+        SELECT d.id, d.title
         FROM deduplicated_papers d
-        JOIN screening_decisions s ON s.paper_id = d.id
-        WHERE d.project_id = %s AND s.human_decision = 'Incluir'
+        WHERE d.project_id = %s
+          AND EXISTS (
+              SELECT 1
+              FROM screening_decisions s
+              WHERE s.paper_id = d.id
+                AND s.human_decision = 'Incluir'
+          )
     """, (project_id,))
-    ids_aprovados = {str(linha[0]) for linha in cursor.fetchall()}
+    artigos_aprovados = {str(linha[0]): linha[1] for linha in cursor.fetchall()}
+    ids_aprovados = set(artigos_aprovados)
+    resumo["total_aprovados"] = len(ids_aprovados)
 
     arquivos_pdf = [
         arquivo for arquivo in os.listdir(DIRETORIO_PDFS)
         if arquivo.lower().endswith('.pdf')
         and arquivo[:-4] in ids_aprovados
     ]
+    resumo["pdfs_encontrados"] = len(arquivos_pdf)
     if not arquivos_pdf:
         cursor.close()
         conexao.close()
         print("✅ Nenhum PDF aprovado deste projeto está pendente de processamento.")
-        return
+        return resumo
 
     for arquivo in arquivos_pdf:
         # O nome do arquivo deve ser o UUID exato da tabela deduplicated_papers
         paper_id = arquivo.replace(".pdf", "")
+        titulo = artigos_aprovados[paper_id]
         caminho_completo = os.path.join(DIRETORIO_PDFS, arquivo)
 
         # Um índice antigo sem página precisa ser reconstruído uma única vez.
@@ -152,6 +308,16 @@ def processar_pdfs(project_id=None):
 
         if ja_processado:
             print(f"⏩ PDF {paper_id[:8]}... já possui índice com páginas. Saltando.")
+            resumo["ignorados"] += 1
+            resumo["resultados"].append(
+                {
+                    "paper_id": paper_id,
+                    "title": titulo,
+                    "status": "already_indexed",
+                    "chunks": total_chunks,
+                    "error": None,
+                }
+            )
             continue
 
 
@@ -181,17 +347,32 @@ def processar_pdfs(project_id=None):
         
         if not paginas:
             conexao.rollback()
+            resumo["falhas"] += 1
+            resumo["resultados"].append(
+                {
+                    "paper_id": paper_id,
+                    "title": titulo,
+                    "status": "failed",
+                    "chunks": 0,
+                    "error": "O PDF não possui texto extraível ou não pôde ser lido.",
+                }
+            )
             continue
 
         print(f"🔪 A fatiar {len(paginas)} páginas de {paper_id[:8]} sem perder a origem...")
         chunks = criar_chunks_por_pagina(paginas, max_palavras=250)
         
-        print(f"🧠 A gerar embeddings para {len(chunks)} chunks com a IA do Google...")
+        print(
+            f"🧠 A gerar embeddings para {len(chunks)} chunks com "
+            f"{embedding_config.provider}/{embedding_config.model}..."
+        )
         chunks_inseridos = 0
+        erro_indexacao = None
         
         for index, chunk in enumerate(chunks):
             try:
-                chunk_text = chunk["chunk_text"]
+                # Defesa adicional para chunks produzidos por integrações futuras.
+                chunk_text = sanitizar_texto_pdf(chunk["chunk_text"])
                 # 1. Gera a coordenada matemática do trecho
                 vetor = generate_embedding(chunk_text)
                 
@@ -230,6 +411,10 @@ def processar_pdfs(project_id=None):
                 chunks_inseridos += 1
             except Exception as e:
                 print(f"⚠️ Erro ao vetorizar chunk {index}: {e}")
+                erro_indexacao = str(e)
+                # Uma falha torna a transação incompleta. Interromper evita chamadas
+                # desnecessárias à API e o rollback preserva qualquer índice anterior.
+                break
 
         if chunks_inseridos != len(chunks):
             conexao.rollback()
@@ -237,14 +422,35 @@ def processar_pdfs(project_id=None):
                 f"   ❌ Indexação incompleta ({chunks_inseridos}/{len(chunks)}). "
                 "As alterações deste PDF foram desfeitas para preservar o índice anterior."
             )
+            resumo["falhas"] += 1
+            resumo["resultados"].append(
+                {
+                    "paper_id": paper_id,
+                    "title": titulo,
+                    "status": "failed",
+                    "chunks": chunks_inseridos,
+                    "error": erro_indexacao or "A indexação não processou todos os trechos.",
+                }
+            )
             continue
 
         conexao.commit()
+        resumo["processados"] += 1
+        resumo["resultados"].append(
+            {
+                "paper_id": paper_id,
+                "title": titulo,
+                "status": "indexed",
+                "chunks": chunks_inseridos,
+                "error": None,
+            }
+        )
         print(f"   💾 Sucesso! {chunks_inseridos} trechos indexados para o artigo {paper_id[:8]}.\n")
 
     cursor.close()
     conexao.close()
     print("🎉 Processamento de PDFs concluído!")
+    return resumo
 
 if __name__ == "__main__":
     processar_pdfs(resolver_project_id())

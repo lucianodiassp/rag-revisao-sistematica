@@ -95,6 +95,7 @@ Em instalações que já possuem o volume `postgres_data`, aplique as migraçõe
 docker compose up -d --force-recreate db
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z98_project_isolation.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z99_traceable_evidence.sql
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz100_ai_configuration.sql
 ```
 
 A migração preserva os dados existentes, associa registros antigos a um projeto
@@ -155,6 +156,7 @@ DB_PASSWORD=rag_password
 
 GEMINI_API_KEY="sua-chave-api-do-google-aqui"
 AI_PROVIDER=google_gemini
+AI_CONFIG_DATABASE_ENABLED=true
 AI_DEFAULT_GENERATION_MODEL=gemini-3.6-flash
 AI_EMBEDDING_MODEL=gemini-embedding-2
 AI_EMBEDDING_DIMENSIONS=768
@@ -186,6 +188,26 @@ modelos definidos em `backend/.env.example`.
 > ⚠️ Alterar `AI_EMBEDDING_MODEL` exige executar novamente a indexação na página
 > **Gestão de PDFs**. O sistema identifica vetores incompatíveis, reindexa o documento
 > de forma transacional e devolve a extração relacionada para revisão humana.
+
+#### Configuração local pela interface
+
+A página **4. Configuração de IA** permite, em uma instalação local de usuário único:
+
+- importar a chave existente de `backend/.env` ou cadastrar uma nova;
+- validar a credencial por meio da listagem de modelos, sem gerar conteúdo;
+- consultar os modelos liberados para a chave;
+- escolher modelos distintos para formulação, triagem, RAG, auditoria, extração e relatório;
+- configurar o modelo de embedding e registrar a necessidade de reindexação;
+- consultar o histórico de alterações sem expor credenciais.
+
+A chave de API é cifrada antes de ser armazenada no PostgreSQL. A chave-mestra é
+gerada no diretório privado de dados do usuário do sistema operacional e não faz
+parte do repositório nem do banco. Em uma restauração feita em outro computador,
+cadastre novamente a chave de API pela interface.
+
+Enquanto nenhuma configuração for salva no banco, o sistema continua usando
+`backend/.env`. Depois da configuração pela tela, o banco cifrado passa a ter
+precedência; o `.env` permanece disponível como fallback de compatibilidade.
 
 ---
 
