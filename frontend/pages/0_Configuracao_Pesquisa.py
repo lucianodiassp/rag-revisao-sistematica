@@ -13,6 +13,11 @@ from backend.app.database import (  # noqa: E402
     salvar_protocolo_projeto,
 )
 from backend.coleta.orquestrador_coleta import iniciar_recolha  # noqa: E402
+from backend.coleta.importador_bibtex import (  # noqa: E402
+    ErroBibTeX,
+    analisar_bibtex,
+    importar_bibtex,
+)
 from frontend.project_selector import (  # noqa: E402
     CHAVE_PROJETO_ATIVO,
     selecionar_projeto_ativo,
@@ -117,65 +122,145 @@ string_manual = st.text_area(
     height=150,
     help="A alteração será registrada como uma nova versão do protocolo ao iniciar a coleta.",
 )
-qtd_artigos = st.slider(
-    "Máximo de artigos por fonte",
-    min_value=5,
-    max_value=50,
-    value=10,
-    step=5,
-)
+aba_apis, aba_bibtex = st.tabs(["Consultar APIs", "Importar BibTeX"])
 
-fontes_ativas = [
-    config.label
-    for config in get_bibliographic_settings().values()
-    if config.enabled
-]
-if fontes_ativas:
-    st.caption(f"Fontes habilitadas: **{', '.join(fontes_ativas)}**")
-else:
-    st.warning(
-        "Nenhuma fonte bibliográfica está habilitada. Configure as fontes antes de iniciar a coleta."
+with aba_apis:
+    qtd_artigos = st.slider(
+        "Máximo de artigos por fonte",
+        min_value=5,
+        max_value=50,
+        value=10,
+        step=5,
     )
 
-if st.button(
-    "🚀 Iniciar coleta nas fontes habilitadas",
-    type="primary",
-    use_container_width=True,
-    disabled=not fontes_ativas,
-):
-    nova_string = string_manual.strip()
-    if not nova_string:
-        st.error("A string de busca não pode estar vazia.")
+    fontes_ativas = [
+        config.label
+        for config in get_bibliographic_settings().values()
+        if config.enabled
+    ]
+    if fontes_ativas:
+        st.caption(f"Fontes habilitadas: **{', '.join(fontes_ativas)}**")
     else:
-        if nova_string != termo_busca:
-            protocolo_atualizado = dict(protocolo_exibido)
-            protocolo_atualizado["search_string"] = nova_string
-            salvar_protocolo_projeto(
-                project_id,
-                pergunta_livre,
-                protocolo_atualizado,
-                motivo="Ajuste manual da estratégia antes da coleta",
-            )
-            st.session_state[f"protocol_preview_{project_id}"] = protocolo_atualizado
+        st.warning(
+            "Nenhuma fonte bibliográfica está habilitada. "
+            "Configure as fontes antes de iniciar a coleta por API."
+        )
 
-        with st.spinner("A consultar as bases e registrar a proveniência por fonte..."):
-            try:
-                qtd_salvos, qtd_encontrados = iniciar_recolha(
-                    nova_string,
-                    project_id=project_id,
-                    max_por_fonte=qtd_artigos,
+    if st.button(
+        "🚀 Iniciar coleta nas fontes habilitadas",
+        type="primary",
+        use_container_width=True,
+        disabled=not fontes_ativas,
+    ):
+        nova_string = string_manual.strip()
+        if not nova_string:
+            st.error("A string de busca não pode estar vazia.")
+        else:
+            if nova_string != termo_busca:
+                protocolo_atualizado = dict(protocolo_exibido)
+                protocolo_atualizado["search_string"] = nova_string
+                salvar_protocolo_projeto(
+                    project_id,
+                    pergunta_livre,
+                    protocolo_atualizado,
+                    motivo="Ajuste manual da estratégia antes da coleta",
                 )
-                if qtd_encontrados == 0:
-                    st.warning("Nenhum artigo foi encontrado. Ajuste a estratégia de busca.")
-                elif qtd_salvos == 0:
-                    st.info(
-                        f"Os {qtd_encontrados} registros já existiam neste projeto; "
-                        "a proveniência das fontes foi atualizada."
+                st.session_state[f"protocol_preview_{project_id}"] = protocolo_atualizado
+
+            with st.spinner("A consultar as bases e registrar a proveniência por fonte..."):
+                try:
+                    qtd_salvos, qtd_encontrados = iniciar_recolha(
+                        nova_string,
+                        project_id=project_id,
+                        max_por_fonte=qtd_artigos,
                     )
-                else:
-                    st.success(
-                        f"Coleta concluída: {qtd_salvos} novos artigos em "
-                        f"{qtd_encontrados} registros recuperados."
-                    )
-            except Exception as erro:
-                st.error(f"Erro durante a coleta: {erro}")
+                    if qtd_encontrados == 0:
+                        st.warning("Nenhum artigo foi encontrado. Ajuste a estratégia de busca.")
+                    elif qtd_salvos == 0:
+                        st.info(
+                            f"Os {qtd_encontrados} registros já existiam neste projeto; "
+                            "a proveniência das fontes foi atualizada."
+                        )
+                    else:
+                        st.success(
+                            f"Coleta concluída: {qtd_salvos} novos artigos em "
+                            f"{qtd_encontrados} registros recuperados."
+                        )
+                except Exception as erro:
+                    st.error(f"Erro durante a coleta: {erro}")
+
+with aba_bibtex:
+    st.markdown(
+        "Importe uma exportação `.bib` do Web of Science ou de outro gerenciador. "
+        "Os registros entram na mesma triagem dos artigos coletados por API e são "
+        "deduplicados por DOI ou título, sem aplicação automática dos critérios PICO."
+    )
+    arquivo_bibtex = st.file_uploader(
+        "Arquivo BibTeX",
+        type=["bib"],
+        key=f"bibtex_uploader_{project_id}",
+    )
+
+    if arquivo_bibtex is not None:
+        conteudo_bibtex = arquivo_bibtex.getvalue()
+        try:
+            analise = analisar_bibtex(conteudo_bibtex, arquivo_bibtex.name)
+        except ErroBibTeX as erro:
+            st.error(f"Arquivo BibTeX inválido: {erro}")
+        except Exception as erro:
+            st.error(f"Não foi possível analisar o arquivo: {erro}")
+        else:
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Entradas", analise["total_entries"])
+            col2.metric("Válidas", analise["valid_entries"])
+            col3.metric("Sem abstract", analise["without_abstract"])
+            col4.metric("Sem DOI", analise["without_doi"])
+            st.caption(
+                f"Codificação: {analise['encoding']} · "
+                f"SHA-256: `{analise['file_sha256'][:16]}…`"
+            )
+
+            if analise["invalid_entries"]:
+                st.warning(
+                    f"{analise['invalid_entries']} entrada(s) sem título serão ignoradas."
+                )
+            if analise["duplicates_in_file"]:
+                st.info(
+                    f"O arquivo contém {analise['duplicates_in_file']} possível(is) "
+                    "duplicata(s), que serão consolidadas pela proveniência."
+                )
+
+            st.write("**Prévia dos primeiros registros válidos**")
+            st.dataframe(analise["preview"], use_container_width=True, hide_index=True)
+
+            if st.button(
+                "📥 Importar registros para o projeto ativo",
+                type="primary",
+                use_container_width=True,
+                disabled=analise["valid_entries"] == 0,
+            ):
+                with st.spinner("A importar, deduplicar e registrar a proveniência..."):
+                    try:
+                        relatorio = importar_bibtex(
+                            project_id,
+                            conteudo_bibtex,
+                            arquivo_bibtex.name,
+                        )
+                    except Exception as erro:
+                        st.error(f"Erro durante a importação: {erro}")
+                    else:
+                        if relatorio["persistence_errors"]:
+                            st.warning(
+                                "Importação concluída com "
+                                f"{relatorio['persistence_errors']} erro(s) de persistência."
+                            )
+                        else:
+                            st.success("Importação BibTeX concluída e registrada.")
+                        resultado1, resultado2, resultado3 = st.columns(3)
+                        resultado1.metric("Novos artigos", relatorio["new_papers"])
+                        resultado2.metric("Duplicatas mescladas", relatorio["merged_records"])
+                        resultado3.metric("Entradas inválidas", relatorio["invalid_entries"])
+                        st.caption(
+                            "Os artigos válidos já estão disponíveis na página de Triagem. "
+                            f"Execução: `{relatorio['search_query_id']}`"
+                        )
