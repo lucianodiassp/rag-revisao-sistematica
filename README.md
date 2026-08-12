@@ -53,12 +53,16 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 ### Coleta bibliográfica configurável
 
 - Integração com **OpenAlex**, **Semantic Scholar** e **PubMed**.
+- Importação de arquivos **BibTeX**, incluindo exportações do Web of Science.
+- Prévia antes da importação, com contagem de registros válidos, sem DOI e sem abstract.
 - Ativação ou desativação individual de cada fonte.
 - Chaves opcionais armazenadas de forma cifrada, com `.env` como fallback.
 - E-mail, identificação da aplicação, timeout e tentativas configuráveis.
 - Teste de acesso sem persistir artigos.
 - Retry limitado para falhas transitórias e respostas `429`.
 - Registro da configuração pública usada na busca, sem segredos ou e-mail literal.
+- Registro auditável do arquivo importado por nome, hash SHA-256, codificação e resultado.
+- Preservação da entrada BibTeX bruta e consolidação de duplicatas por DOI ou título.
 
 ### Configuração central de IA
 
@@ -119,7 +123,9 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 ```mermaid
 flowchart LR
     A["Projeto e protocolo"] --> B["Coleta multifonte"]
+    A --> B2["Importação BibTeX"]
     B --> C["Desduplicação e proveniência"]
+    B2 --> C
     C --> D["Triagem assistida + decisão humana"]
     D --> E["PDFs incluídos"]
     E --> F["Chunks por página + embeddings"]
@@ -137,7 +143,7 @@ flowchart LR
 | Aplicação | Python, agentes e serviços de configuração |
 | Banco | PostgreSQL 16 com `pgvector` |
 | IA | Google Gemini com configuração central por função |
-| Coleta | OpenAlex, Semantic Scholar e NCBI E-utilities/PubMed |
+| Coleta | OpenAlex, Semantic Scholar, NCBI E-utilities/PubMed e BibTeX |
 | Documentos | PyMuPDF para leitura e segmentação por página |
 | Segurança local | Fernet e chave-mestra fora do banco |
 
@@ -318,7 +324,8 @@ recadastre as credenciais pelas telas de configuração.
 - Crie ou selecione um projeto.
 - Informe a pergunta e solicite a estruturação PICO.
 - Revise critérios e estratégia de busca.
-- Inicie a coleta nas fontes habilitadas.
+- Consulte as APIs habilitadas e/ou importe um arquivo `.bib`.
+- Confira a prévia e o relatório da importação antes de seguir para a triagem.
 
 ### 3. Realizar a triagem
 
@@ -387,7 +394,7 @@ python -m unittest discover -s tests -v
 ```
 
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
-isolamento por projeto, indexação de PDFs e evidências rastreáveis.
+importação BibTeX, isolamento por projeto, indexação de PDFs e evidências rastreáveis.
 
 Os testes SQL de integração ficam em `tests/*.sql`. Exemplo no PowerShell:
 
@@ -470,6 +477,7 @@ docker compose down -v
 | Vários projetos ao executar um script | Defina `PROJECT_ID` explicitamente. |
 | Credencial cifrada não pode ser aberta | Restaure a chave-mestra correta ou cadastre novamente a credencial. |
 | Acentos incorretos no CSV | Use o arquivo da interface; ele é exportado como UTF-8 com BOM. |
+| BibTeX não é aceito | Confirme a extensão `.bib`, o limite de 20 MB e se todas as chaves e aspas estão fechadas. |
 
 ## Limites atuais
 
@@ -477,6 +485,7 @@ docker compose down -v
 - Adaptador de IA implementado apenas para Google Gemini.
 - Schema vetorial fixado em 768 dimensões.
 - Coleta dependente da disponibilidade, cobertura e limites das APIs externas.
+- Campos ausentes no BibTeX permanecem identificados como indisponíveis e exigem revisão na triagem.
 - PDFs baseados somente em imagem exigem OCR, ainda não integrado.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
 - O sistema não substitui protocolo metodológico, avaliação de risco de viés ou

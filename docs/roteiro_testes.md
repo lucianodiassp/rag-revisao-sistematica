@@ -22,15 +22,20 @@ Este documento guia a sua experiência de teste na plataforma. O objetivo é ava
 
    *Exemplo:* *"Como a IA apoia o diagnóstico em exames de imagem?"*
 
-3. Gere a string de busca (PICO) e inicie a coleta na base de dados disponível (ex.: OpenAlex).
+3. Gere a string de busca (PICO).
+4. Na seção de coleta, abra a aba **"Importar BibTeX"** e selecione um arquivo `.bib`.
+5. Confira a prévia, as contagens e importe os registros para o projeto ativo.
+6. Opcionalmente, use também a aba **"Consultar APIs"** para combinar as duas formas de coleta.
 
 ### ✅ Critério de Sucesso
 
 A plataforma deve:
 
 * Gerar a string de busca corretamente.
-* Comunicar com a base de dados externa.
-* Exibir o número de artigos encontrados sem apresentar erros.
+* Exibir a prévia do BibTeX e informar entradas válidas, sem DOI e sem abstract.
+* Registrar os artigos importados e encaminhá-los para a triagem.
+* Consolidar artigos repetidos por DOI ou título, preservando a proveniência.
+* Quando a coleta por API for utilizada, comunicar com a base externa sem erros.
 
 ---
 

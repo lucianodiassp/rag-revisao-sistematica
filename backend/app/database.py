@@ -151,6 +151,21 @@ def registrar_busca(project_id, fonte, query_text, parametros=None):
         return cursor.fetchone()[0]
 
 
+def atualizar_metadados_busca(project_id, search_query_id, parametros):
+    """Atualiza o relatório auditável de uma execução de coleta/importação."""
+    with get_connection() as conexao, conexao.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE search_queries
+            SET query_jsonb = %s
+            WHERE id = %s AND project_id = %s
+            """,
+            (Json(parametros or {}), search_query_id, project_id),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError("Execução de coleta não encontrada no projeto ativo.")
+
+
 def salvar_artigo_coletado(
     project_id,
     id_artigo,
@@ -159,6 +174,7 @@ def salvar_artigo_coletado(
     fontes_dict,
     search_query_id=None,
     fonte=None,
+    registro_bruto=None,
 ):
     """Registra a coleta bruta e consolida o artigo dentro de um único projeto."""
     doi = normalizar_doi((fontes_dict or {}).get("external_ids", {}).get("doi"))
@@ -180,7 +196,7 @@ def salvar_artigo_coletado(
                 external_id,
                 doi,
                 Json((fontes_dict or {}).get("metadata", {})),
-                Json(fontes_dict or {}),
+                Json(registro_bruto if registro_bruto is not None else (fontes_dict or {})),
             ),
         )
 
