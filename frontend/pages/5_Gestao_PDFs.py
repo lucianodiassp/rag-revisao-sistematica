@@ -10,6 +10,11 @@ from backend.processamento.leitor_pdf import (
     processar_pdfs,
     resumir_status_fluxo,
 )
+from backend.app.screening_reassessment import (
+    ACTION_EXCLUDE,
+    ACTION_RETURN_TO_SCREENING,
+    reassess_included_paper,
+)
 from frontend.project_selector import selecionar_projeto_ativo
 
 # ==========================================
@@ -37,6 +42,13 @@ ROTULOS_RESULTADO = {
     "failed": "Falhou",
 }
 
+MOTIVOS_REAVALIACAO = {
+    "Acesso restrito ou pago": "restricted_access",
+    "PDF não localizado": "pdf_not_found",
+    "Artigo/PDF não corresponde aos metadados": "metadata_mismatch",
+    "Outro motivo": "other",
+}
+
 # ==========================================
 # INTERFACE VISUAL
 # ==========================================
@@ -49,6 +61,18 @@ Faça o upload dos documentos na íntegra para os artigos aprovados e acione a i
 vetorial para alimentar o cérebro do motor RAG.
 """)
 st.divider()
+
+ultima_reavaliacao = st.session_state.pop("ultima_reavaliacao_pdf", None)
+if ultima_reavaliacao and ultima_reavaliacao.get("project_id") == project_id:
+    if ultima_reavaliacao["action"] == ACTION_RETURN_TO_SCREENING:
+        st.success(
+            "Artigo devolvido à Triagem. A decisão anterior e a justificativa "
+            "foram preservadas no histórico."
+        )
+    else:
+        st.success(
+            "Artigo excluído da revisão com justificativa registrada no histórico."
+        )
 
 # Carrega o estado completo: arquivo físico, chunks, embeddings e extração.
 status_artigos = carregar_status_pdfs(project_id)
@@ -80,15 +104,14 @@ else:
         st.subheader(f"⏳ Pendentes de Upload ({len(df_pendentes)})")
         
         if not df_pendentes.empty:
-            titulo_selecionado = st.selectbox(
+            uuid_alvo = st.selectbox(
                 "1. Selecione o artigo aprovado:",
-                options=df_pendentes['title'].tolist(),
+                options=df_pendentes['paper_id'].tolist(),
+                format_func=lambda paper_id: df_pendentes.loc[
+                    df_pendentes['paper_id'] == paper_id, 'title'
+                ].iloc[0],
                 help="Apenas artigos marcados como 'Incluir' que ainda não possuem PDF aparecem aqui."
             )
-            
-            uuid_alvo = df_pendentes[
-                df_pendentes['title'] == titulo_selecionado
-            ]['paper_id'].values[0]
             st.caption(f"**UUID de Vínculo:** `{uuid_alvo}`")
             
             arquivo_upload = st.file_uploader("2. Envie o ficheiro PDF do artigo", type=['pdf'])
@@ -102,6 +125,57 @@ else:
                     
                     st.success(f"Ficheiro guardado e vinculado com sucesso!")
                     st.rerun()
+
+            with st.expander("Não consegui obter este PDF", expanded=False):
+                st.write(
+                    "Se o texto integral não estiver acessível, você pode devolver o "
+                    "artigo para uma nova decisão ou excluí-lo da revisão. A justificativa "
+                    "é obrigatória e a decisão anterior não será apagada do histórico."
+                )
+                with st.form(f"reavaliar_pdf_{uuid_alvo}", clear_on_submit=True):
+                    acao_rotulo = st.radio(
+                        "O que deseja fazer?",
+                        ["Voltar para a Triagem", "Excluir da revisão"],
+                        horizontal=True,
+                    )
+                    motivo_rotulo = st.selectbox(
+                        "Categoria do motivo",
+                        list(MOTIVOS_REAVALIACAO),
+                    )
+                    justificativa_reavaliacao = st.text_area(
+                        "Justificativa obrigatória",
+                        placeholder=(
+                            "Ex.: o artigo está disponível apenas mediante pagamento e "
+                            "não foi possível obter legalmente o texto integral."
+                        ),
+                        height=100,
+                    )
+                    confirmar_reavaliacao = st.form_submit_button(
+                        "Registrar reavaliação",
+                        use_container_width=True,
+                    )
+
+                if confirmar_reavaliacao:
+                    acao = (
+                        ACTION_RETURN_TO_SCREENING
+                        if acao_rotulo == "Voltar para a Triagem"
+                        else ACTION_EXCLUDE
+                    )
+                    try:
+                        resultado = reassess_included_paper(
+                            project_id=project_id,
+                            paper_id=uuid_alvo,
+                            action=acao,
+                            reason_code=MOTIVOS_REAVALIACAO[motivo_rotulo],
+                            reason=justificativa_reavaliacao,
+                        )
+                    except ValueError as erro:
+                        st.warning(str(erro))
+                    except Exception as erro:
+                        st.error(f"Não foi possível reavaliar o artigo: {erro}")
+                    else:
+                        st.session_state["ultima_reavaliacao_pdf"] = resultado
+                        st.rerun()
         else:
             st.success("🎉 Todos os artigos aprovados já possuem o respetivo PDF associado!")
 
