@@ -151,8 +151,12 @@ st.divider()
 st.header("2. Auditoria do Agente de Busca (LLM-as-a-Judge)")
 
 # --- NOVO BLOCO DE CONFIGURAÇÃO DINÂMICA DE PERGUNTAS ---
-with st.expander("⚙️ Configurar Perguntas de Auditoria (Golden Queries)", expanded=False):
-    st.markdown("Defina as perguntas de teste que o Juiz usará para avaliar a fidelidade e relevância do RAG. Insira **uma pergunta por linha**.")
+with st.expander("⚙️ Configurar Perguntas do Juiz (avaliação qualitativa)", expanded=False):
+    st.markdown(
+        "Defina as perguntas que o Juiz por IA usará para avaliar fidelidade e "
+        "relevância. O Golden Set humano e as métricas determinísticas ficam na "
+        "página **Avaliação Quantitativa RAG**. Insira uma pergunta por linha."
+    )
     
     perguntas_atuais = protocolo.get("audit_questions") or PERGUNTAS_PADRAO
 

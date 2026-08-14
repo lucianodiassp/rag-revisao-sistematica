@@ -99,7 +99,33 @@ registrada em `screening_reassessments`, sem apagar a decisão anterior.
 
 ---
 
-## 📍 Cenário 4: Auditoria e Relatório Final
+## 📍 Cenário 4: Avaliação Quantitativa do RAG
+
+**Contexto:** Medir a recuperação contra um gabarito definido por uma pessoa, sem
+usar a própria IA como fonte da verdade.
+
+### Passos
+
+1. Aceda ao menu **"Avaliação Quantitativa RAG"**.
+2. Cadastre uma pergunta que possa ser respondida pelos PDFs indexados.
+3. Associe ao menos um artigo, uma página opcional e o grau de relevância.
+4. Cadastre uma pergunta fora do corpus e marque **"O sistema deve recusar"**.
+5. Execute o benchmark.
+
+### ✅ Critério de Sucesso
+
+* Cada alteração deve aumentar a versão do Golden Set.
+* O painel deve comparar RRF e reranking em Precision, Recall, Hit Rate, MRR e nDCG.
+* A pergunta fora do corpus deve contribuir para a taxa de recusa correta.
+* O resultado deve informar a versão e o hash do gabarito usado.
+* Erros transitórios `429` ou `503` devem acionar novas tentativas com espera progressiva.
+* Se uma pergunta esgotar as tentativas, a execução deve registrar a falha e preservar
+  os resultados das demais perguntas.
+* Os arquivos JSON e CSV devem ser exportados corretamente.
+
+---
+
+## 📍 Cenário 5: Auditoria e Relatório Final
 
 **Contexto:** Verificação da transparência do sistema e das métricas de qualidade produzidas pelo Juiz IA (*LLM-as-a-Judge*).
 
@@ -128,7 +154,8 @@ O seu feedback é fundamental para a evolução da pesquisa.
 | 1. Configuração e Coleta     |                      |                                       |                         |
 | 2. Triagem de Artigos        |                      |                                       |                         |
 | 3. Interação com o Motor RAG |                      |                                       |                         |
-| 4. Relatório e Auditoria     |                      |                                       |                         |
+| 4. Avaliação Quantitativa    |                      |                                       |                         |
+| 5. Relatório e Auditoria     |                      |                                       |                         |
 
 ---
 

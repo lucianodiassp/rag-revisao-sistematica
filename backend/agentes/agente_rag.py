@@ -138,6 +138,7 @@ def buscar_contexto_reranqueado(pergunta, project_id=None):
         return [], {
             "status": "no_candidates",
             "initial_ranking": [],
+            "reranked_ranking": [],
             "final_ranking": [],
             "error": None,
             "configuration": config.metadata(),

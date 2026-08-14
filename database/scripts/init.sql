@@ -197,6 +197,50 @@ CREATE TABLE evaluation_runs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Perguntas e julgamentos humanos usados como gabarito do benchmark do RAG.
+CREATE TABLE rag_golden_queries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    expected_refusal BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (project_id, question),
+    CHECK (length(btrim(question)) >= 5)
+);
+
+CREATE TABLE rag_golden_relevances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    golden_query_id UUID NOT NULL REFERENCES rag_golden_queries(id) ON DELETE CASCADE,
+    paper_id UUID NOT NULL REFERENCES deduplicated_papers(id) ON DELETE CASCADE,
+    page_number INTEGER,
+    relevance_grade INTEGER NOT NULL DEFAULT 2,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CHECK (page_number IS NULL OR page_number > 0),
+    CHECK (relevance_grade BETWEEN 1 AND 3)
+);
+
+CREATE UNIQUE INDEX uq_rag_golden_relevance_target
+    ON rag_golden_relevances (
+        golden_query_id,
+        paper_id,
+        COALESCE(page_number, 0)
+    );
+
+-- Cada edição do gabarito produz um retrato imutável, usado posteriormente
+-- para reproduzir e interpretar execuções do benchmark.
+CREATE TABLE rag_golden_set_versions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    set_jsonb JSONB NOT NULL,
+    change_reason TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (project_id, version)
+);
+
 -- Retratos imutáveis e versionados do fluxo de seleção e síntese.
 CREATE TABLE prisma_flow_snapshots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -360,6 +404,9 @@ CREATE INDEX idx_agent_interactions_project ON agent_interactions(project_id);
 CREATE INDEX idx_screening_reassessments_project ON screening_reassessments(project_id, created_at DESC);
 CREATE INDEX idx_screening_reassessments_paper ON screening_reassessments(paper_id, created_at DESC);
 CREATE INDEX idx_evaluation_runs_project ON evaluation_runs(project_id);
+CREATE INDEX idx_rag_golden_queries_project ON rag_golden_queries(project_id, created_at);
+CREATE INDEX idx_rag_golden_relevances_query ON rag_golden_relevances(golden_query_id);
+CREATE INDEX idx_rag_golden_versions_project ON rag_golden_set_versions(project_id, version DESC);
 CREATE INDEX idx_prisma_snapshots_project ON prisma_flow_snapshots(project_id, snapshot_version DESC);
 CREATE INDEX idx_paper_chunks_paper ON paper_chunks(paper_id);
 CREATE INDEX idx_embeddings_chunk ON embeddings_metadata(chunk_id);
