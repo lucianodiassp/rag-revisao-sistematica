@@ -34,9 +34,19 @@ def buscar_artigo_pendente(project_id):
         
         # Fazemos um JOIN para pegar os dados do artigo E a sugestão da IA
         cursor.execute("""
-            SELECT d.id, d.title, d.abstract, s.suggested_decision, s.rationale_jsonb
+            SELECT d.id, d.title, d.abstract, s.suggested_decision, s.rationale_jsonb,
+                   r.reason_code, r.reason, r.created_at
             FROM deduplicated_papers d
             JOIN screening_decisions s ON d.id = s.paper_id
+            LEFT JOIN LATERAL (
+                SELECT reason_code, reason, created_at
+                FROM screening_reassessments sr
+                WHERE sr.paper_id = d.id
+                  AND sr.project_id = d.project_id
+                  AND sr.action = 'return_to_screening'
+                ORDER BY sr.created_at DESC
+                LIMIT 1
+            ) r ON TRUE
             WHERE d.project_id = %s
               AND s.human_decision IS NULL
             LIMIT 1;
@@ -114,11 +124,27 @@ st.divider()
 artigo_atual = buscar_artigo_pendente(project_id)
 
 if artigo_atual:
-    paper_id, titulo, abstract, sugestao_ia, rationale_ia = artigo_atual
+    (
+        paper_id,
+        titulo,
+        abstract,
+        sugestao_ia,
+        rationale_ia,
+        motivo_reavaliacao,
+        justificativa_reavaliacao,
+        data_reavaliacao,
+    ) = artigo_atual
     
     st.subheader(titulo)
     st.write("**Abstract:**")
     st.info(abstract)
+
+    if justificativa_reavaliacao:
+        st.warning(
+            "**Artigo devolvido para nova triagem pela Gestão de PDFs**  \n"
+            f"Motivo registrado: {justificativa_reavaliacao}  \n"
+            f"Data: {data_reavaliacao:%d/%m/%Y %H:%M}"
+        )
     
     # --- BLOCO: O PARECER DA IA ---
     st.divider()

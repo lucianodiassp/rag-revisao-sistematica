@@ -55,6 +55,17 @@ A plataforma deve:
 * O artigo deve transitar para a próxima fase.
 * Nenhuma mensagem de erro deve ser apresentada.
 
+### Reavaliação por indisponibilidade do PDF
+
+1. Inclua um artigo na triagem e abra **Gestão de PDFs**.
+2. Selecione o artigo ainda sem PDF e abra **"Não consegui obter este PDF"**.
+3. Informe a categoria e uma justificativa; escolha **"Voltar para a Triagem"**.
+4. Confirme que o artigo reaparece na Triagem com o motivo registrado.
+5. Após nova decisão de inclusão, repita o fluxo escolhendo **"Excluir da revisão"**.
+
+O artigo deve sair da lista de PDFs pendentes e cada alteração deve permanecer
+registrada em `screening_reassessments`, sem apagar a decisão anterior.
+
 ---
 
 ## 📍 Cenário 3: Interação com o Motor RAG (O Cérebro da Plataforma)

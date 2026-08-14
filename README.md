@@ -79,6 +79,8 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Sugestão de inclusão ou exclusão, com confiança e justificativa.
 - Decisão humana obrigatória: **Incluir** ou **Excluir**.
 - Somente artigos incluídos seguem para PDFs, RAG e extração.
+- Reavaliação de artigos incluídos quando o texto integral não pode ser obtido.
+- Retorno à triagem ou exclusão posterior com justificativa e histórico preservado.
 
 ### PDFs e indexação vetorial rastreável
 
@@ -258,6 +260,7 @@ docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-e
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z99_traceable_evidence.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz100_ai_configuration.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz102_screening_reassessment.sql
 ```
 
 As migrações são idempotentes e preservam os dados. A migração de isolamento cria
@@ -337,6 +340,7 @@ recadastre as credenciais pelas telas de configuração.
 
 - Abra **5. Gestão de PDFs**.
 - Envie o PDF de cada artigo incluído.
+- Se o PDF não puder ser obtido legalmente, devolva o artigo à triagem ou exclua-o com justificativa.
 - Execute o processamento e acompanhe o resultado por documento.
 - Confirme no funil a diferença entre PDF armazenado e PDF indexado.
 

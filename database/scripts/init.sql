@@ -102,6 +102,26 @@ CREATE TABLE screening_decisions (
     reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Histórico de reavaliações motivadas durante as etapas posteriores à triagem.
+CREATE TABLE screening_reassessments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    screening_decision_id UUID NOT NULL REFERENCES screening_decisions(id) ON DELETE CASCADE,
+    paper_id UUID NOT NULL REFERENCES deduplicated_papers(id) ON DELETE CASCADE,
+    action VARCHAR(50) NOT NULL,
+    reason_code VARCHAR(50) NOT NULL,
+    reason TEXT NOT NULL,
+    previous_human_decision VARCHAR(50) NOT NULL,
+    previous_justification TEXT,
+    resulting_human_decision VARCHAR(50),
+    origin VARCHAR(50) NOT NULL DEFAULT 'pdf_management',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CHECK (action IN ('return_to_screening', 'exclude')),
+    CHECK (reason_code IN ('restricted_access', 'pdf_not_found', 'metadata_mismatch', 'other')),
+    CHECK (origin IN ('pdf_management')),
+    CHECK (length(btrim(reason)) >= 5)
+);
+
 -- Matriz de evidências estruturada
 CREATE TABLE extracted_evidence (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -281,6 +301,8 @@ CREATE INDEX idx_search_queries_project ON search_queries(project_id);
 CREATE INDEX idx_retrieved_records_project ON retrieved_records(project_id);
 CREATE INDEX idx_deduplicated_papers_project ON deduplicated_papers(project_id);
 CREATE INDEX idx_agent_interactions_project ON agent_interactions(project_id);
+CREATE INDEX idx_screening_reassessments_project ON screening_reassessments(project_id, created_at DESC);
+CREATE INDEX idx_screening_reassessments_paper ON screening_reassessments(paper_id, created_at DESC);
 CREATE INDEX idx_evaluation_runs_project ON evaluation_runs(project_id);
 CREATE INDEX idx_paper_chunks_paper ON paper_chunks(paper_id);
 CREATE INDEX idx_embeddings_chunk ON embeddings_metadata(chunk_id);
