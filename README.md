@@ -142,6 +142,20 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Síntese somente com evidências rastreáveis aprovadas ou corrigidas.
 - Citações no formato `[paper_id, p. página]` e download em Markdown.
 
+### Avaliação quantitativa reprodutível do RAG
+
+- Golden Set definido por julgamento humano e isolado por projeto.
+- Perguntas respondíveis ligadas a artigos, páginas opcionais e graus de relevância.
+- Perguntas fora do corpus marcadas com expectativa explícita de recusa.
+- Versionamento imutável do gabarito após cada alteração.
+- Cálculo determinístico de `Precision@k`, `Recall@k`, `Hit Rate@k`, MRR e `nDCG@k`.
+- Comparação do ranking híbrido RRF com a ordenação completa após reranking.
+- Taxas de recusa correta, recusa indevida, validade e conformidade das citações.
+- Execuções persistidas em JSONB com Golden Set, hash e configurações exatas dos modelos.
+- Recuperação automática de erros transitórios `429`/`503`, com espera exponencial,
+  rastreabilidade das tentativas e preservação dos resultados parciais.
+- Interpretação automática e exportações JSON e CSV.
+
 ## Arquitetura
 
 ```mermaid
@@ -157,6 +171,7 @@ flowchart LR
     F --> H["Extração rastreável"]
     H --> I["Revisão humana da matriz"]
     G --> J["Auditoria LLM-as-a-Judge"]
+    G --> L["Golden Set + métricas determinísticas"]
     I --> K["Síntese e relatório final"]
     J --> K
 ```
@@ -286,6 +301,7 @@ docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-e
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz103_explainable_deduplication.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz104_reranking_configuration.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz105_prisma_reporting.sql
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz106_rag_benchmark.sql
 ```
 
 As migrações são idempotentes e preservam os dados. A migração de isolamento cria
@@ -392,7 +408,18 @@ recadastre as credenciais pelas telas de configuração.
 - Aprove, corrija ou rejeite cada extração.
 - Baixe a matriz em CSV quando necessário.
 
-### 8. Auditar e gerar o relatório
+### 8. Medir o RAG com Golden Set
+
+- Abra **8. Avaliação Quantitativa RAG**.
+- Cadastre perguntas que o corpus deve responder e associe as fontes relevantes.
+- Cadastre perguntas fora do escopo marcando que o sistema deve recusá-las.
+- Execute o benchmark e compare RRF e reranking nas mesmas perguntas.
+- Interprete Precision, Recall, Hit Rate, MRR, nDCG, recusas e citações.
+- Se o provedor estiver temporariamente indisponível, aguarde as novas tentativas
+  automáticas; uma pergunta que continue falhando será registrada sem interromper as demais.
+- Baixe o resultado em JSON ou CSV.
+
+### 9. Auditar e gerar o relatório
 
 - Abra **3. Relatório Final**.
 - Configure as perguntas de auditoria.
@@ -432,8 +459,8 @@ python -m unittest discover -s tests -v
 ```
 
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
-importação BibTeX, deduplicação explicável, reranking com fallback, isolamento por
-projeto, indexação de PDFs e evidências rastreáveis.
+importação BibTeX, deduplicação explicável, reranking com fallback, métricas do
+Golden Set, isolamento por projeto, indexação de PDFs e evidências rastreáveis.
 
 Os testes SQL de integração ficam em `tests/*.sql`. Exemplo no PowerShell:
 
@@ -533,6 +560,8 @@ docker compose down -v
 - PDFs baseados somente em imagem exigem OCR, ainda não integrado.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
 - O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo.
+- As métricas do benchmark refletem a qualidade do Golden Set humano; um gabarito
+  pequeno, ambíguo ou incompleto pode produzir conclusões enganosas.
 - O sistema não substitui protocolo metodológico, avaliação de risco de viés ou
   julgamento do pesquisador.
 

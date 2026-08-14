@@ -23,6 +23,7 @@ services:
       - ./database/scripts/007_explainable_deduplication.sql:/docker-entrypoint-initdb.d/zz103_explainable_deduplication.sql:ro
       - ./database/scripts/008_reranking_configuration.sql:/docker-entrypoint-initdb.d/zz104_reranking_configuration.sql:ro
       - ./database/scripts/009_prisma_reporting.sql:/docker-entrypoint-initdb.d/zz105_prisma_reporting.sql:ro
+      - ./database/scripts/010_rag_benchmark.sql:/docker-entrypoint-initdb.d/zz106_rag_benchmark.sql:ro
     networks:
       - rag_network
 

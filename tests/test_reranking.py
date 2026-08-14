@@ -84,6 +84,8 @@ class RerankingTests(unittest.TestCase):
         self.assertEqual(selecionados[0]["rerank_rank"], 1)
         self.assertEqual(selecionados[0]["rerank_score"], 96.0)
         self.assertEqual(len(trace["initial_ranking"]), 3)
+        self.assertEqual(len(trace["reranked_ranking"]), 3)
+        self.assertEqual(trace["reranked_ranking"][0]["candidate_id"], "c2")
         self.assertEqual(len(trace["final_ranking"]), 2)
         self.assertEqual(logger.call_args.args[1], "reranking_agent")
         self.assertEqual(logger.call_args.args[3]["status"], STATUS_SUCCESS)

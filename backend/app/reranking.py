@@ -139,6 +139,7 @@ def reranquear_candidatos(
         return [], {
             "status": STATUS_DISABLED if not config.enabled else STATUS_SUCCESS,
             "initial_ranking": [],
+            "reranked_ranking": [],
             "final_ranking": [],
             "error": None,
             "configuration": config.metadata(),
@@ -147,7 +148,8 @@ def reranquear_candidatos(
     erro = None
     if not config.enabled:
         status = STATUS_DISABLED
-        selecionados = _selecionar_por_rrf(candidatos, limite_final)
+        ranking_completo = _selecionar_por_rrf(candidatos, len(candidatos))
+        selecionados = ranking_completo[:limite_final]
     else:
         candidatos_prompt = [
             {
@@ -184,17 +186,23 @@ Regras:
                 contents=prompt,
                 response_mime_type="application/json",
             )
-            selecionados = _normalizar_ranking(resposta.text, candidatos, limite_final)
+            ranking_completo = _normalizar_ranking(
+                resposta.text, candidatos, len(candidatos)
+            )
+            selecionados = ranking_completo[:limite_final]
             status = STATUS_SUCCESS
         except Exception as excecao:
             status = STATUS_FALLBACK
             erro = _erro_seguro(excecao)
-            selecionados = _selecionar_por_rrf(candidatos, limite_final)
+            ranking_completo = _selecionar_por_rrf(candidatos, len(candidatos))
+            selecionados = ranking_completo[:limite_final]
 
     ranking_final = [_candidato_auditavel(item) for item in selecionados]
+    ranking_reranqueado = [_candidato_auditavel(item) for item in ranking_completo]
     trace = {
         "status": status,
         "initial_ranking": ranking_inicial,
+        "reranked_ranking": ranking_reranqueado,
         "final_ranking": ranking_final,
         "error": erro,
         "configuration": config.metadata(),
