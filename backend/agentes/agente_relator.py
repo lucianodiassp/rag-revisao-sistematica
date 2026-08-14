@@ -5,6 +5,7 @@ from dotenv import load_dotenv, find_dotenv
 from backend.app.ai_config import TASK_REPORT, get_generation_config
 from backend.app.ai_service import generate_content
 from backend.app.database import log_interacao_agente, resolver_project_id
+from backend.app.prisma import calcular_fluxo_prisma, salvar_snapshot_prisma
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
@@ -21,60 +22,8 @@ def get_conexao():
     )
 
 def coletar_metricas_prisma(project_id):
-    """Recolhe os números para o fluxograma de auditoria."""
-    conexao = get_conexao()
-    cursor = conexao.cursor()
-    
-    metricas = {}
-    
-    # 1. Total de artigos únicos na base
-    cursor.execute("SELECT COUNT(*) FROM deduplicated_papers WHERE project_id = %s;", (project_id,))
-    metricas['total_unicos'] = cursor.fetchone()[0]
-    
-    # 2. Total processado pela IA (Triagem)
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM screening_decisions s
-        JOIN deduplicated_papers p ON p.id = s.paper_id
-        WHERE p.project_id = %s
-    """, (project_id,))
-    metricas['triados_ia'] = cursor.fetchone()[0]
-    
-    # 3. Total aprovado pelo Humano
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM screening_decisions s
-        JOIN deduplicated_papers p ON p.id = s.paper_id
-        WHERE p.project_id = %s AND s.human_decision = 'Incluir'
-    """, (project_id,))
-    metricas['aprovados_humano'] = cursor.fetchone()[0]
-    
-    # 4. Total de evidências extraídas
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM extracted_evidence e
-        JOIN deduplicated_papers p ON p.id = e.paper_id
-        WHERE p.project_id = %s
-    """, (project_id,))
-    metricas['evidencias_extraidas'] = cursor.fetchone()[0]
-
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM extracted_evidence e
-        JOIN deduplicated_papers p ON p.id = e.paper_id
-        WHERE p.project_id = %s
-          AND e.human_review_status IN ('approved', 'corrected')
-          AND e.schema_version = 'traceable-v1'
-          AND EXISTS (
-              SELECT 1 FROM evidence_field_sources efs
-              WHERE efs.extraction_id = e.id AND efs.quote_validated = TRUE
-          )
-    """, (project_id,))
-    metricas['evidencias_aprovadas'] = cursor.fetchone()[0]
-    
-    cursor.close()
-    conexao.close()
-    return metricas
+    """Compatibilidade para consumidores antigos das métricas do fluxo."""
+    return calcular_fluxo_prisma(project_id)["metrics"]
 
 def coletar_evidencias(project_id):
     """Recolhe somente a versão humana aprovada e suas fontes literais."""
@@ -134,7 +83,8 @@ def gerar_relatorio_final(project_id=None):
     """Orquestra a coleta de dados e a geração do texto pelo Gemini."""
     project_id = resolver_project_id(project_id)
     print("📊 A recolher métricas PRISMA...")
-    metricas = coletar_metricas_prisma(project_id)
+    snapshot_prisma = salvar_snapshot_prisma(project_id)
+    metricas = snapshot_prisma["metrics"]
     
     print("📚 A recolher evidências extraídas...")
     evidencias = coletar_evidencias(project_id)
@@ -142,6 +92,7 @@ def gerar_relatorio_final(project_id=None):
     if not evidencias:
         return {
             "metricas": metricas,
+            "prisma_snapshot": snapshot_prisma,
             "relatorio_md": (
                 "Não há evidências **aprovadas pela revisão humana** para gerar o relatório. "
                 "Revise e aprove ao menos uma extração na Matriz de Evidências."
@@ -154,22 +105,30 @@ def gerar_relatorio_final(project_id=None):
     prompt = f"""
     Atue como um investigador sénior a redigir a secção de 'Resultados e Discussão' de uma Revisão Sistemática da Literatura.
     
-    Aqui estão as métricas do fluxo de trabalho (PRISMA):
-    - Artigos únicos analisados: {metricas['total_unicos']}
-    - Artigos aprovados para extração: {metricas['aprovados_humano']}
+    Aqui está o snapshot determinístico e versionado do fluxo de trabalho PRISMA.
+    Reproduza esses números exatamente; não estime nem recalcule valores:
+    {json.dumps({
+        'snapshot_version': snapshot_prisma['snapshot_version'],
+        'protocol_version': snapshot_prisma['protocol_version'],
+        'metrics': metricas,
+        'source_counts': snapshot_prisma['source_counts'],
+        'exclusion_reasons': snapshot_prisma['exclusion_reasons'],
+        'interpretation': snapshot_prisma['interpretation'],
+    }, indent=2, ensure_ascii=False)}
     
     Abaixo estão apenas os dados aprovados ou corrigidos por revisão humana, junto
     com as citações literais validadas contra o PDF:
     {json.dumps(evidencias, indent=2, ensure_ascii=False)}
     
     Sua tarefa:
-    1. Escreva um resumo executivo formal e coeso (formato Markdown).
-    2. Sintetize os principais 'Objetivos' e 'Métodos' encontrados.
-    3. Destaque os 'Principais Resultados' de forma agregada (quais são as tendências ou consensos?).
-    4. Identifique as 'Limitações' mais comuns relatadas pelos autores.
-    5. Mantenha um tom estritamente académico, imparcial e científico. Não invente dados, baseie-se APENAS no JSON fornecido.
-    6. Ao apresentar um achado, cite a fonte no formato [paper_id, p. página].
-    7. Não apresente um achado quando não houver uma fonte literal compatível no campo correspondente.
+    1. Abra com uma seção 'Fluxo PRISMA' e relate os números e motivos do snapshot exatamente como fornecidos.
+    2. Escreva um resumo executivo formal e coeso (formato Markdown).
+    3. Sintetize os principais 'Objetivos' e 'Métodos' encontrados.
+    4. Destaque os 'Principais Resultados' de forma agregada (quais são as tendências ou consensos?).
+    5. Identifique as 'Limitações' mais comuns relatadas pelos autores.
+    6. Mantenha um tom estritamente académico, imparcial e científico. Não invente dados, baseie-se APENAS no JSON fornecido.
+    7. Ao apresentar um achado, cite a fonte no formato [paper_id, p. página].
+    8. Não apresente um achado quando não houver uma fonte literal compatível no campo correspondente.
     """
     
     try:
@@ -184,13 +143,21 @@ def gerar_relatorio_final(project_id=None):
     log_interacao_agente(
         project_id,
         "report_agent",
-        {"metrics": metricas, "paper_ids": [item["paper_id"] for item in evidencias]},
-        {"report_markdown": texto_relatorio},
+        {
+            "prisma_snapshot_id": snapshot_prisma["id"],
+            "metrics": metricas,
+            "paper_ids": [item["paper_id"] for item in evidencias],
+        },
+        {
+            "report_markdown": texto_relatorio,
+            "prisma_snapshot_version": snapshot_prisma["snapshot_version"],
+        },
         get_generation_config(TASK_REPORT).metadata(),
     )
         
     return {
         "metricas": metricas,
+        "prisma_snapshot": snapshot_prisma,
         "relatorio_md": texto_relatorio
     }
 

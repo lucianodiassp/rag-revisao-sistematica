@@ -76,6 +76,7 @@ def reassess_included_paper(
                 UPDATE screening_decisions
                 SET human_decision = NULL,
                     justification = NULL,
+                    exclusion_reason_code = NULL,
                     reviewed_at = NULL
                 WHERE id = %s
                 """,
@@ -87,10 +88,11 @@ def reassess_included_paper(
                 UPDATE screening_decisions
                 SET human_decision = 'Excluir',
                     justification = %s,
+                    exclusion_reason_code = %s,
                     reviewed_at = CURRENT_TIMESTAMP
                 WHERE id = %s
                 """,
-                (reason, str(decision_id)),
+                (reason, reason_code, str(decision_id)),
             )
 
         cursor.execute(

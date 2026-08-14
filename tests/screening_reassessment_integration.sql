@@ -32,7 +32,8 @@ VALUES
      'Inclusão inicial');
 
 UPDATE screening_decisions
-SET human_decision = NULL, justification = NULL, reviewed_at = NULL
+SET human_decision = NULL, justification = NULL,
+    exclusion_reason_code = NULL, reviewed_at = NULL
 WHERE id = '71000000-0000-0000-0000-000000000003';
 
 INSERT INTO screening_reassessments
@@ -68,6 +69,7 @@ WHERE id = '71000000-0000-0000-0000-000000000003';
 UPDATE screening_decisions
 SET human_decision = 'Excluir',
     justification = 'PDF não obtido legalmente.',
+    exclusion_reason_code = 'pdf_not_found',
     reviewed_at = CURRENT_TIMESTAMP
 WHERE id = '71000000-0000-0000-0000-000000000003';
 

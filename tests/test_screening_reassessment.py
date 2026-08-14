@@ -63,7 +63,7 @@ class ScreeningReassessmentTests(unittest.TestCase):
         self.assertIn("human_decision = 'Excluir'", update_sql)
         self.assertEqual(
             update_params,
-            ("O PDF não foi localizado em fontes legais.", "decision-1"),
+            ("O PDF não foi localizado em fontes legais.", "pdf_not_found", "decision-1"),
         )
         self.assertEqual(resultado["resulting_human_decision"], "Excluir")
 
