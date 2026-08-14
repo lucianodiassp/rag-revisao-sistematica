@@ -9,6 +9,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 
 # Importação da função geradora (UI-ready) do backend
 from backend.agentes.agente_triagem import executar_pipeline_triagem_ui
+from backend.app.screening_service import (
+    EXCLUSION_REASON_LABELS,
+    save_human_screening_decision,
+)
 from frontend.project_selector import selecionar_projeto_ativo
 
 # ==========================================
@@ -57,27 +61,6 @@ def buscar_artigo_pendente(project_id):
     except Exception as e:
         st.error(f"Erro ao conectar ao banco de dados: {e}")
         return None
-
-def salvar_decisao_humana(project_id, paper_id, human_decision, justification):
-    """Atualiza a linha no banco de dados com a decisão final humana."""
-    try:
-        conexao = get_conexao()
-        cursor = conexao.cursor()
-        
-        cursor.execute("""
-            UPDATE screening_decisions 
-            SET human_decision = %s, justification = %s, reviewed_at = NOW()
-            WHERE paper_id = %s
-              AND EXISTS (
-                  SELECT 1 FROM deduplicated_papers p
-                  WHERE p.id = screening_decisions.paper_id AND p.project_id = %s
-              )
-        """, (human_decision, justification, paper_id, project_id))
-        
-        conexao.commit()
-        conexao.close()
-    except Exception as e:
-        st.error(f"Erro ao gravar a decisão no banco de dados: {e}")
 
 # ==========================================
 # INTERFACE GRÁFICA (STREAMLIT)
@@ -176,17 +159,44 @@ if artigo_atual:
             )
         
         with col_form2:
-            justificativa = st.text_input("Observações (Opcional caso concorde com a IA):", placeholder="Motivo da discordância ou nota técnica...")
+            motivo_exclusao = st.selectbox(
+                "Categoria da exclusão:",
+                options=list(EXCLUSION_REASON_LABELS),
+                format_func=lambda code: EXCLUSION_REASON_LABELS[code],
+                help="Este campo só é aplicado quando a decisão final é Excluir.",
+            )
+
+        justificativa = st.text_area(
+            "Justificativa ou observação:",
+            placeholder=(
+                "A justificativa é obrigatória para exclusões e quando a decisão humana "
+                "for diferente da sugestão da IA."
+            ),
+            height=90,
+        )
             
         botao_salvar = st.form_submit_button("💾 Confirmar e Próximo", type="primary")
         
         if botao_salvar:
-            if decisao != sugestao_ia and not justificativa:
+            if decisao == "Excluir" and len(justificativa.strip()) < 5:
+                st.warning("⚠️ Para excluir, selecione o motivo e descreva a justificativa.")
+            elif decisao != sugestao_ia and len(justificativa.strip()) < 5:
                 st.warning("⚠️ Você discordou da IA. Por favor, insira uma observação justificando sua escolha.")
             else:
-                salvar_decisao_humana(project_id, paper_id, decisao, justificativa)
-                st.success("✅ Decisão updated no banco de dados!")
-                st.rerun()
+                try:
+                    save_human_screening_decision(
+                        project_id,
+                        paper_id,
+                        decisao,
+                        justificativa,
+                        motivo_exclusao if decisao == "Excluir" else None,
+                    )
+                    st.success("✅ Decisão e justificativa registradas com rastreabilidade!")
+                    st.rerun()
+                except ValueError as exc:
+                    st.warning(str(exc))
+                except Exception as exc:
+                    st.error(f"Erro ao gravar a decisão no banco de dados: {exc}")
 else:
     st.balloons()
     st.success("🎉 Todos os artigos já foram validados por você!")

@@ -86,7 +86,8 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 ### Triagem humana assistida
 
 - Sugestão de inclusão ou exclusão, com confiança e justificativa.
-- Decisão humana obrigatória: **Incluir** ou **Excluir**.
+- Decisão humana entre **Incluir**, **Excluir** e **Talvez**.
+- Exclusão com categoria metodológica estruturada e justificativa textual obrigatória.
 - Somente artigos incluídos seguem para PDFs, RAG e extração.
 - Reavaliação de artigos incluídos quando o texto integral não pode ser obtido.
 - Retorno à triagem ou exclusão posterior com justificativa e histórico preservado.
@@ -129,6 +130,12 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 
 ### Auditoria e relatório final
 
+- Fluxo PRISMA operacional calculado diretamente dos dados do projeto, sem estimativas da IA.
+- Separação entre registros identificados, deduplicação, triagem, texto integral,
+  extração e estudos efetivamente incluídos na síntese.
+- Motivos de exclusão consolidados por etapa.
+- Snapshots imutáveis vinculados à versão do protocolo e armazenados em JSONB.
+- Diagrama vetorial e exportações JSON e CSV para auditoria e apresentação.
 - Perguntas de auditoria configuráveis e versionadas no protocolo.
 - Avaliação `LLM-as-a-Judge` de fidelidade e relevância.
 - Persistência das execuções e métricas no projeto ativo.
@@ -278,6 +285,7 @@ docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-e
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz102_screening_reassessment.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz103_explainable_deduplication.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz104_reranking_configuration.sql
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz105_prisma_reporting.sql
 ```
 
 As migrações são idempotentes e preservam os dados. A migração de isolamento cria
@@ -519,6 +527,9 @@ docker compose down -v
 - Coleta dependente da disponibilidade, cobertura e limites das APIs externas.
 - Campos ausentes no BibTeX permanecem identificados como indisponíveis e exigem revisão na triagem.
 - Decisões de deduplicação anteriores à migração 007 não recebem histórico retroativo.
+- O diagrama implementa um fluxo PRISMA operacional adaptado às etapas observáveis
+  pela aplicação; ele não substitui a avaliação metodológica nem a conferência do
+  checklist PRISMA 2020 pelo pesquisador.
 - PDFs baseados somente em imagem exigem OCR, ainda não integrado.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
 - O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo.

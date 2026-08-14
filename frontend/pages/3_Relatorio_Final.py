@@ -1,10 +1,8 @@
 import os
 import sys
-import psycopg2
 import pandas as pd
 import streamlit as st
-import plotly.express as px
-import plotly.graph_objects as go
+import streamlit.components.v1 as components
 from dotenv import load_dotenv, find_dotenv
 
 # Adiciona o caminho raiz para podermos importar o agente relator e avaliador
@@ -12,6 +10,15 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from backend.agentes.agente_relator import gerar_relatorio_final
 from backend.agentes.agente_avaliador import PERGUNTAS_PADRAO, executar_auditoria
 from backend.app.database import carregar_ultima_execucao_avaliacao, salvar_protocolo_projeto
+from backend.app.prisma import (
+    calcular_fluxo_prisma,
+    carregar_ultimo_snapshot_prisma,
+    gerar_prisma_svg,
+    prisma_para_csv,
+    prisma_para_json,
+    salvar_snapshot_prisma,
+)
+from backend.app.screening_service import EXCLUSION_REASON_LABELS
 from frontend.project_selector import selecionar_projeto_ativo
 
 # ==========================================
@@ -19,34 +26,6 @@ from frontend.project_selector import selecionar_projeto_ativo
 # ==========================================
 st.set_page_config(page_title="Relatório e Auditoria", page_icon="📊", layout="wide")
 load_dotenv(find_dotenv())
-
-def get_conexao():
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        dbname=os.getenv("DB_NAME", "rag_systematic_review"),
-        user=os.environ["DB_USER"],
-        password=os.environ["DB_PASSWORD"]
-    )
-
-@st.cache_data(ttl=60)
-def carregar_dados_triagem(project_id):
-    """Consulta rápida ao PostgreSQL para alimentar os gráficos em tempo real."""
-    conexao = get_conexao()
-    df_total = pd.read_sql(
-        "SELECT COUNT(*) as total FROM deduplicated_papers WHERE project_id = %s",
-        conexao,
-        params=(project_id,),
-    )
-    df_decisoes = pd.read_sql("""
-        SELECT human_decision, COUNT(*) as quantidade 
-        FROM screening_decisions s
-        JOIN deduplicated_papers p ON p.id = s.paper_id
-        WHERE p.project_id = %s AND human_decision IS NOT NULL
-        GROUP BY human_decision
-    """, conexao, params=(project_id,))
-    conexao.close()
-    return df_total.iloc[0]['total'], df_decisoes
 
 def carregar_metricas_auditoria(project_id):
     execucao = carregar_ultima_execucao_avaliacao(project_id)
@@ -66,42 +45,105 @@ st.caption(f"Projeto ativo: **{projeto['title']}**")
 st.markdown("Acompanhe o funil da Revisão Sistemática, as métricas de IA e a síntese final do conhecimento.")
 st.divider()
 
-# --- 1. DASHBOARD VISUAL (PRISMA) ---
-st.header("1. Fluxo Quantitativo de Triagem")
+# --- 1. FLUXO PRISMA RASTREÁVEL ---
+st.header("1. Fluxo PRISMA Rastreável")
+st.caption(
+    "Os números abaixo são calculados diretamente dos registros do projeto. "
+    "Um snapshot preserva o retrato, a versão do protocolo e os motivos de exclusão."
+)
 
-total_artigos, df_decisoes = carregar_dados_triagem(project_id)
-aprovados = df_decisoes[df_decisoes['human_decision'] == 'Incluir']['quantidade'].sum() if not df_decisoes.empty and 'Incluir' in df_decisoes['human_decision'].values else 0
-rejeitados = df_decisoes[df_decisoes['human_decision'] == 'Excluir']['quantidade'].sum() if not df_decisoes.empty and 'Excluir' in df_decisoes['human_decision'].values else 0
-pendentes = total_artigos - (aprovados + rejeitados)
+try:
+    fluxo_atual = calcular_fluxo_prisma(project_id)
+    ultimo_snapshot = carregar_ultimo_snapshot_prisma(project_id)
+except Exception as exc:
+    st.error(f"Não foi possível calcular o fluxo PRISMA: {exc}")
+    st.stop()
 
+metricas = fluxo_atual["metrics"]
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("📚 Total Coletado", total_artigos)
-col2.metric("⏳ Pendentes", pendentes)
-col3.metric("✅ Incluídos (RAG)", aprovados)
-col4.metric("❌ Excluídos", rejeitados)
+col1.metric("📚 Registros identificados", metricas["records_identified"])
+col2.metric("🧹 Artigos únicos", metricas["records_after_deduplication"])
+col3.metric("📄 PDFs indexados", metricas["reports_assessed"])
+col4.metric("✅ Estudos na síntese", metricas["studies_included_synthesis"])
 
-st.write("") # Espaçamento
-
-col_chart1, col_chart2 = st.columns(2)
-with col_chart1:
-    fig_funil = go.Figure(go.Funnel(
-        y=["Identificados", "Triados (Decididos)", "Incluídos (Final)"],
-        x=[total_artigos, (aprovados + rejeitados), aprovados],
-        textinfo="value+percent initial",
-        marker={"color": ["#1f77b4", "#ff7f0e", "#2ca02c"]}
-    ))
-    fig_funil.update_layout(title="Funil PRISMA de Seleção", margin=dict(l=20, r=20, t=40, b=20))
-    st.plotly_chart(fig_funil, use_container_width=True)
-
-with col_chart2:
-    if not df_decisoes.empty:
-        fig_pie = px.pie(df_decisoes, values='quantidade', names='human_decision', 
-                         color='human_decision',
-                         color_discrete_map={'Incluir':'#2ca02c', 'Excluir':'#d62728'})
-        fig_pie.update_layout(title="Distribuição das Decisões Humanas", margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig_pie, use_container_width=True)
+col_status, col_snapshot = st.columns([2, 1])
+with col_status:
+    if ultimo_snapshot:
+        mudou = ultimo_snapshot["metrics"] != fluxo_atual["metrics"]
+        st.info(
+            f"Último snapshot: versão {ultimo_snapshot['snapshot_version']} · "
+            f"protocolo v{ultimo_snapshot['protocol_version']} · "
+            f"{ultimo_snapshot['created_at']}"
+        )
+        if mudou:
+            st.warning("O fluxo atual mudou desde o último snapshot. Registre uma nova versão.")
     else:
-        st.info("Ainda não existem decisões de triagem registadas.")
+        st.info("Ainda não há snapshot PRISMA registrado para este projeto.")
+with col_snapshot:
+    if st.button("📌 Registrar snapshot PRISMA", type="primary", use_container_width=True):
+        try:
+            snapshot_criado = salvar_snapshot_prisma(project_id)
+            st.success(f"Snapshot v{snapshot_criado['snapshot_version']} registrado.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Não foi possível registrar o snapshot: {exc}")
+
+svg_fluxo = gerar_prisma_svg(fluxo_atual)
+components.html(
+    "<style>html,body{margin:0;padding:0;overflow:hidden;background:#f7f9fc}</style>"
+    + svg_fluxo,
+    height=1130,
+    scrolling=False,
+)
+
+with st.expander("Ver interpretação e definições metodológicas", expanded=True):
+    for statement in fluxo_atual["interpretation"]["statements"]:
+        st.write(f"- {statement}")
+    for warning in fluxo_atual["interpretation"]["warnings"]:
+        st.warning(warning)
+    st.caption(
+        "PDF avaliado = texto integral indexado. Estudo incluído na síntese = extração "
+        "aprovada ou corrigida por humano, com ao menos uma fonte literal validada."
+    )
+
+linhas_motivos = []
+for etapa, motivos in fluxo_atual["exclusion_reasons"].items():
+    for codigo, quantidade in motivos.items():
+        linhas_motivos.append(
+            {
+                "Etapa": "Triagem" if etapa == "screening" else "Texto integral",
+                "Motivo": EXCLUSION_REASON_LABELS.get(codigo, codigo),
+                "Quantidade": quantidade,
+            }
+        )
+if linhas_motivos:
+    with st.expander("Ver motivos estruturados de exclusão"):
+        st.dataframe(pd.DataFrame(linhas_motivos), use_container_width=True, hide_index=True)
+
+if ultimo_snapshot:
+    export_col1, export_col2, export_col3 = st.columns(3)
+    nome_base = f"prisma_snapshot_v{ultimo_snapshot['snapshot_version']}"
+    export_col1.download_button(
+        "⬇️ Baixar JSON auditável",
+        prisma_para_json(ultimo_snapshot).encode("utf-8"),
+        file_name=f"{nome_base}.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    export_col2.download_button(
+        "⬇️ Baixar dados CSV",
+        prisma_para_csv(ultimo_snapshot).encode("utf-8"),
+        file_name=f"{nome_base}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+    export_col3.download_button(
+        "⬇️ Baixar diagrama SVG",
+        gerar_prisma_svg(ultimo_snapshot).encode("utf-8"),
+        file_name=f"{nome_base}.svg",
+        mime="image/svg+xml",
+        use_container_width=True,
+    )
 
 st.divider()
 
@@ -189,6 +231,12 @@ with col_btn:
 relatorio_compilado = st.session_state.relatorios_por_projeto.get(project_id)
 if relatorio_compilado is not None:
     texto_relatorio = relatorio_compilado["relatorio_md"]
+    snapshot_relatorio = relatorio_compilado.get("prisma_snapshot")
+    if snapshot_relatorio:
+        st.info(
+            f"Relatório vinculado ao snapshot PRISMA v{snapshot_relatorio['snapshot_version']} "
+            f"e ao protocolo v{snapshot_relatorio['protocol_version']}."
+        )
     
     with st.container(height=500, border=True):
         st.markdown(texto_relatorio)

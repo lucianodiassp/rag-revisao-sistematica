@@ -126,8 +126,19 @@ CREATE TABLE screening_decisions (
     suggested_decision VARCHAR(50),
     human_decision VARCHAR(50),
     rationale_jsonb JSONB,
-	justification TEXT,
-    reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    justification TEXT,
+    exclusion_reason_code VARCHAR(50),
+    reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (exclusion_reason_code IS NULL OR exclusion_reason_code IN (
+        'population_mismatch', 'intervention_mismatch', 'outcome_mismatch',
+        'study_design_mismatch', 'publication_type', 'language', 'date_range',
+        'insufficient_information', 'restricted_access', 'pdf_not_found',
+        'metadata_mismatch', 'other'
+    )),
+    CHECK (
+        (human_decision = 'Excluir' AND exclusion_reason_code IS NOT NULL)
+        OR (human_decision IS DISTINCT FROM 'Excluir' AND exclusion_reason_code IS NULL)
+    )
 );
 
 -- Histórico de reavaliações motivadas durante as etapas posteriores à triagem.
@@ -184,6 +195,20 @@ CREATE TABLE evaluation_runs (
     metrics_jsonb JSONB NOT NULL,
     params_jsonb JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Retratos imutáveis e versionados do fluxo de seleção e síntese.
+CREATE TABLE prisma_flow_snapshots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    snapshot_version INTEGER NOT NULL,
+    protocol_version INTEGER NOT NULL,
+    metrics_jsonb JSONB NOT NULL,
+    source_counts_jsonb JSONB NOT NULL,
+    exclusion_reasons_jsonb JSONB NOT NULL,
+    interpretation_jsonb JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (project_id, snapshot_version)
 );
 
 -- Credenciais cifradas e configurações de IA da instalação local. Os campos de
@@ -335,6 +360,7 @@ CREATE INDEX idx_agent_interactions_project ON agent_interactions(project_id);
 CREATE INDEX idx_screening_reassessments_project ON screening_reassessments(project_id, created_at DESC);
 CREATE INDEX idx_screening_reassessments_paper ON screening_reassessments(paper_id, created_at DESC);
 CREATE INDEX idx_evaluation_runs_project ON evaluation_runs(project_id);
+CREATE INDEX idx_prisma_snapshots_project ON prisma_flow_snapshots(project_id, snapshot_version DESC);
 CREATE INDEX idx_paper_chunks_paper ON paper_chunks(paper_id);
 CREATE INDEX idx_embeddings_chunk ON embeddings_metadata(chunk_id);
 CREATE INDEX idx_evidence_sources_extraction ON evidence_field_sources(extraction_id);
