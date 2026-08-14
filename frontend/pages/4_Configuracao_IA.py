@@ -20,6 +20,7 @@ from backend.app.ai_config import (  # noqa: E402
     TASK_EXTRACTION,
     TASK_FORMULATION,
     TASK_RAG,
+    TASK_RERANKING,
     TASK_REPORT,
     TASK_SCREENING,
 )
@@ -34,6 +35,7 @@ TASK_LABELS = {
     TASK_FORMULATION: "Formulação da pergunta",
     TASK_SCREENING: "Triagem",
     TASK_RAG: "Resposta RAG",
+    TASK_RERANKING: "Reranking das evidências",
     TASK_EVALUATION: "Auditoria / juiz",
     TASK_EXTRACTION: "Extração de evidências",
     TASK_REPORT: "Relatório final",
@@ -203,6 +205,36 @@ with st.form("form_modelos_ia"):
             "temperature": temperatura,
         }
 
+    st.markdown("#### Reranking da busca híbrida")
+    config_reranking = estado["generation"][TASK_RERANKING]
+    reranking_ativo = st.checkbox(
+        "Reordenar os candidatos da busca híbrida antes de gerar a resposta",
+        value=bool(config_reranking.enabled),
+        help="Se ocorrer uma falha, o sistema usa automaticamente a ordem RRF original.",
+    )
+    col_candidatos, col_finais = st.columns(2)
+    limite_candidatos = col_candidatos.number_input(
+        "Candidatos recuperados pelo RRF",
+        min_value=4,
+        max_value=30,
+        value=int(config_reranking.candidate_limit or 12),
+        step=1,
+    )
+    limite_final = col_finais.number_input(
+        "Trechos após o reranking",
+        min_value=2,
+        max_value=10,
+        value=int(config_reranking.final_limit or 4),
+        step=1,
+    )
+    valores_modelos[TASK_RERANKING].update(
+        {
+            "enabled": reranking_ativo,
+            "candidate_limit": int(limite_candidatos),
+            "final_limit": int(limite_final),
+        }
+    )
+
     st.markdown("#### Busca vetorial")
     col_embedding, col_dimensoes = st.columns([3, 1])
     modelo_embedding = col_embedding.text_input(
@@ -226,7 +258,9 @@ with st.form("form_modelos_ia"):
     salvar_modelos = st.form_submit_button("💾 Salvar configuração de modelos", type="primary")
 
 if salvar_modelos:
-    if embedding_alterado and not confirmar_reindexacao:
+    if limite_final > limite_candidatos:
+        st.error("O número de trechos finais não pode superar o total de candidatos.")
+    elif embedding_alterado and not confirmar_reindexacao:
         st.error("Confirme a necessidade de reindexação antes de trocar o embedding.")
     else:
         try:
@@ -243,6 +277,9 @@ linhas = [
         "Função": TASK_LABELS[task],
         "Modelo": config.model,
         "Temperatura efetiva": config.effective_temperature,
+        "Ativo": config.enabled if task == TASK_RERANKING else None,
+        "Candidatos": config.candidate_limit if task == TASK_RERANKING else None,
+        "Trechos finais": config.final_limit if task == TASK_RERANKING else None,
         "Origem": config.source,
     }
     for task, config in estado["generation"].items()
@@ -252,6 +289,9 @@ linhas.append(
         "Função": "Embedding",
         "Modelo": estado["embedding"].model,
         "Temperatura efetiva": None,
+        "Ativo": None,
+        "Candidatos": None,
+        "Trechos finais": None,
         "Origem": estado["embedding"].source,
     }
 )

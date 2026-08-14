@@ -2,7 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from backend.app.ai_admin_service import inspect_gemini_key
+from backend.app.ai_admin_service import inspect_gemini_key, save_ai_models
+from backend.app.ai_config import GENERATION_TASKS, TASK_RERANKING
 
 
 class AIAdminServiceTests(unittest.TestCase):
@@ -39,6 +40,42 @@ class AIAdminServiceTests(unittest.TestCase):
 
         self.assertNotIn(segredo, str(contexto.exception))
         self.assertIn("[REDACTED]", str(contexto.exception))
+
+    @patch("backend.app.ai_admin_service.reload_ai_runtime")
+    @patch("backend.app.ai_admin_service.save_installation_model_settings")
+    @patch("backend.app.ai_admin_service.get_installation_credential", return_value=None)
+    def test_salva_parametros_especificos_do_reranking(
+        self,
+        _credential,
+        save_settings,
+        _reload,
+    ):
+        generation = {
+            task: {"model_name": "gemini-test", "temperature": 0.0}
+            for task in GENERATION_TASKS
+        }
+        generation[TASK_RERANKING].update(
+            {"enabled": True, "candidate_limit": 12, "final_limit": 4}
+        )
+
+        save_ai_models(generation, "embedding-test", 768)
+
+        configuracoes = save_settings.call_args.args[2]
+        self.assertEqual(configuracoes[TASK_RERANKING]["parameters"]["candidate_limit"], 12)
+        self.assertEqual(configuracoes[TASK_RERANKING]["parameters"]["final_limit"], 4)
+        self.assertTrue(configuracoes[TASK_RERANKING]["parameters"]["enabled"])
+
+    def test_rejeita_limites_inconsistentes_do_reranking(self):
+        generation = {
+            task: {"model_name": "gemini-test", "temperature": 0.0}
+            for task in GENERATION_TASKS
+        }
+        generation[TASK_RERANKING].update(
+            {"enabled": True, "candidate_limit": 4, "final_limit": 5}
+        )
+
+        with self.assertRaisesRegex(ValueError, "não pode superar"):
+            save_ai_models(generation, "embedding-test", 768)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from backend.app.ai_config import (
     TASK_EXTRACTION,
+    TASK_RERANKING,
     TASK_REPORT,
     clear_ai_settings_cache,
     get_ai_settings,
@@ -90,6 +91,25 @@ class AIConfigTests(unittest.TestCase):
             clear_ai_settings_cache()
             with self.assertRaisesRegex(RuntimeError, "número inteiro"):
                 get_ai_settings()
+
+    def test_reranking_pode_ser_configurado_pelo_ambiente(self):
+        with patch.dict(
+            os.environ,
+            {
+                "AI_CONFIG_DATABASE_ENABLED": "false",
+                "AI_RERANKING_ENABLED": "false",
+                "AI_RERANKING_CANDIDATE_LIMIT": "10",
+                "AI_RERANKING_FINAL_LIMIT": "3",
+            },
+            clear=True,
+        ):
+            clear_ai_settings_cache()
+            config = get_generation_config(TASK_RERANKING)
+
+            self.assertFalse(config.enabled)
+            self.assertEqual(config.candidate_limit, 10)
+            self.assertEqual(config.final_limit, 3)
+            self.assertEqual(config.metadata()["candidate_limit"], 10)
 
     def test_banco_sobrescreve_modelo_e_chave_sem_expor_segredo(self):
         modelos = {

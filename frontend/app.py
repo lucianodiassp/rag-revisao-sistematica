@@ -59,11 +59,73 @@ if pergunta_usuario:
         with st.spinner("A pesquisar na base de dados e a ler artigos..."):
             try:
                 # C. Chamar o nosso Agente (Pessoa 5) passando a pergunta
-                resposta_agente = responder_com_rag(pergunta_usuario, project_id)
+                resultado_rag = responder_com_rag(
+                    pergunta_usuario,
+                    project_id,
+                    return_details=True,
+                )
+                resposta_agente = resultado_rag["answer"]
                 
                 # D. Imprimir a resposta no ecrã e guardar no histórico
                 st.markdown(resposta_agente)
                 mensagens.append({"role": "assistant", "content": resposta_agente})
+
+                trace = resultado_rag.get("reranking") or {}
+                with st.expander("Como as evidências foram selecionadas"):
+                    status = trace.get("status")
+                    if status == "success":
+                        st.success("Reranking executado com sucesso após a busca híbrida RRF.")
+                    elif status == "fallback_rrf":
+                        st.warning(
+                            "O reranking não pôde ser executado; a resposta utilizou "
+                            "a ordem segura do RRF."
+                        )
+                    elif status == "disabled":
+                        st.info("Reranking desativado; foi utilizada a ordem RRF.")
+                    else:
+                        st.info("Nenhuma evidência candidata foi encontrada.")
+
+                    ranking = trace.get("final_ranking") or []
+                    if ranking:
+                        st.dataframe(
+                            [
+                                {
+                                    "Artigo": item["paper_id"],
+                                    "Página": item["page_number"],
+                                    "Posição RRF": item["original_rank"],
+                                    "Posição final": item["rerank_rank"],
+                                    "Score RRF": item["rrf_score"],
+                                    "Score reranking": item.get("rerank_score"),
+                                    "Justificativa": item.get("rerank_reason"),
+                                }
+                                for item in ranking
+                            ],
+                            hide_index=True,
+                            use_container_width=True,
+                        )
+
+                    validacao = resultado_rag.get("citation_validation") or {}
+                    referencias_internas = validacao.get(
+                        "internal_references_disambiguated"
+                    ) or []
+                    citacoes_invalidas = validacao.get("invalid_citations_removed") or []
+                    fontes_adicionadas = validacao.get("source_citations_appended") or []
+                    st.caption(
+                        f"Citações artigo/página validadas: "
+                        f"{len(validacao.get('valid_citations') or [])}."
+                    )
+                    if referencias_internas:
+                        st.info(
+                            "Referências numéricas internas desambiguadas: "
+                            + ", ".join(f"[{item}]" for item in referencias_internas)
+                        )
+                    if citacoes_invalidas:
+                        st.warning("Uma ou mais citações de fonte não validadas foram removidas.")
+                    if fontes_adicionadas:
+                        st.warning(
+                            "O modelo não vinculou cada afirmação a uma fonte; o aviso de "
+                            "rastreabilidade foi acrescentado à resposta."
+                        )
                 
             except Exception as e:
                 st.error(f"⚠️ Ocorreu um erro de comunicação com o backend: {e}")

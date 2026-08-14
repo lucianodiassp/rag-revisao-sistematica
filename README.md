@@ -107,8 +107,14 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Recuperação semântica por distância vetorial.
 - Recuperação lexical pelo Full-Text Search do PostgreSQL.
 - Fusão dos rankings com **Reciprocal Rank Fusion (RRF)**.
+- Reranking opcional dos melhores candidatos com modelo generativo configurável.
+- Registro em JSONB do ranking antes/depois, notas, justificativas, modelo e parâmetros.
+- Fallback automático para a ordem RRF quando o reranking falha ou está desativado.
 - Filtro pelo projeto ativo e pelo modelo de embedding configurado.
-- Recusa quando não há contexto suficiente e citação do UUID do artigo.
+- Recuperação restrita a chunks de PDF com página de origem registrada.
+- Citações validadas no formato `[paper_id, p. página]`.
+- Referências bibliográficas internas, como `[36]`, são explicitamente desambiguadas.
+- Recusa quando não há contexto suficiente.
 - Registro da pergunta, resposta, evidências recuperadas e configuração do modelo.
 
 ### Matriz de evidências rastreáveis
@@ -140,7 +146,7 @@ flowchart LR
     C --> D["Triagem assistida + decisão humana"]
     D --> E["PDFs incluídos"]
     E --> F["Chunks por página + embeddings"]
-    F --> G["RAG híbrido: vetorial + lexical + RRF"]
+    F --> G["RAG híbrido: vetorial + lexical + RRF + reranking"]
     F --> H["Extração rastreável"]
     H --> I["Revisão humana da matriz"]
     G --> J["Auditoria LLM-as-a-Judge"]
@@ -271,6 +277,7 @@ docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-e
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz102_screening_reassessment.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz103_explainable_deduplication.sql
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz104_reranking_configuration.sql
 ```
 
 As migrações são idempotentes e preservam os dados. A migração de isolamento cria
@@ -286,8 +293,9 @@ Na página **4. Configuração de IA** é possível:
 2. Importar a chave presente em `backend/.env`.
 3. Consultar os modelos liberados para a credencial.
 4. Selecionar modelos e temperaturas por função.
-5. Configurar o modelo de embedding.
-6. Consultar a configuração efetiva e o histórico.
+5. Ativar o reranking e configurar o total de candidatos e trechos finais.
+6. Configurar o modelo de embedding.
+7. Consultar a configuração efetiva e o histórico.
 
 Trocar o modelo de embedding exige nova indexação dos PDFs. O sistema identifica o
 índice incompatível, reconstrói o documento de forma transacional e devolve a
@@ -365,7 +373,8 @@ recadastre as credenciais pelas telas de configuração.
 
 - Retorne à página inicial **Assistente de Revisão Sistemática**.
 - Faça perguntas sobre o texto integral indexado.
-- Confira os UUIDs citados na resposta.
+- Confira as citações com UUID e página no formato `[paper_id, p. página]`.
+- Abra **Como as evidências foram selecionadas** para comparar posição RRF, posição final e score do reranking.
 
 ### 7. Extrair e revisar evidências
 
@@ -415,8 +424,8 @@ python -m unittest discover -s tests -v
 ```
 
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
-importação BibTeX, deduplicação explicável, isolamento por projeto, indexação de PDFs
-e evidências rastreáveis.
+importação BibTeX, deduplicação explicável, reranking com fallback, isolamento por
+projeto, indexação de PDFs e evidências rastreáveis.
 
 Os testes SQL de integração ficam em `tests/*.sql`. Exemplo no PowerShell:
 
@@ -499,6 +508,7 @@ docker compose down -v
 | Vários projetos ao executar um script | Defina `PROJECT_ID` explicitamente. |
 | Credencial cifrada não pode ser aberta | Restaure a chave-mestra correta ou cadastre novamente a credencial. |
 | Acentos incorretos no CSV | Use o arquivo da interface; ele é exportado como UTF-8 com BOM. |
+| Resposta mostra "referência bibliográfica nº 36" | É uma referência interna do artigo, não uma página. A fonte rastreável aparece como `[paper_id, p. página]`. |
 | BibTeX não é aceito | Confirme a extensão `.bib`, o limite de 20 MB e se todas as chaves e aspas estão fechadas. |
 
 ## Limites atuais
@@ -511,6 +521,7 @@ docker compose down -v
 - Decisões de deduplicação anteriores à migração 007 não recebem histórico retroativo.
 - PDFs baseados somente em imagem exigem OCR, ainda não integrado.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
+- O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo.
 - O sistema não substitui protocolo metodológico, avaliação de risco de viés ou
   julgamento do pesquisador.
 

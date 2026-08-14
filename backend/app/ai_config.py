@@ -14,6 +14,7 @@ CURRENT_VECTOR_DIMENSIONS = 768
 TASK_FORMULATION = "formulation"
 TASK_SCREENING = "screening"
 TASK_RAG = "rag"
+TASK_RERANKING = "reranking"
 TASK_EVALUATION = "evaluation"
 TASK_EXTRACTION = "extraction"
 TASK_REPORT = "report"
@@ -22,6 +23,7 @@ GENERATION_TASKS = (
     TASK_FORMULATION,
     TASK_SCREENING,
     TASK_RAG,
+    TASK_RERANKING,
     TASK_EVALUATION,
     TASK_EXTRACTION,
     TASK_REPORT,
@@ -31,6 +33,7 @@ TASK_MODEL_ENV = {
     TASK_FORMULATION: "AI_FORMULATION_MODEL",
     TASK_SCREENING: "AI_SCREENING_MODEL",
     TASK_RAG: "AI_RAG_MODEL",
+    TASK_RERANKING: "AI_RERANKING_MODEL",
     TASK_EVALUATION: "AI_EVALUATION_MODEL",
     TASK_EXTRACTION: "AI_EXTRACTION_MODEL",
     TASK_REPORT: "AI_REPORT_MODEL",
@@ -39,6 +42,7 @@ TASK_TEMPERATURE_ENV = {
     TASK_FORMULATION: "AI_FORMULATION_TEMPERATURE",
     TASK_SCREENING: "AI_SCREENING_TEMPERATURE",
     TASK_RAG: "AI_RAG_TEMPERATURE",
+    TASK_RERANKING: "AI_RERANKING_TEMPERATURE",
     TASK_EVALUATION: "AI_EVALUATION_TEMPERATURE",
     TASK_EXTRACTION: "AI_EXTRACTION_TEMPERATURE",
     TASK_REPORT: "AI_REPORT_TEMPERATURE",
@@ -47,6 +51,7 @@ TASK_DEFAULT_TEMPERATURE = {
     TASK_FORMULATION: 0.2,
     TASK_SCREENING: 0.0,
     TASK_RAG: 0.1,
+    TASK_RERANKING: 0.0,
     TASK_EVALUATION: 0.0,
     TASK_EXTRACTION: 0.0,
     TASK_REPORT: 0.2,
@@ -100,6 +105,43 @@ def _ler_temperatura(nome, padrao):
     return temperatura
 
 
+def _ler_booleano(nome, padrao):
+    valor = os.getenv(nome)
+    if valor is None or not valor.strip():
+        return bool(padrao)
+    normalizado = valor.strip().lower()
+    if normalizado in {"1", "true", "yes", "on", "sim"}:
+        return True
+    if normalizado in {"0", "false", "no", "off", "nao", "não"}:
+        return False
+    raise RuntimeError(f"{nome} deve ser verdadeiro ou falso.")
+
+
+def _inteiro_configuracao(valor, padrao, nome):
+    if valor in (None, ""):
+        return int(padrao)
+    try:
+        resultado = int(valor)
+    except (TypeError, ValueError) as erro:
+        raise RuntimeError(f"{nome} deve ser um número inteiro.") from erro
+    if resultado <= 0:
+        raise RuntimeError(f"{nome} deve ser maior que zero.")
+    return resultado
+
+
+def _booleano_configuracao(valor, padrao):
+    if valor is None:
+        return bool(padrao)
+    if isinstance(valor, bool):
+        return valor
+    normalizado = str(valor).strip().lower()
+    if normalizado in {"1", "true", "yes", "on", "sim"}:
+        return True
+    if normalizado in {"0", "false", "no", "off", "nao", "não"}:
+        return False
+    return bool(padrao)
+
+
 def model_supports_sampling_parameters(provider, model):
     """Evita enviar parâmetros removidos por modelos Gemini mais recentes."""
     if provider != PROVIDER_GOOGLE_GEMINI:
@@ -119,6 +161,9 @@ class GenerationTaskConfig:
     model: str
     temperature: float | None
     source: str = "environment"
+    enabled: bool = True
+    candidate_limit: int | None = None
+    final_limit: int | None = None
 
     @property
     def effective_temperature(self):
@@ -127,13 +172,18 @@ class GenerationTaskConfig:
         return self.temperature
 
     def metadata(self):
-        return {
+        metadata = {
             "provider": self.provider,
             "model_name": self.model,
             "temperature": self.effective_temperature,
             "configuration_source": self.source,
             "task": self.task,
         }
+        if self.task == TASK_RERANKING:
+            metadata["enabled"] = self.enabled
+            metadata["candidate_limit"] = self.candidate_limit
+            metadata["final_limit"] = self.final_limit
+        return metadata
 
 
 @dataclass(frozen=True)
@@ -208,12 +258,36 @@ def _apply_database_overrides(settings):
             geracao[tarefa] = configuracao
             continue
         parametros = salvo.get("parameters_jsonb") or {}
+        candidate_limit = configuracao.candidate_limit
+        final_limit = configuracao.final_limit
+        enabled = configuracao.enabled
+        if tarefa == TASK_RERANKING:
+            candidate_limit = _inteiro_configuracao(
+                parametros.get("candidate_limit"),
+                configuracao.candidate_limit or 12,
+                "candidate_limit",
+            )
+            final_limit = _inteiro_configuracao(
+                parametros.get("final_limit"),
+                configuracao.final_limit or 4,
+                "final_limit",
+            )
+            if not 4 <= candidate_limit <= 30:
+                raise RuntimeError("candidate_limit deve estar entre 4 e 30.")
+            if not 2 <= final_limit <= 10:
+                raise RuntimeError("final_limit deve estar entre 2 e 10.")
+            if final_limit > candidate_limit:
+                raise RuntimeError("O limite final do reranking não pode superar os candidatos.")
+            enabled = _booleano_configuracao(parametros.get("enabled"), configuracao.enabled)
         geracao[tarefa] = GenerationTaskConfig(
             task=tarefa,
             provider=salvo["provider_code"],
             model=salvo["model_name"],
             temperature=parametros.get("temperature", configuracao.temperature),
             source="database",
+            enabled=enabled,
+            candidate_limit=candidate_limit,
+            final_limit=final_limit,
         )
 
     embedding_salvo = modelos_banco.get("embedding")
@@ -255,6 +329,21 @@ def get_environment_ai_settings():
         modelo = os.getenv(TASK_MODEL_ENV[tarefa], modelo_padrao).strip()
         if not modelo:
             raise RuntimeError(f"{TASK_MODEL_ENV[tarefa]} não pode ficar vazio.")
+        candidate_limit = None
+        final_limit = None
+        enabled = True
+        if tarefa == TASK_RERANKING:
+            enabled = _ler_booleano("AI_RERANKING_ENABLED", True)
+            candidate_limit = _ler_inteiro("AI_RERANKING_CANDIDATE_LIMIT", 12)
+            final_limit = _ler_inteiro("AI_RERANKING_FINAL_LIMIT", 4)
+            if not 4 <= candidate_limit <= 30:
+                raise RuntimeError("AI_RERANKING_CANDIDATE_LIMIT deve estar entre 4 e 30.")
+            if not 2 <= final_limit <= 10:
+                raise RuntimeError("AI_RERANKING_FINAL_LIMIT deve estar entre 2 e 10.")
+            if final_limit > candidate_limit:
+                raise RuntimeError(
+                    "AI_RERANKING_FINAL_LIMIT não pode superar AI_RERANKING_CANDIDATE_LIMIT."
+                )
         geracao[tarefa] = GenerationTaskConfig(
             task=tarefa,
             provider=provider,
@@ -263,6 +352,9 @@ def get_environment_ai_settings():
                 TASK_TEMPERATURE_ENV[tarefa],
                 TASK_DEFAULT_TEMPERATURE[tarefa],
             ),
+            enabled=enabled,
+            candidate_limit=candidate_limit,
+            final_limit=final_limit,
         )
 
     embedding = EmbeddingConfig(
@@ -295,6 +387,10 @@ def get_generation_config(task):
 
 def get_embedding_config():
     return get_ai_settings().embedding
+
+
+def get_reranking_config():
+    return get_generation_config(TASK_RERANKING)
 
 
 def clear_ai_settings_cache():

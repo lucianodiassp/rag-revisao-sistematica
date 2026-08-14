@@ -5,6 +5,7 @@ from google import genai
 from backend.app.ai_config import (
     GENERATION_TASKS,
     PROVIDER_GOOGLE_GEMINI,
+    TASK_RERANKING,
     get_environment_ai_settings,
     get_ai_settings,
 )
@@ -143,14 +144,32 @@ def get_ai_admin_state():
 
 
 def save_ai_models(generation, embedding_model, embedding_dimensions=768):
+    reranking = generation.get(TASK_RERANKING) or {}
+    try:
+        candidate_limit = int(reranking.get("candidate_limit"))
+        final_limit = int(reranking.get("final_limit"))
+    except (TypeError, ValueError) as erro:
+        raise ValueError("Informe limites inteiros para o reranking.") from erro
+    if not 4 <= candidate_limit <= 30:
+        raise ValueError("Os candidatos do reranking devem ficar entre 4 e 30.")
+    if not 2 <= final_limit <= 10:
+        raise ValueError("Os trechos finais do reranking devem ficar entre 2 e 10.")
+    if final_limit > candidate_limit:
+        raise ValueError("O limite final do reranking não pode superar os candidatos.")
+
     credential = get_installation_credential(PROVIDER_GOOGLE_GEMINI)
     credential_id = str(credential["id"]) if credential else None
     configuracoes = {}
     for task in GENERATION_TASKS:
         item = generation[task]
+        parameters = {
+            chave: valor
+            for chave, valor in item.items()
+            if chave != "model_name" and valor is not None
+        }
         configuracoes[task] = {
             "model_name": str(item["model_name"]).strip(),
-            "parameters": {"temperature": item.get("temperature")},
+            "parameters": parameters,
             "embedding_dimensions": None,
         }
     configuracoes["embedding"] = {
