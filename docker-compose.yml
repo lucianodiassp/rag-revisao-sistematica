@@ -21,6 +21,7 @@ services:
       - ./database/scripts/005_bibliographic_sources.sql:/docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql:ro
       - ./database/scripts/006_screening_reassessment.sql:/docker-entrypoint-initdb.d/zz102_screening_reassessment.sql:ro
       - ./database/scripts/007_explainable_deduplication.sql:/docker-entrypoint-initdb.d/zz103_explainable_deduplication.sql:ro
+      - ./database/scripts/008_reranking_configuration.sql:/docker-entrypoint-initdb.d/zz104_reranking_configuration.sql:ro
     networks:
       - rag_network
 

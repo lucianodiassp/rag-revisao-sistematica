@@ -8,7 +8,7 @@ from backend.app.ai_service import generate_content
 # 1. Ajuste de Caminho para importar o nosso Agente RAG
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-from backend.agentes.agente_rag import responder_com_rag, buscar_contexto_hibrido
+from backend.agentes.agente_rag import responder_com_rag
 from backend.app.database import (
     log_interacao_agente,
     obter_projeto,
@@ -34,14 +34,18 @@ def carregar_perguntas_auditoria(project_id):
 def obter_resposta_rag_segura(project_id, pergunta, tentativa=1):
     """Envolve a chamada do RAG num mecanismo de tolerância a falhas (Rate Limit)."""
     try:
-        return responder_com_rag(pergunta, project_id)
+        return responder_com_rag(pergunta, project_id, return_details=True)
     except Exception as e:
         if "429" in str(e) and tentativa <= 3:
             print(f"   ⏳ Rate limit do RAG atingido. A aguardar 45s (Tentativa {tentativa}/3)...")
             time.sleep(45)
             return obter_resposta_rag_segura(project_id, pergunta, tentativa + 1)
         print(f"❌ Erro fatal no RAG: {e}")
-        return "Erro ao gerar resposta devido a falha na API."
+        return {
+            "answer": "Erro ao gerar resposta devido a falha na API.",
+            "evidence": [],
+            "reranking": {"status": "error"},
+        }
 
 def avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa=1):
     """O LLM atua como Juiz, avaliando a resposta gerada contra o contexto original."""
@@ -99,12 +103,18 @@ def executar_auditoria(project_id=None):
     for i, pergunta in enumerate(perguntas_ativas, 1):
         print(f"[{i}/{len(perguntas_ativas)}] Testando: '{pergunta}'")
         
-        # 1. Pede ao motor RAG para buscar as evidências textuais puras (para o Juiz ler)
-        evidencias_brutas = buscar_contexto_hibrido(pergunta, project_id=project_id, limite=3)
-        contexto_texto = " ".join([chunk for _, chunk, _ in evidencias_brutas]) if evidencias_brutas else "Nenhum contexto encontrado."
+        # 1. Executa uma única recuperação e reutiliza exatamente as evidências
+        # selecionadas tanto na resposta quanto na avaliação do Juiz.
+        resultado_rag = obter_resposta_rag_segura(project_id, pergunta)
+        evidencias_brutas = resultado_rag.get("evidence") or []
+        contexto_texto = (
+            " ".join(item["text"] for item in evidencias_brutas)
+            if evidencias_brutas
+            else "Nenhum contexto encontrado."
+        )
         
-        # 2. Pede ao RAG para gerar a resposta oficial final
-        resposta_gerada = obter_resposta_rag_segura(project_id, pergunta)
+        # 2. Usa a resposta produzida a partir desse mesmo ranking final.
+        resposta_gerada = resultado_rag["answer"]
         
         print("   -> 👨‍⚖️ O Juiz a avaliar a precisão...")
         avaliacao = avaliar_resposta(pergunta, resposta_gerada, contexto_texto)
@@ -145,6 +155,7 @@ def executar_auditoria(project_id=None):
         {
             "questions": perguntas_ativas,
             "judge_model": get_generation_config(TASK_EVALUATION).model,
+            "retrieval_pipeline": "hybrid_rrf_plus_reranking",
         },
     )
     

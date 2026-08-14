@@ -5,9 +5,16 @@ from backend.app.ai_config import (
     TASK_RAG,
     get_embedding_config,
     get_generation_config,
+    get_reranking_config,
 )
 from backend.app.ai_service import generate_content, generate_embedding
 from backend.app.database import log_interacao_agente, resolver_project_id
+from backend.app.rag_citations import (
+    RESPOSTA_SEM_CONTEXTO,
+    formatar_citacao,
+    validar_citacoes_rag,
+)
+from backend.app.reranking import reranquear_candidatos
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E MODELOS
@@ -27,7 +34,7 @@ def get_conexao():
 # ==========================================
 # 1. MOTOR DE BUSCA HÍBRIDA (BM25 + VETORES RRF)
 # ==========================================
-def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
+def _buscar_contexto_hibrido_detalhado(pergunta, project_id=None, limite=3):
     """
     Combina a busca semântica (pgvector) com a busca por palavras-chave (Full-Text Search)
     utilizando a fusão matemática RRF para mitigar falhas de recall.
@@ -46,6 +53,7 @@ def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
     query = """
     WITH vector_search AS (
         SELECT pc.id, pc.paper_id, pc.chunk_text,
+               (pc.metadata_jsonb->>'page_start')::INTEGER AS page_number,
                RANK() OVER (ORDER BY em.embedding <=> %s::vector) AS vector_rank
         FROM embeddings_metadata em
         JOIN paper_chunks pc ON em.chunk_id = pc.id
@@ -53,22 +61,29 @@ def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
         WHERE dp.project_id = %s
           AND em.model_name = %s
           AND em.dimensions = %s
+          AND pc.metadata_jsonb->>'source_type' = 'pdf'
+          AND pc.metadata_jsonb ? 'page_start'
         ORDER BY em.embedding <=> %s::vector
         LIMIT 20
     ),
     keyword_search AS (
         SELECT pc.id, pc.paper_id, pc.chunk_text,
+               (pc.metadata_jsonb->>'page_start')::INTEGER AS page_number,
                RANK() OVER (ORDER BY ts_rank_cd(to_tsvector('english', pc.chunk_text), plainto_tsquery('english', %s)) DESC) AS keyword_rank
         FROM paper_chunks pc
         JOIN deduplicated_papers dp ON dp.id = pc.paper_id
         WHERE dp.project_id = %s
+          AND pc.metadata_jsonb->>'source_type' = 'pdf'
+          AND pc.metadata_jsonb ? 'page_start'
           AND to_tsvector('english', pc.chunk_text) @@ plainto_tsquery('english', %s)
         ORDER BY ts_rank_cd(to_tsvector('english', pc.chunk_text), plainto_tsquery('english', %s)) DESC
         LIMIT 20
     )
     SELECT
+        COALESCE(v.id, k.id) AS chunk_id,
         COALESCE(v.paper_id, k.paper_id) AS paper_id,
         COALESCE(v.chunk_text, k.chunk_text) AS text,
+        COALESCE(v.page_number, k.page_number) AS page_number,
         COALESCE(1.0 / (60 + v.vector_rank), 0.0) + COALESCE(1.0 / (60 + k.keyword_rank), 0.0) AS rrf_score
     FROM vector_search v
     FULL OUTER JOIN keyword_search k ON v.id = k.id
@@ -87,18 +102,61 @@ def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
     cursor.close()
     conexao.close()
     
-    return resultados
+    return [
+        {
+            "candidate_id": f"c{indice}",
+            "chunk_id": str(chunk_id),
+            "paper_id": str(paper_id),
+            "text": texto,
+            "page_number": int(page_number),
+            "rrf_score": float(score),
+            "original_rank": indice,
+        }
+        for indice, (chunk_id, paper_id, texto, page_number, score) in enumerate(resultados, 1)
+    ]
+
+
+def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
+    """Mantém a interface histórica: lista de (paper_id, texto, score RRF)."""
+    resultados = _buscar_contexto_hibrido_detalhado(pergunta, project_id, limite)
+    return [
+        (item["paper_id"], item["text"], item["rrf_score"])
+        for item in resultados
+    ]
+
+
+def buscar_contexto_reranqueado(pergunta, project_id=None):
+    """Recupera candidatos pelo RRF e aplica o reranking configurado."""
+    project_id = resolver_project_id(project_id)
+    config = get_reranking_config()
+    candidatos = _buscar_contexto_hibrido_detalhado(
+        pergunta,
+        project_id,
+        limite=int(config.candidate_limit or 12),
+    )
+    if not candidatos:
+        return [], {
+            "status": "no_candidates",
+            "initial_ranking": [],
+            "final_ranking": [],
+            "error": None,
+            "configuration": config.metadata(),
+        }
+    return reranquear_candidatos(pergunta, candidatos, project_id, config=config)
 
 # ==========================================
 # 2. O AGENTE INTELIGENTE (Orquestrador RAG)
 # ==========================================
-def responder_com_rag(pergunta, project_id=None):
+def responder_com_rag(pergunta, project_id=None, return_details=False):
     project_id = resolver_project_id(project_id)
     print("\n🔍 INÍCIO DA RECUPERAÇÃO DE EVIDÊNCIAS")
-    evidencias = buscar_contexto_hibrido(pergunta, project_id=project_id, limite=4)
+    evidencias, trace_reranking = buscar_contexto_reranqueado(
+        pergunta,
+        project_id=project_id,
+    )
     
     if not evidencias:
-        resposta_sem_contexto = "Não tenho dados suficientes nos artigos recolhidos para responder."
+        resposta_sem_contexto = f"{RESPOSTA_SEM_CONTEXTO} para responder."
         log_interacao_agente(
             project_id,
             "rag_agent",
@@ -106,14 +164,39 @@ def responder_com_rag(pergunta, project_id=None):
             {"answer": resposta_sem_contexto, "supporting_evidence": []},
             get_generation_config(TASK_RAG).metadata(),
         )
+        if return_details:
+            return {
+                "answer": resposta_sem_contexto,
+                "reranking": trace_reranking,
+                "evidence": [],
+                "citation_validation": {
+                    "valid_citations": [],
+                    "invalid_citations_removed": [],
+                    "internal_references_disambiguated": [],
+                    "source_citations_appended": [],
+                },
+            }
         return resposta_sem_contexto
 
     contexto_formatado = ""
-    print("\n📑 EVIDÊNCIAS RECUPERADAS (TOP SCORE RRF):")
-    for paper_id, texto_chunk, score in evidencias:
+    print("\n📑 EVIDÊNCIAS SELECIONADAS APÓS RERANKING:")
+    for evidencia in evidencias:
+        paper_id = evidencia["paper_id"]
+        texto_chunk = evidencia["text"]
+        score = evidencia["rrf_score"]
+        pagina = evidencia["page_number"]
+        score_reranking = evidencia.get("rerank_score")
         paper_id_texto = str(paper_id)
-        print(f" -> Artigo ID: {paper_id_texto[:8]}... | Score Híbrido: {score:.4f}")
-        contexto_formatado += f"\n[Artigo ID: {paper_id} | Score RRF: {score:.4f}]\nTrecho: {texto_chunk}\n"
+        score_exibido = f"{score_reranking:.1f}" if score_reranking is not None else "fallback RRF"
+        print(
+            f" -> Artigo ID: {paper_id_texto[:8]}... | "
+            f"Página: {pagina} | RRF: {score:.4f} | Reranking: {score_exibido}"
+        )
+        contexto_formatado += (
+            f"\n[FONTE RASTREÁVEL: {formatar_citacao(paper_id, pagina)} | "
+            f"Score RRF: {score:.4f} | Score reranking: {score_exibido}]"
+            f"\nTrecho: {texto_chunk}\n"
+        )
 
     print("\n🧠 A gerar síntese com IA baseada EXCLUSIVAMENTE no contexto...")
     
@@ -124,7 +207,9 @@ def responder_com_rag(pergunta, project_id=None):
     REGRA 1: Responde APENAS com base na informação fornecida no Contexto.
     REGRA 2: Se a resposta não estiver contida explicitamente no Contexto, diz estritamente "Não tenho dados suficientes nos artigos recolhidos".
     REGRA 3: Não inventes nem adiciones conhecimento externo (Zero Alucinação).
-    REGRA 4: Sempre que fizeres uma afirmação baseada num artigo, cite o ID do Artigo correspondente.
+    REGRA 4: Toda afirmação factual deve terminar com uma ou mais citações no formato exato [paper_id, p. página], copiadas das FONTES RASTREÁVEIS.
+    REGRA 5: Não use números bibliográficos internos como [5] ou [36] como fonte da resposta. Se precisar mencioná-los, escreva "referência 5 citada pelo artigo" e acrescente a fonte rastreável com UUID e página.
+    REGRA 6: Nunca invente um UUID ou uma página e nunca cite uma fonte que não esteja no Contexto.
     
     CONTEXTO CIENTÍFICO RECUPERADO:
     {contexto_formatado}
@@ -136,24 +221,44 @@ def responder_com_rag(pergunta, project_id=None):
         system_instruction=prompt_sistema,
     )
     
-    resposta_texto = resposta.text
+    resposta_original = resposta.text
+    resposta_texto, validacao_citacoes = validar_citacoes_rag(
+        resposta_original,
+        evidencias,
+    )
     log_interacao_agente(
         project_id,
         "rag_agent",
         {"question": pergunta},
         {
             "answer": resposta_texto,
+            "raw_answer": resposta_original,
             "supporting_evidence": [
                 {
-                    "paper_id": str(paper_id),
-                    "snippet": texto_chunk,
-                    "retrieval_score": float(score),
+                    "paper_id": str(evidencia["paper_id"]),
+                    "chunk_id": str(evidencia["chunk_id"]),
+                    "page_number": int(evidencia["page_number"]),
+                    "snippet": evidencia["text"],
+                    "rrf_score": float(evidencia["rrf_score"]),
+                    "original_rank": int(evidencia["original_rank"]),
+                    "rerank_rank": int(evidencia["rerank_rank"]),
+                    "rerank_score": evidencia.get("rerank_score"),
+                    "rerank_reason": evidencia.get("rerank_reason"),
                 }
-                for paper_id, texto_chunk, score in evidencias
+                for evidencia in evidencias
             ],
+            "reranking_status": trace_reranking["status"],
+            "citation_validation": validacao_citacoes,
         },
         get_generation_config(TASK_RAG).metadata(),
     )
+    if return_details:
+        return {
+            "answer": resposta_texto,
+            "reranking": trace_reranking,
+            "evidence": evidencias,
+            "citation_validation": validacao_citacoes,
+        }
     return resposta_texto
 
 # ==========================================
