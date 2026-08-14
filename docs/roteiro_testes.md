@@ -26,6 +26,9 @@ Este documento guia a sua experiência de teste na plataforma. O objetivo é ava
 4. Na seção de coleta, abra a aba **"Importar BibTeX"** e selecione um arquivo `.bib`.
 5. Confira a prévia, as contagens e importe os registros para o projeto ativo.
 6. Opcionalmente, use também a aba **"Consultar APIs"** para combinar as duas formas de coleta.
+7. Abra **"Deduplicação"** e selecione um candidato pendente.
+8. Compare regra, pontuação, DOI, título, autores, ano, fontes e resumos.
+9. Mescle um candidato com justificativa e mantenha outro separado, quando houver.
 
 ### ✅ Critério de Sucesso
 
@@ -33,8 +36,11 @@ A plataforma deve:
 
 * Gerar a string de busca corretamente.
 * Exibir a prévia do BibTeX e informar entradas válidas, sem DOI e sem abstract.
-* Registrar os artigos importados e encaminhá-los para a triagem.
-* Consolidar artigos repetidos por DOI ou título, preservando a proveniência.
+* Registrar os artigos importados e encaminhar os registros sem conflito para a triagem.
+* Consolidar automaticamente somente DOI idêntico, preservando a proveniência.
+* Manter candidatos por título fora da triagem até a decisão humana.
+* Exibir regra, pontuação, evidências comparativas e justificativa da deduplicação.
+* Registrar a decisão humana e liberar artigos mantidos separados para a triagem.
 * Quando a coleta por API for utilizada, comunicar com a base externa sem erros.
 
 ---

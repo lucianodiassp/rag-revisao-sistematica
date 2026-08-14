@@ -142,6 +142,32 @@ Unique-ID = {WOS:TESTE001},
         self.assertIn("raw_entry", chamadas["artigos"][0]["registro_bruto"])
         self.assertEqual(chamadas["relatorios"][0][1], "busca-1")
 
+    def test_importacao_reporta_candidato_pendente_de_deduplicacao(self):
+        conteudo = b"@article{candidato, title={Possible duplicate without DOI}}"
+        relatorios = []
+        repositorio = SimpleNamespace(
+            registrar_busca=lambda *args, **kwargs: "busca-2",
+            salvar_artigo_coletado=lambda **kwargs: {
+                "status": "pending_review",
+                "decision_id": "decision-1",
+            },
+            atualizar_metadados_busca=lambda project_id, busca_id, parametros: relatorios.append(
+                parametros
+            ),
+        )
+
+        relatorio = importar_bibtex(
+            "projeto-1",
+            conteudo,
+            "candidato.bib",
+            _repositorio=repositorio,
+        )
+
+        self.assertEqual(relatorio["new_papers"], 0)
+        self.assertEqual(relatorio["merged_records"], 0)
+        self.assertEqual(relatorio["pending_deduplication_review"], 1)
+        self.assertEqual(relatorios[0]["pending_deduplication_review"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

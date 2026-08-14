@@ -5,6 +5,12 @@ import uuid
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import Json
+from backend.app.deduplication import (
+    ACTION_AUTO_CREATE,
+    ACTION_AUTO_MERGE,
+    ACTION_PENDING_REVIEW,
+    avaliar_duplicidade,
+)
 from backend.app.project_utils import (
     mesclar_proveniencia,
     normalizar_doi,
@@ -176,7 +182,7 @@ def salvar_artigo_coletado(
     fonte=None,
     registro_bruto=None,
 ):
-    """Registra a coleta bruta e consolida o artigo dentro de um único projeto."""
+    """Registra a coleta e aplica uma decisão de deduplicação auditável."""
     doi = normalizar_doi((fontes_dict or {}).get("external_ids", {}).get("doi"))
     fonte_registro = fonte or next(iter((fontes_dict or {}).get("sources", [])), "desconhecida")
     ids_externos = (fontes_dict or {}).get("external_ids", {})
@@ -188,6 +194,7 @@ def salvar_artigo_coletado(
             INSERT INTO retrieved_records
                 (project_id, search_query_id, source, external_id, doi, metadata_jsonb, raw_jsonb)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 project_id,
@@ -199,23 +206,46 @@ def salvar_artigo_coletado(
                 Json(registro_bruto if registro_bruto is not None else (fontes_dict or {})),
             ),
         )
+        retrieved_record_id = cursor.fetchone()[0]
 
         cursor.execute(
             """
-            SELECT project_id, title, abstract, merged_sources_jsonb
+            SELECT id, canonical_doi, title, abstract, merged_sources_jsonb
             FROM deduplicated_papers
-            WHERE id = %s
-            FOR UPDATE
+            WHERE project_id = %s
+            FOR SHARE
             """,
-            (id_artigo,),
+            (project_id,),
         )
-        existente = cursor.fetchone()
+        candidatos = [
+            {
+                "id": linha[0],
+                "canonical_doi": linha[1],
+                "title": linha[2],
+                "abstract": linha[3],
+                "merged_sources_jsonb": linha[4],
+            }
+            for linha in cursor.fetchall()
+        ]
+        entrada = {
+            "proposed_paper_id": str(id_artigo),
+            "canonical_doi": doi,
+            "title": titulo,
+            "abstract": abstract,
+            "fontes_dict": fontes_dict or {},
+        }
+        avaliacao = avaliar_duplicidade(entrada, candidatos)
+        candidato = avaliacao["candidate"]
+        candidate_paper_id = str(candidato["id"]) if candidato else None
+        result_paper_id = None
 
-        if existente:
-            if str(existente[0]) != str(project_id):
-                raise ValueError("Colisão de artigo entre projetos; o identificador deve incluir project_id.")
-            proveniencia = mesclar_proveniencia(existente[3], fontes_dict)
-            abstract_final = abstract if abstract and "indispon" not in abstract.lower() else existente[2]
+        if avaliacao["system_action"] == ACTION_AUTO_MERGE:
+            proveniencia = mesclar_proveniencia(candidato["merged_sources_jsonb"], fontes_dict)
+            abstract_final = (
+                abstract
+                if abstract and "indispon" not in abstract.lower()
+                else candidato["abstract"]
+            )
             cursor.execute(
                 """
                 UPDATE deduplicated_papers
@@ -225,19 +255,62 @@ def salvar_artigo_coletado(
                     merged_sources_jsonb = %s
                 WHERE id = %s AND project_id = %s
                 """,
-                (titulo or existente[1], abstract_final, doi, Json(proveniencia), id_artigo, project_id),
+                (
+                    titulo or candidato["title"],
+                    abstract_final,
+                    doi,
+                    Json(proveniencia),
+                    candidate_paper_id,
+                    project_id,
+                ),
             )
-            return False
+            result_paper_id = candidate_paper_id
+        elif avaliacao["system_action"] == ACTION_AUTO_CREATE:
+            cursor.execute(
+                """
+                INSERT INTO deduplicated_papers
+                    (id, project_id, canonical_doi, title, abstract, merged_sources_jsonb)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (id_artigo, project_id, doi, titulo, abstract, Json(fontes_dict or {})),
+            )
+            result_paper_id = str(id_artigo)
 
+        review_status = "pending" if avaliacao["system_action"] == ACTION_PENDING_REVIEW else "automatic"
         cursor.execute(
             """
-            INSERT INTO deduplicated_papers
-                (id, project_id, canonical_doi, title, abstract, merged_sources_jsonb)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO deduplication_decisions
+                (project_id, retrieved_record_id, candidate_paper_id, result_paper_id,
+                 rule_code, similarity_score, system_action, explanation,
+                 evidence_jsonb, incoming_record_jsonb, review_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
             """,
-            (id_artigo, project_id, doi, titulo, abstract, Json(fontes_dict or {})),
+            (
+                project_id,
+                str(retrieved_record_id),
+                candidate_paper_id,
+                result_paper_id,
+                avaliacao["rule_code"],
+                avaliacao["score"],
+                avaliacao["system_action"],
+                avaliacao["explanation"],
+                Json(avaliacao["evidence"]),
+                Json(entrada),
+                review_status,
+            ),
         )
-        return True
+        decision_id = cursor.fetchone()[0]
+        return {
+            "status": avaliacao["system_action"],
+            "decision_id": str(decision_id),
+            "retrieved_record_id": str(retrieved_record_id),
+            "candidate_paper_id": candidate_paper_id,
+            "paper_id": result_paper_id,
+            "rule_code": avaliacao["rule_code"],
+            "score": float(avaliacao["score"]),
+            "explanation": avaliacao["explanation"],
+        }
 
 
 def log_interacao_agente(project_id, nome_agente, input_dict, output_dict, modelo_dict):

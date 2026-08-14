@@ -6,6 +6,11 @@ import re
 import unicodedata
 
 from backend.app.project_utils import gerar_id_artigo, normalizar_doi, normalizar_titulo
+from backend.app.deduplication import (
+    ACTION_AUTO_CREATE,
+    ACTION_AUTO_MERGE,
+    ACTION_PENDING_REVIEW,
+)
 
 
 FONTE_BIBTEX = "BibTeX"
@@ -400,12 +405,13 @@ def importar_bibtex(project_id, conteudo, nome_arquivo="importacao.bib", _reposi
     )
     novos = 0
     mesclados = 0
+    pendentes_revisao = 0
     erros = []
 
     for artigo in analise["articles"]:
         try:
             artigo_id = gerar_id_artigo(artigo, project_id)
-            inserido = _repositorio.salvar_artigo_coletado(
+            resultado_persistencia = _repositorio.salvar_artigo_coletado(
                 project_id=project_id,
                 id_artigo=artigo_id,
                 titulo=artigo["titulo"],
@@ -415,10 +421,19 @@ def importar_bibtex(project_id, conteudo, nome_arquivo="importacao.bib", _reposi
                 fonte=artigo["fontes_dict"]["sources"][0],
                 registro_bruto=artigo["registro_bruto"],
             )
-            if inserido:
-                novos += 1
+            if isinstance(resultado_persistencia, dict):
+                status_deduplicacao = resultado_persistencia.get("status")
             else:
+                # Compatibilidade com repositórios de teste e integrações antigas.
+                status_deduplicacao = (
+                    ACTION_AUTO_CREATE if resultado_persistencia else ACTION_AUTO_MERGE
+                )
+            if status_deduplicacao == ACTION_AUTO_CREATE:
+                novos += 1
+            elif status_deduplicacao == ACTION_AUTO_MERGE:
                 mesclados += 1
+            elif status_deduplicacao == ACTION_PENDING_REVIEW:
+                pendentes_revisao += 1
         except Exception as erro:
             erros.append(
                 {
@@ -433,6 +448,7 @@ def importar_bibtex(project_id, conteudo, nome_arquivo="importacao.bib", _reposi
         status,
         new_papers=novos,
         merged_records=mesclados,
+        pending_deduplication_review=pendentes_revisao,
         persistence_errors=len(erros),
         persistence_error_details=erros[:100],
     )

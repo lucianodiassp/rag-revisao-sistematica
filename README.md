@@ -50,6 +50,15 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Identificador estável de artigo por projeto, baseado no DOI normalizado ou no título normalizado.
 - Consolidação de duplicatas com preservação da proveniência das diferentes fontes.
 
+### Deduplicação explicável e revisável
+
+- Cada registro recuperado recebe regra, pontuação, justificativa e evidências comparativas.
+- DOI normalizado idêntico é consolidado automaticamente, com evento auditável.
+- Título idêntico ou suficientemente semelhante aguarda decisão humana antes da triagem.
+- Pontuação combina título (80%), autores (15%) e ano (5%), com limites registrados no JSONB.
+- Comparação lado a lado de título, DOI, autores, ano, fontes e resumos.
+- Decisão humana entre mesclar e manter separado, sempre com justificativa preservada.
+
 ### Coleta bibliográfica configurável
 
 - Integração com **OpenAlex**, **Semantic Scholar** e **PubMed**.
@@ -62,7 +71,7 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Retry limitado para falhas transitórias e respostas `429`.
 - Registro da configuração pública usada na busca, sem segredos ou e-mail literal.
 - Registro auditável do arquivo importado por nome, hash SHA-256, codificação e resultado.
-- Preservação da entrada BibTeX bruta e consolidação de duplicatas por DOI ou título.
+- Preservação da entrada BibTeX bruta e encaminhamento de candidatos por título à revisão humana.
 
 ### Configuração central de IA
 
@@ -126,7 +135,7 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 flowchart LR
     A["Projeto e protocolo"] --> B["Coleta multifonte"]
     A --> B2["Importação BibTeX"]
-    B --> C["Desduplicação e proveniência"]
+    B --> C["Deduplicação explicável + revisão humana"]
     B2 --> C
     C --> D["Triagem assistida + decisão humana"]
     D --> E["PDFs incluídos"]
@@ -261,6 +270,7 @@ docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-e
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz100_ai_configuration.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql
 docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz102_screening_reassessment.sql
+docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz103_explainable_deduplication.sql
 ```
 
 As migrações são idempotentes e preservam os dados. A migração de isolamento cria
@@ -330,13 +340,20 @@ recadastre as credenciais pelas telas de configuração.
 - Consulte as APIs habilitadas e/ou importe um arquivo `.bib`.
 - Confira a prévia e o relatório da importação antes de seguir para a triagem.
 
-### 3. Realizar a triagem
+### 3. Revisar possíveis duplicatas
+
+- Abra **7. Deduplicação**.
+- Confira a regra, a pontuação e os metadados apresentados lado a lado.
+- Para cada item pendente, decida entre mesclar ou manter os artigos separados.
+- Registre a justificativa; artigos mantidos separados são liberados para a Triagem.
+
+### 4. Realizar a triagem
 
 - Abra **1. Triagem**.
 - Execute a sugestão da IA quando desejado.
 - Registre a decisão humana para cada artigo.
 
-### 4. Associar e indexar PDFs
+### 5. Associar e indexar PDFs
 
 - Abra **5. Gestão de PDFs**.
 - Envie o PDF de cada artigo incluído.
@@ -344,13 +361,13 @@ recadastre as credenciais pelas telas de configuração.
 - Execute o processamento e acompanhe o resultado por documento.
 - Confirme no funil a diferença entre PDF armazenado e PDF indexado.
 
-### 5. Consultar o corpus pelo RAG
+### 6. Consultar o corpus pelo RAG
 
 - Retorne à página inicial **Assistente de Revisão Sistemática**.
 - Faça perguntas sobre o texto integral indexado.
 - Confira os UUIDs citados na resposta.
 
-### 6. Extrair e revisar evidências
+### 7. Extrair e revisar evidências
 
 - Abra **2. Matriz de Evidências**.
 - Execute a extração dos PDFs indexados.
@@ -358,7 +375,7 @@ recadastre as credenciais pelas telas de configuração.
 - Aprove, corrija ou rejeite cada extração.
 - Baixe a matriz em CSV quando necessário.
 
-### 7. Auditar e gerar o relatório
+### 8. Auditar e gerar o relatório
 
 - Abra **3. Relatório Final**.
 - Configure as perguntas de auditoria.
@@ -398,7 +415,8 @@ python -m unittest discover -s tests -v
 ```
 
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
-importação BibTeX, isolamento por projeto, indexação de PDFs e evidências rastreáveis.
+importação BibTeX, deduplicação explicável, isolamento por projeto, indexação de PDFs
+e evidências rastreáveis.
 
 Os testes SQL de integração ficam em `tests/*.sql`. Exemplo no PowerShell:
 
@@ -490,6 +508,7 @@ docker compose down -v
 - Schema vetorial fixado em 768 dimensões.
 - Coleta dependente da disponibilidade, cobertura e limites das APIs externas.
 - Campos ausentes no BibTeX permanecem identificados como indisponíveis e exigem revisão na triagem.
+- Decisões de deduplicação anteriores à migração 007 não recebem histórico retroativo.
 - PDFs baseados somente em imagem exigem OCR, ainda não integrado.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
 - O sistema não substitui protocolo metodológico, avaliação de risco de viés ou
