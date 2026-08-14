@@ -169,22 +169,24 @@ with aba_apis:
 
             with st.spinner("A consultar as bases e registrar a proveniência por fonte..."):
                 try:
-                    qtd_salvos, qtd_encontrados = iniciar_recolha(
+                    qtd_salvos, qtd_encontrados, qtd_mesclados, qtd_pendentes = iniciar_recolha(
                         nova_string,
                         project_id=project_id,
                         max_por_fonte=qtd_artigos,
                     )
                     if qtd_encontrados == 0:
                         st.warning("Nenhum artigo foi encontrado. Ajuste a estratégia de busca.")
-                    elif qtd_salvos == 0:
+                    elif qtd_salvos == 0 and qtd_pendentes == 0:
                         st.info(
                             f"Os {qtd_encontrados} registros já existiam neste projeto; "
                             "a proveniência das fontes foi atualizada."
                         )
                     else:
                         st.success(
-                            f"Coleta concluída: {qtd_salvos} novos artigos em "
-                            f"{qtd_encontrados} registros recuperados."
+                            f"Coleta concluída: {qtd_salvos} novo(s), "
+                            f"{qtd_mesclados} mesclado(s) por DOI e "
+                            f"{qtd_pendentes} candidato(s) aguardando revisão, em "
+                            f"{qtd_encontrados} registro(s) recuperado(s)."
                         )
                 except Exception as erro:
                     st.error(f"Erro durante a coleta: {erro}")
@@ -256,11 +258,16 @@ with aba_bibtex:
                             )
                         else:
                             st.success("Importação BibTeX concluída e registrada.")
-                        resultado1, resultado2, resultado3 = st.columns(3)
+                        resultado1, resultado2, resultado3, resultado4 = st.columns(4)
                         resultado1.metric("Novos artigos", relatorio["new_papers"])
-                        resultado2.metric("Duplicatas mescladas", relatorio["merged_records"])
-                        resultado3.metric("Entradas inválidas", relatorio["invalid_entries"])
+                        resultado2.metric("Mesclados por DOI", relatorio["merged_records"])
+                        resultado3.metric(
+                            "Revisão de duplicatas",
+                            relatorio.get("pending_deduplication_review", 0),
+                        )
+                        resultado4.metric("Entradas inválidas", relatorio["invalid_entries"])
                         st.caption(
-                            "Os artigos válidos já estão disponíveis na página de Triagem. "
+                            "Novos artigos já estão na Triagem; candidatos por título precisam "
+                            "ser decididos na página Deduplicação. "
                             f"Execução: `{relatorio['search_query_id']}`"
                         )

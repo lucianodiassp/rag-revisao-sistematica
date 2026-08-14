@@ -17,6 +17,11 @@ from backend.app.bibliographic_config import (  # noqa: E402
     get_source_config,
 )
 from backend.app.project_utils import gerar_id_artigo  # noqa: E402
+from backend.app.deduplication import (  # noqa: E402
+    ACTION_AUTO_CREATE,
+    ACTION_AUTO_MERGE,
+    ACTION_PENDING_REVIEW,
+)
 from backend.coleta.coleta_openalex import recolher_artigos_openalex  # noqa: E402
 from backend.coleta.coleta_pubmed import recolher_artigos_pubmed  # noqa: E402
 from backend.coleta.coleta_semantic import recolher_artigos_semantic  # noqa: E402
@@ -72,11 +77,13 @@ def iniciar_recolha(query, project_id=None, max_por_fonte=5):
     print(f"📊 Total de artigos recolhidos na web: {total_encontrados}")
 
     sucessos = 0
+    mesclados = 0
+    pendentes_revisao = 0
     for nome_fonte, busca_id, artigos in resultados_por_fonte:
         for artigo in artigos:
             try:
                 id_artigo = gerar_id_deterministico(artigo, project_id)
-                inserido = salvar_artigo_coletado(
+                resultado_persistencia = salvar_artigo_coletado(
                     project_id=project_id,
                     id_artigo=id_artigo,
                     titulo=artigo["titulo"],
@@ -85,16 +92,26 @@ def iniciar_recolha(query, project_id=None, max_por_fonte=5):
                     search_query_id=busca_id,
                     fonte=nome_fonte,
                 )
-                if inserido:
+                status_deduplicacao = (
+                    resultado_persistencia.get("status")
+                    if isinstance(resultado_persistencia, dict)
+                    else ACTION_AUTO_CREATE if resultado_persistencia else ACTION_AUTO_MERGE
+                )
+                if status_deduplicacao == ACTION_AUTO_CREATE:
                     sucessos += 1
+                elif status_deduplicacao == ACTION_AUTO_MERGE:
+                    mesclados += 1
+                elif status_deduplicacao == ACTION_PENDING_REVIEW:
+                    pendentes_revisao += 1
             except Exception as erro:
                 print(f"⚠️ Artigo '{artigo['titulo'][:20]}...' gerou erro: {erro}")
 
     print(
         f"\n✅ Processo concluído no projeto {project_id}: "
-        f"{sucessos} novos artigos de {total_encontrados} registros recuperados."
+        f"{sucessos} novos, {mesclados} mesclados automaticamente e "
+        f"{pendentes_revisao} aguardando revisão, em {total_encontrados} registros recuperados."
     )
-    return sucessos, total_encontrados
+    return sucessos, total_encontrados, mesclados, pendentes_revisao
 
 
 if __name__ == "__main__":
