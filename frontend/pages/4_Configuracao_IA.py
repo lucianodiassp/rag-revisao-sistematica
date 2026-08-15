@@ -227,11 +227,24 @@ with st.form("form_modelos_ia"):
         value=int(config_reranking.final_limit or 4),
         step=1,
     )
+    peso_rrf = st.slider(
+        "Peso da ordem original da busca híbrida (RRF)",
+        min_value=0.0,
+        max_value=1.0,
+        value=float(config_reranking.rrf_weight or 0.0),
+        step=0.05,
+        help=(
+            "0 mantém somente a ordem proposta pela IA; 1 mantém somente a ordem "
+            "RRF. Valores intermediários combinam os dois sinais. Use o benchmark "
+            "para escolher o peso."
+        ),
+    )
     valores_modelos[TASK_RERANKING].update(
         {
             "enabled": reranking_ativo,
             "candidate_limit": int(limite_candidatos),
             "final_limit": int(limite_final),
+            "rrf_weight": float(peso_rrf),
         }
     )
 
@@ -280,6 +293,7 @@ linhas = [
         "Ativo": config.enabled if task == TASK_RERANKING else None,
         "Candidatos": config.candidate_limit if task == TASK_RERANKING else None,
         "Trechos finais": config.final_limit if task == TASK_RERANKING else None,
+        "Peso RRF": config.rrf_weight if task == TASK_RERANKING else None,
         "Origem": config.source,
     }
     for task, config in estado["generation"].items()
@@ -292,6 +306,7 @@ linhas.append(
         "Ativo": None,
         "Candidatos": None,
         "Trechos finais": None,
+        "Peso RRF": None,
         "Origem": estado["embedding"].source,
     }
 )

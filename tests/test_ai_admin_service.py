@@ -55,7 +55,12 @@ class AIAdminServiceTests(unittest.TestCase):
             for task in GENERATION_TASKS
         }
         generation[TASK_RERANKING].update(
-            {"enabled": True, "candidate_limit": 12, "final_limit": 4}
+            {
+                "enabled": True,
+                "candidate_limit": 12,
+                "final_limit": 4,
+                "rrf_weight": 0.35,
+            }
         )
 
         save_ai_models(generation, "embedding-test", 768)
@@ -63,6 +68,7 @@ class AIAdminServiceTests(unittest.TestCase):
         configuracoes = save_settings.call_args.args[2]
         self.assertEqual(configuracoes[TASK_RERANKING]["parameters"]["candidate_limit"], 12)
         self.assertEqual(configuracoes[TASK_RERANKING]["parameters"]["final_limit"], 4)
+        self.assertEqual(configuracoes[TASK_RERANKING]["parameters"]["rrf_weight"], 0.35)
         self.assertTrue(configuracoes[TASK_RERANKING]["parameters"]["enabled"])
 
     def test_rejeita_limites_inconsistentes_do_reranking(self):
@@ -75,6 +81,23 @@ class AIAdminServiceTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "não pode superar"):
+            save_ai_models(generation, "embedding-test", 768)
+
+    def test_rejeita_peso_rrf_fora_do_intervalo(self):
+        generation = {
+            task: {"model_name": "gemini-test", "temperature": 0.0}
+            for task in GENERATION_TASKS
+        }
+        generation[TASK_RERANKING].update(
+            {
+                "enabled": True,
+                "candidate_limit": 12,
+                "final_limit": 4,
+                "rrf_weight": -0.1,
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "peso RRF"):
             save_ai_models(generation, "embedding-test", 768)
 
 

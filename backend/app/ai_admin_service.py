@@ -148,14 +148,17 @@ def save_ai_models(generation, embedding_model, embedding_dimensions=768):
     try:
         candidate_limit = int(reranking.get("candidate_limit"))
         final_limit = int(reranking.get("final_limit"))
+        rrf_weight = float(reranking.get("rrf_weight", 0.0))
     except (TypeError, ValueError) as erro:
-        raise ValueError("Informe limites inteiros para o reranking.") from erro
+        raise ValueError("Informe limites válidos e um peso entre 0 e 1 para o reranking.") from erro
     if not 4 <= candidate_limit <= 30:
         raise ValueError("Os candidatos do reranking devem ficar entre 4 e 30.")
     if not 2 <= final_limit <= 10:
         raise ValueError("Os trechos finais do reranking devem ficar entre 2 e 10.")
     if final_limit > candidate_limit:
         raise ValueError("O limite final do reranking não pode superar os candidatos.")
+    if not 0 <= rrf_weight <= 1:
+        raise ValueError("O peso RRF do reranking deve estar entre 0 e 1.")
 
     credential = get_installation_credential(PROVIDER_GOOGLE_GEMINI)
     credential_id = str(credential["id"]) if credential else None

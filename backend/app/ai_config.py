@@ -105,6 +105,19 @@ def _ler_temperatura(nome, padrao):
     return temperatura
 
 
+def _ler_peso(nome, padrao):
+    valor = os.getenv(nome)
+    if valor is None or not valor.strip():
+        return float(padrao)
+    try:
+        peso = float(valor)
+    except ValueError as erro:
+        raise RuntimeError(f"{nome} deve ser um número entre 0 e 1.") from erro
+    if not 0 <= peso <= 1:
+        raise RuntimeError(f"{nome} deve estar entre 0 e 1.")
+    return peso
+
+
 def _ler_booleano(nome, padrao):
     valor = os.getenv(nome)
     if valor is None or not valor.strip():
@@ -127,6 +140,18 @@ def _inteiro_configuracao(valor, padrao, nome):
     if resultado <= 0:
         raise RuntimeError(f"{nome} deve ser maior que zero.")
     return resultado
+
+
+def _peso_configuracao(valor, padrao, nome):
+    if valor in (None, ""):
+        return float(padrao)
+    try:
+        peso = float(valor)
+    except (TypeError, ValueError) as erro:
+        raise RuntimeError(f"{nome} deve ser um número entre 0 e 1.") from erro
+    if not 0 <= peso <= 1:
+        raise RuntimeError(f"{nome} deve estar entre 0 e 1.")
+    return peso
 
 
 def _booleano_configuracao(valor, padrao):
@@ -164,6 +189,7 @@ class GenerationTaskConfig:
     enabled: bool = True
     candidate_limit: int | None = None
     final_limit: int | None = None
+    rrf_weight: float | None = None
 
     @property
     def effective_temperature(self):
@@ -183,6 +209,7 @@ class GenerationTaskConfig:
             metadata["enabled"] = self.enabled
             metadata["candidate_limit"] = self.candidate_limit
             metadata["final_limit"] = self.final_limit
+            metadata["rrf_weight"] = self.rrf_weight
         return metadata
 
 
@@ -260,6 +287,7 @@ def _apply_database_overrides(settings):
         parametros = salvo.get("parameters_jsonb") or {}
         candidate_limit = configuracao.candidate_limit
         final_limit = configuracao.final_limit
+        rrf_weight = configuracao.rrf_weight
         enabled = configuracao.enabled
         if tarefa == TASK_RERANKING:
             candidate_limit = _inteiro_configuracao(
@@ -278,6 +306,11 @@ def _apply_database_overrides(settings):
                 raise RuntimeError("final_limit deve estar entre 2 e 10.")
             if final_limit > candidate_limit:
                 raise RuntimeError("O limite final do reranking não pode superar os candidatos.")
+            rrf_weight = _peso_configuracao(
+                parametros.get("rrf_weight"),
+                configuracao.rrf_weight or 0.0,
+                "rrf_weight",
+            )
             enabled = _booleano_configuracao(parametros.get("enabled"), configuracao.enabled)
         geracao[tarefa] = GenerationTaskConfig(
             task=tarefa,
@@ -288,6 +321,7 @@ def _apply_database_overrides(settings):
             enabled=enabled,
             candidate_limit=candidate_limit,
             final_limit=final_limit,
+            rrf_weight=rrf_weight,
         )
 
     embedding_salvo = modelos_banco.get("embedding")
@@ -331,6 +365,7 @@ def get_environment_ai_settings():
             raise RuntimeError(f"{TASK_MODEL_ENV[tarefa]} não pode ficar vazio.")
         candidate_limit = None
         final_limit = None
+        rrf_weight = None
         enabled = True
         if tarefa == TASK_RERANKING:
             enabled = _ler_booleano("AI_RERANKING_ENABLED", True)
@@ -344,6 +379,7 @@ def get_environment_ai_settings():
                 raise RuntimeError(
                     "AI_RERANKING_FINAL_LIMIT não pode superar AI_RERANKING_CANDIDATE_LIMIT."
                 )
+            rrf_weight = _ler_peso("AI_RERANKING_RRF_WEIGHT", 0.0)
         geracao[tarefa] = GenerationTaskConfig(
             task=tarefa,
             provider=provider,
@@ -355,6 +391,7 @@ def get_environment_ai_settings():
             enabled=enabled,
             candidate_limit=candidate_limit,
             final_limit=final_limit,
+            rrf_weight=rrf_weight,
         )
 
     embedding = EmbeddingConfig(

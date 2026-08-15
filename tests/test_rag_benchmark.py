@@ -129,13 +129,19 @@ class RagBenchmarkTests(unittest.TestCase):
         summary = run["metrics"]["summary"]
 
         self.assertEqual(summary["rrf"]["reciprocal_rank"], 0.5)
+        self.assertEqual(summary["model_reranked"]["reciprocal_rank"], 1.0)
         self.assertEqual(summary["reranked"]["reciprocal_rank"], 1.0)
+        self.assertEqual(
+            summary["reranking_calibration"]["recommended_rrf_weight"], 0.0
+        )
+        self.assertEqual(summary["reranking_calibration"]["status"], "exploratory")
         self.assertEqual(summary["correct_refusal_rate"], 1.0)
         self.assertEqual(summary["false_refusal_rate"], 0.0)
         self.assertEqual(summary["citation_validity"], 1.0)
         self.assertEqual(summary["citation_compliance_rate"], 1.0)
         self.assertEqual(run["params"]["golden_set_version"], 4)
         self.assertIn("Qual método foi utilizado?", benchmark_to_csv(run))
+        self.assertIn("Fusão configurada", benchmark_to_csv(run))
         self.assertEqual(summary["failed_query_count"], 0)
         save_run.assert_called_once()
 
