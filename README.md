@@ -111,12 +111,14 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Reranking opcional dos melhores candidatos com modelo generativo configurável.
 - Fusão ponderada e configurável entre a ordem RRF e a ordem proposta pela IA.
 - Registro em JSONB das posições RRF, IA e final, scores, justificativas, modelo e parâmetros.
-- Fallback automático para a ordem RRF quando o reranking falha ou está desativado.
+- Nova tentativa controlada do reranking antes do fallback para a ordem segura do RRF.
+- Registro do motivo, das tentativas e da eventual recuperação do reranking.
 - Filtro pelo projeto ativo e pelo modelo de embedding configurado.
 - Recuperação restrita a chunks de PDF com página de origem registrada.
 - Citações validadas no formato `[paper_id, p. página]`.
 - Referências bibliográficas internas, como `[36]`, são explicitamente desambiguadas.
 - Recusa quando não há contexto suficiente.
+- Segunda leitura conservadora quando uma recusa conflita com evidências potencialmente fortes.
 - Registro da pergunta, resposta, evidências recuperadas e configuração do modelo.
 
 ### Matriz de evidências rastreáveis
@@ -150,8 +152,9 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Perguntas fora do corpus marcadas com expectativa explícita de recusa.
 - Versionamento imutável do gabarito após cada alteração.
 - Cálculo determinístico de `Precision@k`, `Recall@k`, `Hit Rate@k`, MRR e `nDCG@k`.
-- Comparação entre ranking híbrido RRF, reranking puro da IA e fusão configurada.
+- Comparação entre RRF, reranking puro da IA e fusão usando o mesmo conjunto de perguntas.
 - Calibração de pesos sem novas chamadas à API, com recomendação baseada no Golden Set.
+- Cobertura explícita da amostra comparável e alerta quando fallbacks tornam a recomendação parcial.
 - Taxas de recusa correta, recusa indevida, validade e conformidade das citações.
 - Execuções persistidas em JSONB com Golden Set, hash e configurações exatas dos modelos.
 - Recuperação automática de erros transitórios `429`/`503`, com espera exponencial,
@@ -417,12 +420,16 @@ recadastre as credenciais pelas telas de configuração.
 - Cadastre perguntas que o corpus deve responder e associe as fontes relevantes.
 - Cadastre perguntas fora do escopo marcando que o sistema deve recusá-las.
 - Execute o benchmark e compare RRF, reranking puro da IA e fusão configurada.
+- Confirme o tamanho da amostra comparável; perguntas sem ranking da IA são excluídas
+  igualmente dos três pipelines e permanecem visíveis nos resultados operacionais.
 - Interprete Precision, Recall, Hit Rate, MRR, nDCG, recusas e citações.
 - Consulte a curva de calibração. O peso `0` usa somente a ordem da IA e o peso `1`
   preserva somente o RRF. Trate recomendações com menos de dez perguntas respondíveis
   como exploratórias.
 - Se o provedor estiver temporariamente indisponível, aguarde as novas tentativas
   automáticas; uma pergunta que continue falhando será registrada sem interromper as demais.
+- Consulte por pergunta o motivo do fallback, as tentativas do reranking e a eventual
+  reavaliação de uma recusa inicial.
 - Baixe o resultado em JSON ou CSV.
 
 ### 9. Auditar e gerar o relatório
@@ -565,7 +572,10 @@ docker compose down -v
   checklist PRISMA 2020 pelo pesquisador.
 - PDFs baseados somente em imagem exigem OCR, ainda não integrado.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
-- O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo.
+- O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo e
+  pode realizar uma segunda tentativa controlada quando a primeira saída falha.
+- Uma recusa pode provocar uma segunda leitura quando as evidências selecionadas possuem
+  score forte ou vieram de um fallback sem score; a reavaliação continua autorizada a recusar.
 - O peso sugerido pelo benchmark é específico do projeto e depende da diversidade e
   qualidade do Golden Set; ele não é aplicado automaticamente à configuração global.
 - As métricas do benchmark refletem a qualidade do Golden Set humano; um gabarito

@@ -40,6 +40,31 @@ GOLDEN = {
     ],
 }
 
+GOLDEN_COM_FALLBACK = {
+    **GOLDEN,
+    "version": 5,
+    "queries": [
+        GOLDEN["queries"][0],
+        {
+            "id": "q3",
+            "question": "Qual limitação foi identificada?",
+            "expected_refusal": False,
+            "notes": None,
+            "relevances": [
+                {
+                    "id": "r3",
+                    "paper_id": "paper-3",
+                    "paper_title": "Terceiro artigo",
+                    "page_number": 9,
+                    "relevance_grade": 3,
+                    "notes": None,
+                }
+            ],
+        },
+        GOLDEN["queries"][1],
+    ],
+}
+
 
 def _runner(question, project_id, return_details=False):
     if "Marte" in question:
@@ -236,6 +261,84 @@ class RagBenchmarkTests(unittest.TestCase):
         self.assertTrue(summary["interpretation"]["warnings"])
         self.assertIn("status_execucao", benchmark_to_csv(run))
         save_run.assert_called_once()
+
+    @patch("backend.app.rag_benchmark.get_reranking_config")
+    @patch("backend.app.rag_benchmark.get_generation_config")
+    @patch("backend.app.rag_benchmark.get_embedding_config")
+    @patch("backend.app.rag_benchmark.salvar_execucao_avaliacao", return_value="run-4")
+    @patch(
+        "backend.app.rag_benchmark.list_golden_queries",
+        return_value=GOLDEN_COM_FALLBACK,
+    )
+    def test_compara_pipelines_na_mesma_amostra_e_registra_fallback(
+        self,
+        _golden,
+        _save_run,
+        embedding_config,
+        rag_config,
+        reranking_config,
+    ):
+        embedding_config.return_value = SimpleNamespace(metadata=lambda: {"model": "embed"})
+        rag_config.return_value = SimpleNamespace(metadata=lambda: {"model": "rag"})
+        reranking_config.return_value = SimpleNamespace(
+            rrf_weight=0.3,
+            metadata=lambda: {"model": "rerank", "rrf_weight": 0.3},
+        )
+
+        def runner(question, project_id, return_details=False):
+            if "limitação" not in question:
+                return _runner(question, project_id, return_details)
+            relevant = {
+                "chunk_id": "c3",
+                "paper_id": "paper-3",
+                "page_number": 9,
+                "rrf_score": 0.03,
+                "original_rank": 1,
+                "rerank_rank": 1,
+            }
+            return {
+                "answer": "Limitação fundamentada [paper-3, p. 9].",
+                "reranking": {
+                    "status": "fallback_rrf",
+                    "initial_ranking": [relevant],
+                    "model_ranking": [],
+                    "reranked_ranking": [relevant],
+                    "final_ranking": [relevant],
+                    "error": "ValueError: JSON inválido",
+                    "errors": ["ValueError: vazio", "ValueError: JSON inválido"],
+                    "attempts": 2,
+                    "retry_count": 1,
+                    "recovered_after_retry": False,
+                },
+                "generation": {
+                    "refusal_reconsidered": True,
+                    "refusal_recovered": True,
+                },
+                "citation_validation": {
+                    "valid_citations": ["[paper-3, p. 9]"],
+                    "invalid_citations_removed": [],
+                    "source_citations_appended": [],
+                },
+            }
+
+        run = run_rag_benchmark("project-1", rag_runner=runner)
+        summary = run["metrics"]["summary"]
+        fallback_result = run["metrics"]["results"][1]
+
+        self.assertEqual(summary["evaluated_answerable_query_count"], 2)
+        self.assertEqual(summary["comparison_cohort"]["query_count"], 1)
+        self.assertEqual(
+            summary["comparison_cohort"]["excluded_answerable_query_count"], 1
+        )
+        self.assertEqual(summary["reranking_calibration"]["coverage_status"], "partial")
+        self.assertEqual(summary["reranking_fallback_count"], 1)
+        self.assertEqual(summary["reranking_total_retry_count"], 1)
+        self.assertEqual(summary["refusal_recovered_count"], 1)
+        self.assertFalse(fallback_result["comparison_eligible"])
+        self.assertIn("JSON inválido", fallback_result["reranking_error"])
+        csv_output = benchmark_to_csv(run)
+        self.assertIn("amostra_comparavel", csv_output)
+        self.assertIn("erro_reranking", csv_output)
 
     @patch("backend.app.rag_benchmark.salvar_execucao_avaliacao")
     @patch("backend.app.rag_benchmark.list_golden_queries", return_value=GOLDEN)

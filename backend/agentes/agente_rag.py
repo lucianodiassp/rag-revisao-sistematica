@@ -21,6 +21,28 @@ from backend.app.reranking import reranquear_candidatos
 # ==========================================
 load_dotenv(find_dotenv())
 
+RERANK_SCORE_RECONSIDERACAO = 60.0
+
+
+def _resposta_recusada(texto):
+    return RESPOSTA_SEM_CONTEXTO.lower() in str(texto or "").lower()
+
+
+def _motivo_reavaliacao_recusa(evidencias):
+    """Reavalia somente quando há sinal de suporte ou fallback sem score da IA."""
+    if not evidencias:
+        return None
+    scores = [
+        float(item["rerank_score"])
+        for item in evidencias
+        if item.get("rerank_score") is not None
+    ]
+    if scores and max(scores) >= RERANK_SCORE_RECONSIDERACAO:
+        return "high_rerank_score"
+    if not scores:
+        return "unscored_ranking"
+    return None
+
 def get_conexao():
     """Estabelece a conexão estritamente via variáveis de ambiente."""
     return psycopg2.connect(
@@ -162,11 +184,24 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
     
     if not evidencias:
         resposta_sem_contexto = f"{RESPOSTA_SEM_CONTEXTO} para responder."
+        generation_trace = {
+            "attempts": 0,
+            "initial_refused": True,
+            "final_refused": True,
+            "refusal_reconsidered": False,
+            "refusal_recovered": False,
+            "reconsideration_reason": None,
+            "reconsideration_error": None,
+        }
         log_interacao_agente(
             project_id,
             "rag_agent",
             {"question": pergunta},
-            {"answer": resposta_sem_contexto, "supporting_evidence": []},
+            {
+                "answer": resposta_sem_contexto,
+                "supporting_evidence": [],
+                "generation": generation_trace,
+            },
             get_generation_config(TASK_RAG).metadata(),
         )
         if return_details:
@@ -174,6 +209,7 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
                 "answer": resposta_sem_contexto,
                 "reranking": trace_reranking,
                 "evidence": [],
+                "generation": generation_trace,
                 "citation_validation": {
                     "valid_citations": [],
                     "invalid_citations_removed": [],
@@ -227,8 +263,51 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
         contents=pergunta,
         system_instruction=prompt_sistema,
     )
-    
-    resposta_original = resposta.text
+
+    resposta_inicial = resposta.text
+    resposta_original = resposta_inicial
+    recusou_inicialmente = _resposta_recusada(resposta_inicial)
+    motivo_reavaliacao = (
+        _motivo_reavaliacao_recusa(evidencias) if recusou_inicialmente else None
+    )
+    erro_reavaliacao = None
+    tentativas_geracao = 1
+    if motivo_reavaliacao:
+        prompt_reavaliacao = f"""
+        {prompt_sistema}
+
+        REAVALIAÇÃO CONSERVADORA:
+        Uma primeira leitura concluiu que não havia dados suficientes, mas a recuperação
+        selecionou evidências potencialmente relevantes. Releia cuidadosamente os trechos.
+        Se houver suporte explícito, responda à pergunta usando somente esse suporte e as
+        citações rastreáveis fornecidas. Se o suporte continuar insuficiente, mantenha
+        estritamente a frase de recusa definida na REGRA 2. Não complete lacunas por inferência.
+        """
+        try:
+            resposta_reavaliada = generate_content(
+                TASK_RAG,
+                contents=pergunta,
+                system_instruction=prompt_reavaliacao,
+            )
+            resposta_original = resposta_reavaliada.text
+            tentativas_geracao += 1
+        except Exception as excecao:
+            erro_reavaliacao = (
+                f"{excecao.__class__.__name__}: reavaliação indisponível; "
+                "a recusa inicial foi preservada."
+            )
+
+    generation_trace = {
+        "attempts": tentativas_geracao,
+        "initial_refused": recusou_inicialmente,
+        "final_refused": _resposta_recusada(resposta_original),
+        "refusal_reconsidered": bool(motivo_reavaliacao),
+        "refusal_recovered": (
+            recusou_inicialmente and not _resposta_recusada(resposta_original)
+        ),
+        "reconsideration_reason": motivo_reavaliacao,
+        "reconsideration_error": erro_reavaliacao,
+    }
     resposta_texto, validacao_citacoes = validar_citacoes_rag(
         resposta_original,
         evidencias,
@@ -240,6 +319,7 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
         {
             "answer": resposta_texto,
             "raw_answer": resposta_original,
+            "initial_raw_answer": resposta_inicial,
             "supporting_evidence": [
                 {
                     "paper_id": str(evidencia["paper_id"]),
@@ -258,6 +338,7 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
                 for evidencia in evidencias
             ],
             "reranking_status": trace_reranking["status"],
+            "generation": generation_trace,
             "citation_validation": validacao_citacoes,
         },
         get_generation_config(TASK_RAG).metadata(),
@@ -267,6 +348,7 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
             "answer": resposta_texto,
             "reranking": trace_reranking,
             "evidence": evidencias,
+            "generation": generation_trace,
             "citation_validation": validacao_citacoes,
         }
     return resposta_texto

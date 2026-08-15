@@ -8,6 +8,7 @@ from backend.agentes.agente_rag import (
     buscar_contexto_reranqueado,
     responder_com_rag,
 )
+from backend.app.rag_citations import RESPOSTA_SEM_CONTEXTO
 from backend.app.ai_config import GenerationTaskConfig, TASK_RAG, TASK_RERANKING
 
 
@@ -147,6 +148,143 @@ class RagRerankingIntegrationTests(unittest.TestCase):
             output["citation_validation"]["valid_citations"],
             [f"[{paper_id}, p. 7]"],
         )
+
+    @patch("backend.agentes.agente_rag.get_generation_config")
+    @patch("backend.agentes.agente_rag.log_interacao_agente")
+    @patch("backend.agentes.agente_rag.generate_content")
+    @patch("backend.agentes.agente_rag.buscar_contexto_reranqueado")
+    def test_reavalia_recusa_quando_reranking_indica_evidencia_forte(
+        self,
+        buscar,
+        gerar,
+        logar,
+        get_config,
+    ):
+        paper_id = "74000000-0000-0000-0000-000000000003"
+        evidencia = {
+            "candidate_id": "c1",
+            "chunk_id": "chunk-1",
+            "paper_id": paper_id,
+            "paper_title": "Artigo",
+            "page_number": 5,
+            "text": "A restrição é garantida por uma máscara de viabilidade.",
+            "rrf_score": 0.03,
+            "original_rank": 1,
+            "rerank_rank": 1,
+            "model_rank": 1,
+            "rerank_score": 95.0,
+            "rerank_reason": "Evidência direta.",
+        }
+        buscar.return_value = ([evidencia], {"status": "success", "final_ranking": []})
+        gerar.side_effect = [
+            SimpleNamespace(text=RESPOSTA_SEM_CONTEXTO),
+            SimpleNamespace(
+                text=f"A máscara garante a viabilidade [{paper_id}, p. 5]."
+            ),
+        ]
+        get_config.return_value = GenerationTaskConfig(
+            task=TASK_RAG,
+            provider="google_gemini",
+            model="modelo-rag",
+            temperature=0.1,
+        )
+
+        resultado = responder_com_rag("Como a viabilidade é garantida?", "project-1", True)
+
+        self.assertEqual(gerar.call_count, 2)
+        self.assertTrue(resultado["generation"]["refusal_reconsidered"])
+        self.assertTrue(resultado["generation"]["refusal_recovered"])
+        self.assertIn(f"[{paper_id}, p. 5]", resultado["answer"])
+        self.assertTrue(logar.call_args.args[3]["generation"]["refusal_recovered"])
+
+    @patch("backend.agentes.agente_rag.get_generation_config")
+    @patch("backend.agentes.agente_rag.log_interacao_agente")
+    @patch("backend.agentes.agente_rag.generate_content")
+    @patch("backend.agentes.agente_rag.buscar_contexto_reranqueado")
+    def test_mantem_recusa_sem_segunda_chamada_quando_scores_sao_baixos(
+        self,
+        buscar,
+        gerar,
+        _logar,
+        get_config,
+    ):
+        evidencia = {
+            "candidate_id": "c1",
+            "chunk_id": "chunk-1",
+            "paper_id": "paper-1",
+            "paper_title": "Artigo",
+            "page_number": 2,
+            "text": "Trecho apenas tangencial.",
+            "rrf_score": 0.03,
+            "original_rank": 1,
+            "rerank_rank": 1,
+            "model_rank": 1,
+            "rerank_score": 20.0,
+            "rerank_reason": "Baixa relação.",
+        }
+        buscar.return_value = ([evidencia], {"status": "success", "final_ranking": []})
+        gerar.return_value = SimpleNamespace(text=RESPOSTA_SEM_CONTEXTO)
+        get_config.return_value = GenerationTaskConfig(
+            task=TASK_RAG,
+            provider="google_gemini",
+            model="modelo-rag",
+            temperature=0.1,
+        )
+
+        resultado = responder_com_rag("Pergunta fora do corpus", "project-1", True)
+
+        gerar.assert_called_once()
+        self.assertFalse(resultado["generation"]["refusal_reconsidered"])
+        self.assertTrue(resultado["generation"]["final_refused"])
+
+    @patch("backend.agentes.agente_rag.get_generation_config")
+    @patch("backend.agentes.agente_rag.log_interacao_agente")
+    @patch("backend.agentes.agente_rag.generate_content")
+    @patch("backend.agentes.agente_rag.buscar_contexto_reranqueado")
+    def test_reavalia_recusa_quando_fallback_nao_possui_score_da_ia(
+        self,
+        buscar,
+        gerar,
+        _logar,
+        get_config,
+    ):
+        paper_id = "74000000-0000-0000-0000-000000000004"
+        evidencia = {
+            "candidate_id": "c1",
+            "chunk_id": "chunk-1",
+            "paper_id": paper_id,
+            "paper_title": "Artigo",
+            "page_number": 1,
+            "text": "A limitação decorre da representação exclusivamente em grafos.",
+            "rrf_score": 0.03,
+            "original_rank": 1,
+            "rerank_rank": 1,
+            "rerank_score": None,
+            "rerank_reason": "Ordem original do RRF utilizada.",
+        }
+        buscar.return_value = (
+            [evidencia],
+            {"status": "fallback_rrf", "final_ranking": [], "error": "erro"},
+        )
+        gerar.side_effect = [
+            SimpleNamespace(text=RESPOSTA_SEM_CONTEXTO),
+            SimpleNamespace(text=f"A limitação é estrutural [{paper_id}, p. 1]."),
+        ]
+        get_config.return_value = GenerationTaskConfig(
+            task=TASK_RAG,
+            provider="google_gemini",
+            model="modelo-rag",
+            temperature=0.1,
+        )
+
+        resultado = responder_com_rag("Qual é a limitação?", "project-1", True)
+
+        self.assertEqual(gerar.call_count, 2)
+        self.assertEqual(
+            resultado["generation"]["reconsideration_reason"],
+            "unscored_ranking",
+        )
+        self.assertTrue(resultado["generation"]["refusal_recovered"])
 
 
 if __name__ == "__main__":

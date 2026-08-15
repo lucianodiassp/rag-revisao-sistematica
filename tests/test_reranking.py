@@ -119,7 +119,9 @@ class RerankingTests(unittest.TestCase):
         self.assertEqual(trace["configuration"]["rrf_weight"], 0.8)
 
     def test_falha_do_modelo_retorna_ordem_rrf_e_registra_fallback(self):
-        generator = Mock(side_effect=RuntimeError("modelo indisponível"))
+        generator = Mock(
+            side_effect=RuntimeError("modelo indisponível api_key=segredo-de-teste")
+        )
         logger = Mock()
 
         selecionados, trace = reranquear_candidatos(
@@ -135,7 +137,46 @@ class RerankingTests(unittest.TestCase):
         self.assertEqual([item["candidate_id"] for item in selecionados], ["c1", "c2"])
         self.assertTrue(all(item["rerank_score"] is None for item in selecionados))
         self.assertIn("RuntimeError", trace["error"])
+        self.assertNotIn("segredo-de-teste", trace["error"])
+        self.assertIn("[REDACTED]", trace["error"])
+        self.assertEqual(trace["attempts"], 2)
+        self.assertEqual(trace["retry_count"], 1)
+        self.assertEqual(len(trace["errors"]), 2)
+        self.assertEqual(generator.call_count, 2)
         self.assertEqual(logger.call_args.args[3]["status"], STATUS_FALLBACK)
+
+    def test_segunda_tentativa_recupera_reranking_e_preserva_auditoria(self):
+        resposta = {
+            "ranking": [
+                {"candidate_id": "c2", "relevance_score": 96, "reason": "Direta."},
+                {"candidate_id": "c1", "relevance_score": 60, "reason": "Parcial."},
+                {"candidate_id": "c3", "relevance_score": 5, "reason": "Irrelevante."},
+            ]
+        }
+        generator = Mock(
+            side_effect=[
+                ValueError("JSON temporariamente inválido"),
+                SimpleNamespace(text=json.dumps(resposta)),
+            ]
+        )
+        logger = Mock()
+
+        selecionados, trace = reranquear_candidatos(
+            "Pergunta",
+            _candidatos(),
+            "project-1",
+            config=_config(),
+            generator=generator,
+            logger=logger,
+        )
+
+        self.assertEqual(trace["status"], STATUS_SUCCESS)
+        self.assertEqual(selecionados[0]["candidate_id"], "c2")
+        self.assertEqual(trace["attempts"], 2)
+        self.assertEqual(trace["retry_count"], 1)
+        self.assertTrue(trace["recovered_after_retry"])
+        self.assertIn("ValueError", trace["errors"][0])
+        self.assertTrue(logger.call_args.args[3]["recovered_after_retry"])
 
     def test_configuracao_desativada_nao_chama_modelo(self):
         generator = Mock()

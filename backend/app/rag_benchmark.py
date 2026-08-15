@@ -224,8 +224,12 @@ def calibrate_reranking_weights(
     """Avalia pesos sem novas chamadas de IA usando as duas ordens já registradas."""
     golden_by_id = {str(item["id"]): item for item in golden_queries or []}
     eligible = []
+    answerable_total = 0
     for result in results or []:
-        if result.get("expected_refusal") or not result.get("model_ranking"):
+        if result.get("expected_refusal") or result.get("rrf_metrics") is None:
+            continue
+        answerable_total += 1
+        if not result.get("model_ranking"):
             continue
         golden = golden_by_id.get(str(result.get("query_id")))
         if golden and golden.get("relevances"):
@@ -264,6 +268,14 @@ def calibrate_reranking_weights(
             else "exploratory"
         ),
         "answerable_query_count": sample_size,
+        "total_answerable_query_count": answerable_total,
+        "excluded_answerable_query_count": max(0, answerable_total - sample_size),
+        "coverage_rate": (
+            round(sample_size / answerable_total, 6) if answerable_total else None
+        ),
+        "coverage_status": (
+            "complete" if sample_size == answerable_total else "partial"
+        ),
         "minimum_recommended_queries": MIN_CALIBRATION_QUERIES,
         "configured_rrf_weight": round(float(configured_weight or 0.0), 2),
         "recommended_rrf_weight": recommendation,
@@ -275,8 +287,21 @@ def calibrate_reranking_weights(
 def _interpret_summary(summary):
     statements = []
     warnings = []
-    rrf = summary.get("rrf") or {}
-    reranked = summary.get("reranked") or {}
+    comparison = summary.get("comparison_cohort") or {}
+    comparison_count = int(comparison.get("query_count") or 0)
+    if comparison_count:
+        rrf = comparison.get("rrf") or {}
+        reranked = comparison.get("reranked") or {}
+    elif "comparison_cohort" in summary:
+        rrf = {}
+        reranked = {}
+        warnings.append(
+            "Nenhuma pergunta possuía os três rankings; a comparação entre pipelines "
+            "foi omitida para evitar denominadores incompatíveis."
+        )
+    else:
+        rrf = summary.get("rrf") or {}
+        reranked = summary.get("reranked") or {}
     for key, label in (
         ("recall_at_5", "Recall@5"),
         ("ndcg_at_5", "nDCG@5"),
@@ -289,7 +314,14 @@ def _interpret_summary(summary):
         delta = round(after - before, 4)
         direction = "melhorou" if delta > 0 else "piorou" if delta < 0 else "permaneceu igual"
         statements.append(
-            f"{label} {direction} após a fusão configurada ({before:.3f} → {after:.3f})."
+            f"{label} {direction} após a fusão configurada na amostra comparável "
+            f"({before:.3f} → {after:.3f})."
+        )
+    excluded = int(comparison.get("excluded_answerable_query_count") or 0)
+    if excluded:
+        warnings.append(
+            f"A comparação entre pipelines excluiu {excluded} pergunta(s) sem ranking "
+            "da IA, garantindo o mesmo denominador para RRF, IA e fusão."
         )
     calibration = summary.get("reranking_calibration") or {}
     recommended_weight = calibration.get("recommended_rrf_weight")
@@ -302,6 +334,11 @@ def _interpret_summary(summary):
             "A recomendação de peso ainda é exploratória: amplie o Golden Set antes "
             "de adotá-la como configuração estável."
         )
+    if calibration.get("coverage_status") == "partial":
+        warnings.append(
+            "A recomendação de peso foi calculada somente na amostra comparável; "
+            "não a adote como estável enquanto houver fallbacks do reranking."
+        )
     refusal = summary.get("correct_refusal_rate")
     if refusal is not None:
         statements.append(f"A taxa correta de recusa foi {refusal * 100:.1f}%.")
@@ -312,7 +349,18 @@ def _interpret_summary(summary):
         )
     if summary.get("reranking_fallback_count"):
         warnings.append(
-            "Parte das perguntas usou fallback RRF porque o reranking não foi concluído."
+            f"{summary['reranking_fallback_count']} pergunta(s) usaram fallback RRF; "
+            "o motivo foi preservado nos resultados por pergunta."
+        )
+    reranking_recovered = int(summary.get("reranking_recovered_after_retry_count") or 0)
+    if reranking_recovered:
+        statements.append(
+            f"{reranking_recovered} reranking(s) foram recuperados por nova tentativa controlada."
+        )
+    refusal_recovered = int(summary.get("refusal_recovered_count") or 0)
+    if refusal_recovered:
+        statements.append(
+            f"{refusal_recovered} recusa(s) iniciais foram corrigidas após reavaliação das evidências."
         )
     retried = int(summary.get("retried_query_count") or 0)
     if retried:
@@ -359,6 +407,9 @@ def run_rag_benchmark(
     rrf_metrics = []
     model_reranked_metrics = []
     reranked_metrics = []
+    comparable_rrf_metrics = []
+    comparable_model_metrics = []
+    comparable_reranked_metrics = []
     answerable_refusals = []
     expected_refusals = []
     citation_valid = 0
@@ -369,6 +420,11 @@ def run_rag_benchmark(
     successful_count = 0
     retried_count = 0
     total_retry_count = 0
+    reranking_retried_count = 0
+    reranking_total_retry_count = 0
+    reranking_recovered_count = 0
+    refusal_reconsidered_count = 0
+    refusal_recovered_count = 0
     queries = golden["queries"]
 
     for index, query in enumerate(queries, 1):
@@ -407,6 +463,13 @@ def run_rag_benchmark(
                     "response_refused": None,
                     "answer": None,
                     "reranking_status": "not_completed",
+                    "reranking_error": None,
+                    "reranking_errors": [],
+                    "reranking_attempts": 0,
+                    "reranking_retry_count": 0,
+                    "reranking_recovered_after_retry": False,
+                    "comparison_eligible": False,
+                    "generation": {},
                     "rrf_ranking": [],
                     "model_ranking": [],
                     "reranked_ranking": [],
@@ -421,12 +484,23 @@ def run_rag_benchmark(
 
         successful_count += 1
         trace = response.get("reranking") or {}
+        generation_trace = response.get("generation") or {}
         initial = trace.get("initial_ranking") or []
         reranked = trace.get("reranked_ranking") or trace.get("final_ranking") or []
         model_ranking = _model_ranking_from_trace(trace, reranked)
         refused = RESPOSTA_SEM_CONTEXTO.lower() in str(response.get("answer") or "").lower()
         if trace.get("status") == "fallback_rrf":
             fallback_count += 1
+        reranking_retry_count = int(trace.get("retry_count") or 0)
+        reranking_total_retry_count += reranking_retry_count
+        if reranking_retry_count:
+            reranking_retried_count += 1
+        if trace.get("recovered_after_retry"):
+            reranking_recovered_count += 1
+        if generation_trace.get("refusal_reconsidered"):
+            refusal_reconsidered_count += 1
+        if generation_trace.get("refusal_recovered"):
+            refusal_recovered_count += 1
 
         item = {
             "query_id": query["id"],
@@ -435,6 +509,15 @@ def run_rag_benchmark(
             "response_refused": refused,
             "answer": response.get("answer"),
             "reranking_status": trace.get("status"),
+            "reranking_error": trace.get("error"),
+            "reranking_errors": trace.get("errors") or [],
+            "reranking_attempts": int(trace.get("attempts") or 0),
+            "reranking_retry_count": reranking_retry_count,
+            "reranking_recovered_after_retry": bool(
+                trace.get("recovered_after_retry")
+            ),
+            "comparison_eligible": False,
+            "generation": generation_trace,
             "rrf_ranking": _compact_ranking(initial),
             "model_ranking": _compact_ranking(model_ranking),
             "reranked_ranking": _compact_ranking(reranked),
@@ -457,6 +540,10 @@ def run_rag_benchmark(
             rrf_metrics.append(item["rrf_metrics"])
             if item["model_reranked_metrics"] is not None:
                 model_reranked_metrics.append(item["model_reranked_metrics"])
+                comparable_rrf_metrics.append(item["rrf_metrics"])
+                comparable_model_metrics.append(item["model_reranked_metrics"])
+                comparable_reranked_metrics.append(item["reranked_metrics"])
+                item["comparison_eligible"] = True
             reranked_metrics.append(item["reranked_metrics"])
             answerable_refusals.append(1.0 if refused else 0.0)
 
@@ -489,6 +576,23 @@ def run_rag_benchmark(
         k_values=k_values,
         configured_weight=getattr(reranking_config, "rrf_weight", 0.0),
     )
+    evaluated_answerable_count = len(rrf_metrics)
+    comparable_count = len(comparable_rrf_metrics)
+    comparison_cohort = {
+        "query_count": comparable_count,
+        "total_answerable_query_count": evaluated_answerable_count,
+        "excluded_answerable_query_count": max(
+            0, evaluated_answerable_count - comparable_count
+        ),
+        "coverage_rate": (
+            round(comparable_count / evaluated_answerable_count, 6)
+            if evaluated_answerable_count
+            else None
+        ),
+        "rrf": aggregate_ranking_metrics(comparable_rrf_metrics),
+        "model_reranked": aggregate_ranking_metrics(comparable_model_metrics),
+        "reranked": aggregate_ranking_metrics(comparable_reranked_metrics),
+    }
     summary = {
         "query_count": len(queries),
         "answerable_query_count": sum(
@@ -506,6 +610,7 @@ def run_rag_benchmark(
         "rrf": aggregate_ranking_metrics(rrf_metrics),
         "model_reranked": aggregate_ranking_metrics(model_reranked_metrics),
         "reranked": aggregate_ranking_metrics(reranked_metrics),
+        "comparison_cohort": comparison_cohort,
         "reranking_calibration": calibration,
         "correct_refusal_rate": _mean(expected_refusals),
         "false_refusal_rate": _mean(answerable_refusals),
@@ -516,6 +621,11 @@ def run_rag_benchmark(
         ),
         "citation_compliance_rate": _mean(citation_compliance),
         "reranking_fallback_count": fallback_count,
+        "reranking_retried_query_count": reranking_retried_count,
+        "reranking_total_retry_count": reranking_total_retry_count,
+        "reranking_recovered_after_retry_count": reranking_recovered_count,
+        "refusal_reconsidered_count": refusal_reconsidered_count,
+        "refusal_recovered_count": refusal_recovered_count,
     }
     summary["interpretation"] = _interpret_summary(summary)
     golden_snapshot = json.loads(json.dumps(golden, ensure_ascii=False, default=str))
@@ -571,7 +681,13 @@ def benchmark_to_csv(run):
             "mrr",
             "ndcg_at_5",
             "status_reranking",
+            "amostra_comparavel",
+            "tentativas_reranking",
+            "novas_tentativas_reranking",
+            "erro_reranking",
             "peso_rrf_configurado",
+            "recusa_reavaliada",
+            "recusa_recuperada",
             "status_execucao",
             "tentativas",
             "novas_tentativas",
@@ -600,7 +716,13 @@ def benchmark_to_csv(run):
                     metrics.get("reciprocal_rank"),
                     metrics.get("ndcg_at_5"),
                     item.get("reranking_status"),
+                    item.get("comparison_eligible"),
+                    item.get("reranking_attempts"),
+                    item.get("reranking_retry_count"),
+                    item.get("reranking_error"),
                     configured_weight,
+                    (item.get("generation") or {}).get("refusal_reconsidered"),
+                    (item.get("generation") or {}).get("refusal_recovered"),
                     item.get("execution_status"),
                     item.get("execution_attempts"),
                     item.get("retry_count"),
