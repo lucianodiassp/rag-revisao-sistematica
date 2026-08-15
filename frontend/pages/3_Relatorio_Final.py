@@ -42,6 +42,12 @@ projeto = selecionar_projeto_ativo()
 project_id = str(projeto["id"])
 protocolo = projeto.get("criteria_jsonb") or {}
 st.caption(f"Projeto ativo: **{projeto['title']}**")
+if (protocolo.get("_demo") or {}).get("seed_id"):
+    st.info(
+        "No PRISMA deste exemplo, 'PDF avaliado' representa um cartão de evidência "
+        "demonstrativo com página e trecho atribuídos. Os números mostram o funcionamento "
+        "do funil, mas não constituem resultados de uma revisão científica real."
+    )
 st.markdown("Acompanhe o funil da Revisão Sistemática, as métricas de IA e a síntese final do conhecimento.")
 st.divider()
 

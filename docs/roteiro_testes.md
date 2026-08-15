@@ -10,6 +10,34 @@ Este documento guia a sua experiência de teste na plataforma. O objetivo é ava
 
 ---
 
+## 📍 Cenário 0: Projeto demonstrativo reproduzível
+
+**Contexto:** Um novo usuário deseja conhecer o fluxo sem configurar chaves ou
+executar chamadas externas de IA.
+
+### Passos
+
+1. Abra **Configuração da Pesquisa**.
+2. No menu lateral, expanda **Projeto demonstrativo**.
+3. Clique em **Criar / abrir demonstração**.
+4. Confirme que o seletor identifica o projeto como demonstrativo.
+5. Percorra Deduplicação, Triagem, Gestão de PDFs, Matriz de Evidências,
+   Avaliação Quantitativa do RAG e Relatório Final.
+6. Volte à configuração, marque a confirmação e restaure os dados originais.
+
+### ✅ Critério de Sucesso
+
+* A carga deve funcionar sem solicitar chave de IA.
+* O PRISMA deve mostrar 7 registros, 2 duplicatas, 5 artigos únicos, 4 textos
+  avaliáveis e 4 estudos na síntese.
+* A deduplicação deve mostrar 5 novos artigos e 2 mesclagens por DOI.
+* A matriz deve apresentar 4 extrações revisadas e fontes literais atribuídas.
+* O Golden Set deve iniciar na versão 1 com 5 perguntas.
+* A segunda carga não deve duplicar registros.
+* A restauração não deve modificar nenhum outro projeto.
+
+---
+
 ## 📍 Cenário 1: Configuração e Coleta
 
 **Contexto:** É necessário iniciar um novo projeto de revisão e definir a estratégia de busca.
