@@ -12,7 +12,7 @@ from backend.app.reranking import (
 )
 
 
-def _config(enabled=True, candidate_limit=3, final_limit=2):
+def _config(enabled=True, candidate_limit=3, final_limit=2, rrf_weight=0.0):
     return GenerationTaskConfig(
         task=TASK_RERANKING,
         provider="google_gemini",
@@ -22,6 +22,7 @@ def _config(enabled=True, candidate_limit=3, final_limit=2):
         enabled=enabled,
         candidate_limit=candidate_limit,
         final_limit=final_limit,
+        rrf_weight=rrf_weight,
     )
 
 
@@ -80,15 +81,42 @@ class RerankingTests(unittest.TestCase):
 
         self.assertEqual(trace["status"], STATUS_SUCCESS)
         self.assertEqual([item["candidate_id"] for item in selecionados], ["c2", "c1"])
+        self.assertEqual(trace["model_ranking"][0]["candidate_id"], "c2")
         self.assertEqual(selecionados[0]["original_rank"], 2)
+        self.assertEqual(selecionados[0]["model_rank"], 1)
         self.assertEqual(selecionados[0]["rerank_rank"], 1)
         self.assertEqual(selecionados[0]["rerank_score"], 96.0)
+        self.assertIsNotNone(selecionados[0]["fusion_score"])
         self.assertEqual(len(trace["initial_ranking"]), 3)
         self.assertEqual(len(trace["reranked_ranking"]), 3)
         self.assertEqual(trace["reranked_ranking"][0]["candidate_id"], "c2")
         self.assertEqual(len(trace["final_ranking"]), 2)
         self.assertEqual(logger.call_args.args[1], "reranking_agent")
         self.assertEqual(logger.call_args.args[3]["status"], STATUS_SUCCESS)
+
+    def test_peso_rrf_protege_a_ordem_original_sem_descartar_avaliacao_da_ia(self):
+        resposta = {
+            "ranking": [
+                {"candidate_id": "c2", "relevance_score": 96, "reason": "Resposta direta."},
+                {"candidate_id": "c1", "relevance_score": 65, "reason": "Relação parcial."},
+                {"candidate_id": "c3", "relevance_score": 10, "reason": "Irrelevante."},
+            ]
+        }
+
+        selecionados, trace = reranquear_candidatos(
+            "Pergunta",
+            _candidatos(),
+            "project-1",
+            config=_config(rrf_weight=0.8),
+            generator=Mock(return_value=SimpleNamespace(text=json.dumps(resposta))),
+            logger=Mock(),
+        )
+
+        self.assertEqual([item["candidate_id"] for item in selecionados], ["c1", "c2"])
+        self.assertEqual(trace["model_ranking"][0]["candidate_id"], "c2")
+        self.assertEqual(selecionados[0]["model_rank"], 2)
+        self.assertEqual(selecionados[0]["rerank_rank"], 1)
+        self.assertEqual(trace["configuration"]["rrf_weight"], 0.8)
 
     def test_falha_do_modelo_retorna_ordem_rrf_e_registra_fallback(self):
         generator = Mock(side_effect=RuntimeError("modelo indisponível"))

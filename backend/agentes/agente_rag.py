@@ -82,11 +82,13 @@ def _buscar_contexto_hibrido_detalhado(pergunta, project_id=None, limite=3):
     SELECT
         COALESCE(v.id, k.id) AS chunk_id,
         COALESCE(v.paper_id, k.paper_id) AS paper_id,
+        dp.title AS paper_title,
         COALESCE(v.chunk_text, k.chunk_text) AS text,
         COALESCE(v.page_number, k.page_number) AS page_number,
         COALESCE(1.0 / (60 + v.vector_rank), 0.0) + COALESCE(1.0 / (60 + k.keyword_rank), 0.0) AS rrf_score
     FROM vector_search v
     FULL OUTER JOIN keyword_search k ON v.id = k.id
+    JOIN deduplicated_papers dp ON dp.id = COALESCE(v.paper_id, k.paper_id)
     ORDER BY rrf_score DESC
     LIMIT %s;
     """
@@ -107,12 +109,14 @@ def _buscar_contexto_hibrido_detalhado(pergunta, project_id=None, limite=3):
             "candidate_id": f"c{indice}",
             "chunk_id": str(chunk_id),
             "paper_id": str(paper_id),
+            "paper_title": paper_title,
             "text": texto,
             "page_number": int(page_number),
             "rrf_score": float(score),
             "original_rank": indice,
         }
-        for indice, (chunk_id, paper_id, texto, page_number, score) in enumerate(resultados, 1)
+        for indice, (chunk_id, paper_id, paper_title, texto, page_number, score)
+        in enumerate(resultados, 1)
     ]
 
 
@@ -183,6 +187,7 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
     print("\n📑 EVIDÊNCIAS SELECIONADAS APÓS RERANKING:")
     for evidencia in evidencias:
         paper_id = evidencia["paper_id"]
+        paper_title = evidencia.get("paper_title") or "Título não informado"
         texto_chunk = evidencia["text"]
         score = evidencia["rrf_score"]
         pagina = evidencia["page_number"]
@@ -195,6 +200,7 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
         )
         contexto_formatado += (
             f"\n[FONTE RASTREÁVEL: {formatar_citacao(paper_id, pagina)} | "
+            f"Artigo: {paper_title} | "
             f"Score RRF: {score:.4f} | Score reranking: {score_exibido}]"
             f"\nTrecho: {texto_chunk}\n"
         )
@@ -237,13 +243,16 @@ def responder_com_rag(pergunta, project_id=None, return_details=False):
             "supporting_evidence": [
                 {
                     "paper_id": str(evidencia["paper_id"]),
+                    "paper_title": evidencia.get("paper_title"),
                     "chunk_id": str(evidencia["chunk_id"]),
                     "page_number": int(evidencia["page_number"]),
                     "snippet": evidencia["text"],
                     "rrf_score": float(evidencia["rrf_score"]),
                     "original_rank": int(evidencia["original_rank"]),
                     "rerank_rank": int(evidencia["rerank_rank"]),
+                    "model_rank": evidencia.get("model_rank"),
                     "rerank_score": evidencia.get("rerank_score"),
+                    "fusion_score": evidencia.get("fusion_score"),
                     "rerank_reason": evidencia.get("rerank_reason"),
                 }
                 for evidencia in evidencias

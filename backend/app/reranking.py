@@ -10,6 +10,7 @@ from backend.app.database import log_interacao_agente
 STATUS_SUCCESS = "success"
 STATUS_FALLBACK = "fallback_rrf"
 STATUS_DISABLED = "disabled"
+FUSION_RANK_CONSTANT = 60
 
 
 def _candidato_auditavel(candidato, incluir_texto=False):
@@ -17,16 +18,23 @@ def _candidato_auditavel(candidato, incluir_texto=False):
         "candidate_id": candidato["candidate_id"],
         "chunk_id": str(candidato["chunk_id"]),
         "paper_id": str(candidato["paper_id"]),
+        "paper_title": candidato.get("paper_title"),
         "page_number": int(candidato["page_number"]),
         "original_rank": int(candidato["original_rank"]),
         "rrf_score": float(candidato["rrf_score"]),
     }
     if incluir_texto:
         item["snippet"] = str(candidato["text"])[:1000]
-    if "rerank_rank" in candidato:
+    if candidato.get("rerank_rank") is not None:
         item["rerank_rank"] = int(candidato["rerank_rank"])
+    if "rerank_score" in candidato:
         item["rerank_score"] = candidato.get("rerank_score")
+    if "rerank_reason" in candidato:
         item["rerank_reason"] = candidato.get("rerank_reason")
+    if candidato.get("model_rank") is not None:
+        item["model_rank"] = int(candidato["model_rank"])
+    if candidato.get("fusion_score") is not None:
+        item["fusion_score"] = float(candidato["fusion_score"])
     return item
 
 
@@ -48,7 +56,9 @@ def _selecionar_por_rrf(candidatos, limite):
         item.update(
             {
                 "rerank_rank": indice,
+                "model_rank": None,
                 "rerank_score": None,
+                "fusion_score": None,
                 "rerank_reason": "Ordem original do RRF utilizada.",
             }
         )
@@ -105,17 +115,43 @@ def _normalizar_ranking(resposta, candidatos, limite):
             )
 
     selecionados = []
-    for rerank_rank, (score, _, candidate_id, reason) in enumerate(classificados[:limite], 1):
+    for model_rank, (score, _, candidate_id, reason) in enumerate(classificados[:limite], 1):
         item = dict(por_id[candidate_id])
         item.update(
             {
-                "rerank_rank": rerank_rank,
+                "model_rank": model_rank,
                 "rerank_score": None if score < 0 else round(score, 2),
                 "rerank_reason": reason,
             }
         )
         selecionados.append(item)
     return selecionados
+
+
+def fundir_rankings(ranking_modelo, rrf_weight, limite=None):
+    """Combina as posições do RRF e da IA por Reciprocal Rank Fusion ponderado."""
+    peso_rrf = min(1.0, max(0.0, float(rrf_weight or 0.0)))
+    classificados = []
+    for indice, candidato in enumerate(ranking_modelo or [], 1):
+        item = dict(candidato)
+        original_rank = int(item.get("original_rank") or indice)
+        model_rank = int(item.get("model_rank") or indice)
+        fusion_score = (
+            peso_rrf / (FUSION_RANK_CONSTANT + original_rank)
+            + (1.0 - peso_rrf) / (FUSION_RANK_CONSTANT + model_rank)
+        )
+        classificados.append((fusion_score, model_rank, original_rank, item))
+
+    classificados.sort(key=lambda value: (-value[0], value[1], value[2]))
+    limite = len(classificados) if limite is None else min(int(limite), len(classificados))
+    resultado = []
+    for rerank_rank, (fusion_score, _model_rank, _original_rank, item) in enumerate(
+        classificados[:limite], 1
+    ):
+        item["rerank_rank"] = rerank_rank
+        item["fusion_score"] = round(fusion_score, 10)
+        resultado.append(item)
+    return resultado
 
 
 def reranquear_candidatos(
@@ -139,6 +175,7 @@ def reranquear_candidatos(
         return [], {
             "status": STATUS_DISABLED if not config.enabled else STATUS_SUCCESS,
             "initial_ranking": [],
+            "model_ranking": [],
             "reranked_ranking": [],
             "final_ranking": [],
             "error": None,
@@ -148,6 +185,7 @@ def reranquear_candidatos(
     erro = None
     if not config.enabled:
         status = STATUS_DISABLED
+        ranking_modelo = []
         ranking_completo = _selecionar_por_rrf(candidatos, len(candidatos))
         selecionados = ranking_completo[:limite_final]
     else:
@@ -155,6 +193,7 @@ def reranquear_candidatos(
             {
                 "candidate_id": item["candidate_id"],
                 "paper_id": str(item["paper_id"]),
+                "paper_title": item.get("paper_title"),
                 "page_number": int(item["page_number"]),
                 "text": str(item["text"])[:3000],
             }
@@ -186,22 +225,29 @@ Regras:
                 contents=prompt,
                 response_mime_type="application/json",
             )
-            ranking_completo = _normalizar_ranking(
+            ranking_modelo = _normalizar_ranking(
                 resposta.text, candidatos, len(candidatos)
+            )
+            ranking_completo = fundir_rankings(
+                ranking_modelo,
+                config.rrf_weight,
             )
             selecionados = ranking_completo[:limite_final]
             status = STATUS_SUCCESS
         except Exception as excecao:
             status = STATUS_FALLBACK
             erro = _erro_seguro(excecao)
+            ranking_modelo = []
             ranking_completo = _selecionar_por_rrf(candidatos, len(candidatos))
             selecionados = ranking_completo[:limite_final]
 
     ranking_final = [_candidato_auditavel(item) for item in selecionados]
+    ranking_ia = [_candidato_auditavel(item) for item in ranking_modelo]
     ranking_reranqueado = [_candidato_auditavel(item) for item in ranking_completo]
     trace = {
         "status": status,
         "initial_ranking": ranking_inicial,
+        "model_ranking": ranking_ia,
         "reranked_ranking": ranking_reranqueado,
         "final_ranking": ranking_final,
         "error": erro,
@@ -217,6 +263,7 @@ Regras:
         },
         {
             "status": status,
+            "model_ranking": ranking_ia,
             "selected": ranking_final,
             "selected_count": len(selecionados),
             "fallback_error": erro,

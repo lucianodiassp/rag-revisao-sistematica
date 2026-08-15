@@ -257,6 +257,9 @@ with benchmark_tab:
     else:
         summary = (latest.get("metrics") or {}).get("summary") or {}
         params = latest.get("params") or {}
+        calibration = summary.get("reranking_calibration") or {}
+        calibrated_result = bool(calibration)
+        final_pipeline_label = "Fusão configurada" if calibrated_result else "Reranking"
         st.caption(
             f"Última execução: {latest['created_at']} · Golden Set v"
             f"{params.get('golden_set_version')} · hash {str(params.get('golden_set_hash'))[:12]}"
@@ -277,8 +280,8 @@ with benchmark_tab:
                 f"tentativas ({summary.get('total_retry_count', 0)} no total)."
             )
         kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-        kpi1.metric("Recall@5 após reranking", f"{(summary.get('reranked') or {}).get('recall_at_5', 0):.3f}")
-        kpi2.metric("nDCG@5 após reranking", f"{(summary.get('reranked') or {}).get('ndcg_at_5', 0):.3f}")
+        kpi1.metric(f"Recall@5 · {final_pipeline_label}", f"{(summary.get('reranked') or {}).get('recall_at_5', 0):.3f}")
+        kpi2.metric(f"nDCG@5 · {final_pipeline_label}", f"{(summary.get('reranked') or {}).get('ndcg_at_5', 0):.3f}")
         kpi3.metric(
             "Recusas corretas",
             "N/A" if summary.get("correct_refusal_rate") is None else f"{summary['correct_refusal_rate'] * 100:.1f}%",
@@ -289,11 +292,11 @@ with benchmark_tab:
         )
         quality1, quality2, quality3, quality4 = st.columns(4)
         quality1.metric(
-            "Precision@5 após reranking",
+            f"Precision@5 · {final_pipeline_label}",
             f"{(summary.get('reranked') or {}).get('precision_at_5', 0):.3f}",
         )
         quality2.metric(
-            "MRR após reranking",
+            f"MRR · {final_pipeline_label}",
             f"{(summary.get('reranked') or {}).get('reciprocal_rank', 0):.3f}",
         )
         quality3.metric(
@@ -313,13 +316,14 @@ with benchmark_tab:
             ("reciprocal_rank", "MRR"),
             ("ndcg_at_5", "nDCG@5"),
         ):
-            comparison_rows.append(
-                {
-                    "Métrica": label,
-                    "RRF": (summary.get("rrf") or {}).get(key, 0),
-                    "Após reranking": (summary.get("reranked") or {}).get(key, 0),
-                }
-            )
+            row = {
+                "Métrica": label,
+                "RRF": (summary.get("rrf") or {}).get(key, 0),
+                final_pipeline_label: (summary.get("reranked") or {}).get(key, 0),
+            }
+            if summary.get("model_reranked"):
+                row["Reranking IA"] = (summary.get("model_reranked") or {}).get(key, 0)
+            comparison_rows.append(row)
         comparison_df = pd.DataFrame(comparison_rows).set_index("Métrica")
         st.subheader("Comparação do ranking")
         st.bar_chart(comparison_df)
@@ -332,6 +336,53 @@ with benchmark_tab:
             for warning in interpretation.get("warnings") or []:
                 st.warning(warning)
 
+        st.subheader("Calibração do reranking")
+        if not calibration or calibration.get("status") == "unavailable":
+            st.info(
+                "A calibração não está disponível porque não houve ranking da IA "
+                "em perguntas respondíveis nesta execução. Execute novamente o benchmark "
+                "se este resultado foi criado numa versão anterior."
+            )
+        else:
+            calibration_col1, calibration_col2, calibration_col3 = st.columns(3)
+            calibration_col1.metric(
+                "Peso RRF configurado",
+                f"{calibration.get('configured_rrf_weight', 0):.2f}",
+            )
+            calibration_col2.metric(
+                "Peso sugerido pelo Golden Set",
+                f"{calibration.get('recommended_rrf_weight', 0):.2f}",
+            )
+            calibration_col3.metric(
+                "Perguntas usadas na calibração",
+                calibration.get("answerable_query_count", 0),
+            )
+            if calibration.get("status") == "exploratory":
+                st.warning(
+                    "Esta recomendação é exploratória. Cadastre pelo menos "
+                    f"{calibration.get('minimum_recommended_queries', 10)} perguntas "
+                    "respondíveis e diversificadas antes de adotar o peso como estável."
+                )
+            st.caption(
+                "Peso 0 usa somente a ordem da IA; peso 1 preserva somente a ordem RRF. "
+                "A sugestão prioriza Recall@5, depois nDCG@5 e MRR. Para aplicá-la, "
+                "use o campo Peso RRF em Configuração de IA."
+            )
+            calibration_rows = [
+                {
+                    "Peso RRF": item.get("rrf_weight"),
+                    "Recall@5": item.get("recall_at_5"),
+                    "nDCG@5": item.get("ndcg_at_5"),
+                    "MRR": item.get("reciprocal_rank"),
+                }
+                for item in calibration.get("candidate_weights") or []
+            ]
+            if calibration_rows:
+                calibration_df = pd.DataFrame(calibration_rows).set_index("Peso RRF")
+                st.line_chart(calibration_df)
+                with st.expander("Ver métricas de todos os pesos testados"):
+                    st.dataframe(calibration_df, use_container_width=True)
+
         result_rows = []
         for item in (latest.get("metrics") or {}).get("results") or []:
             result_rows.append(
@@ -340,9 +391,11 @@ with benchmark_tab:
                     "Esperava recusa": item["expected_refusal"],
                     "Recusou": item["response_refused"],
                     "Recall@5 RRF": (item.get("rrf_metrics") or {}).get("recall_at_5"),
-                    "Recall@5 reranking": (item.get("reranked_metrics") or {}).get("recall_at_5"),
+                    "Recall@5 IA": (item.get("model_reranked_metrics") or {}).get("recall_at_5"),
+                    "Recall@5 fusão": (item.get("reranked_metrics") or {}).get("recall_at_5"),
                     "MRR RRF": (item.get("rrf_metrics") or {}).get("reciprocal_rank"),
-                    "MRR reranking": (item.get("reranked_metrics") or {}).get("reciprocal_rank"),
+                    "MRR IA": (item.get("model_reranked_metrics") or {}).get("reciprocal_rank"),
+                    "MRR fusão": (item.get("reranked_metrics") or {}).get("reciprocal_rank"),
                     "Status da execução": item.get("execution_status", "success"),
                     "Tentativas": item.get("execution_attempts", 1),
                     "Status do reranking": item.get("reranking_status"),

@@ -109,7 +109,8 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Recuperação lexical pelo Full-Text Search do PostgreSQL.
 - Fusão dos rankings com **Reciprocal Rank Fusion (RRF)**.
 - Reranking opcional dos melhores candidatos com modelo generativo configurável.
-- Registro em JSONB do ranking antes/depois, notas, justificativas, modelo e parâmetros.
+- Fusão ponderada e configurável entre a ordem RRF e a ordem proposta pela IA.
+- Registro em JSONB das posições RRF, IA e final, scores, justificativas, modelo e parâmetros.
 - Fallback automático para a ordem RRF quando o reranking falha ou está desativado.
 - Filtro pelo projeto ativo e pelo modelo de embedding configurado.
 - Recuperação restrita a chunks de PDF com página de origem registrada.
@@ -149,7 +150,8 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Perguntas fora do corpus marcadas com expectativa explícita de recusa.
 - Versionamento imutável do gabarito após cada alteração.
 - Cálculo determinístico de `Precision@k`, `Recall@k`, `Hit Rate@k`, MRR e `nDCG@k`.
-- Comparação do ranking híbrido RRF com a ordenação completa após reranking.
+- Comparação entre ranking híbrido RRF, reranking puro da IA e fusão configurada.
+- Calibração de pesos sem novas chamadas à API, com recomendação baseada no Golden Set.
 - Taxas de recusa correta, recusa indevida, validade e conformidade das citações.
 - Execuções persistidas em JSONB com Golden Set, hash e configurações exatas dos modelos.
 - Recuperação automática de erros transitórios `429`/`503`, com espera exponencial,
@@ -317,7 +319,7 @@ Na página **4. Configuração de IA** é possível:
 2. Importar a chave presente em `backend/.env`.
 3. Consultar os modelos liberados para a credencial.
 4. Selecionar modelos e temperaturas por função.
-5. Ativar o reranking e configurar o total de candidatos e trechos finais.
+5. Ativar o reranking e configurar candidatos, trechos finais e peso da ordem RRF.
 6. Configurar o modelo de embedding.
 7. Consultar a configuração efetiva e o histórico.
 
@@ -398,7 +400,8 @@ recadastre as credenciais pelas telas de configuração.
 - Retorne à página inicial **Assistente de Revisão Sistemática**.
 - Faça perguntas sobre o texto integral indexado.
 - Confira as citações com UUID e página no formato `[paper_id, p. página]`.
-- Abra **Como as evidências foram selecionadas** para comparar posição RRF, posição final e score do reranking.
+- Abra **Como as evidências foram selecionadas** para comparar posições RRF, IA e final,
+  além dos scores do modelo e da fusão.
 
 ### 7. Extrair e revisar evidências
 
@@ -413,8 +416,11 @@ recadastre as credenciais pelas telas de configuração.
 - Abra **8. Avaliação Quantitativa RAG**.
 - Cadastre perguntas que o corpus deve responder e associe as fontes relevantes.
 - Cadastre perguntas fora do escopo marcando que o sistema deve recusá-las.
-- Execute o benchmark e compare RRF e reranking nas mesmas perguntas.
+- Execute o benchmark e compare RRF, reranking puro da IA e fusão configurada.
 - Interprete Precision, Recall, Hit Rate, MRR, nDCG, recusas e citações.
+- Consulte a curva de calibração. O peso `0` usa somente a ordem da IA e o peso `1`
+  preserva somente o RRF. Trate recomendações com menos de dez perguntas respondíveis
+  como exploratórias.
 - Se o provedor estiver temporariamente indisponível, aguarde as novas tentativas
   automáticas; uma pergunta que continue falhando será registrada sem interromper as demais.
 - Baixe o resultado em JSON ou CSV.
@@ -560,6 +566,8 @@ docker compose down -v
 - PDFs baseados somente em imagem exigem OCR, ainda não integrado.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
 - O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo.
+- O peso sugerido pelo benchmark é específico do projeto e depende da diversidade e
+  qualidade do Golden Set; ele não é aplicado automaticamente à configuração global.
 - As métricas do benchmark refletem a qualidade do Golden Set humano; um gabarito
   pequeno, ambíguo ou incompleto pode produzir conclusões enganosas.
 - O sistema não substitui protocolo metodológico, avaliação de risco de viés ou

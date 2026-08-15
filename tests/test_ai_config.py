@@ -100,6 +100,7 @@ class AIConfigTests(unittest.TestCase):
                 "AI_RERANKING_ENABLED": "false",
                 "AI_RERANKING_CANDIDATE_LIMIT": "10",
                 "AI_RERANKING_FINAL_LIMIT": "3",
+                "AI_RERANKING_RRF_WEIGHT": "0.65",
             },
             clear=True,
         ):
@@ -109,7 +110,22 @@ class AIConfigTests(unittest.TestCase):
             self.assertFalse(config.enabled)
             self.assertEqual(config.candidate_limit, 10)
             self.assertEqual(config.final_limit, 3)
+            self.assertEqual(config.rrf_weight, 0.65)
             self.assertEqual(config.metadata()["candidate_limit"], 10)
+            self.assertEqual(config.metadata()["rrf_weight"], 0.65)
+
+    def test_peso_rrf_fora_do_intervalo_e_rejeitado(self):
+        with patch.dict(
+            os.environ,
+            {
+                "AI_CONFIG_DATABASE_ENABLED": "false",
+                "AI_RERANKING_RRF_WEIGHT": "1.2",
+            },
+            clear=True,
+        ):
+            clear_ai_settings_cache()
+            with self.assertRaisesRegex(RuntimeError, "entre 0 e 1"):
+                get_generation_config(TASK_RERANKING)
 
     def test_banco_sobrescreve_modelo_e_chave_sem_expor_segredo(self):
         modelos = {

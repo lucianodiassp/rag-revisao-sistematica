@@ -74,7 +74,11 @@ if pergunta_usuario:
                 with st.expander("Como as evidências foram selecionadas"):
                     status = trace.get("status")
                     if status == "success":
-                        st.success("Reranking executado com sucesso após a busca híbrida RRF.")
+                        peso_rrf = (trace.get("configuration") or {}).get("rrf_weight", 0.0)
+                        st.success(
+                            "Reranking executado com sucesso após a busca híbrida RRF "
+                            f"(peso RRF: {float(peso_rrf):.2f})."
+                        )
                     elif status == "fallback_rrf":
                         st.warning(
                             "O reranking não pôde ser executado; a resposta utilizou "
@@ -91,11 +95,14 @@ if pergunta_usuario:
                             [
                                 {
                                     "Artigo": item["paper_id"],
+                                    "Título": item.get("paper_title"),
                                     "Página": item["page_number"],
                                     "Posição RRF": item["original_rank"],
+                                    "Posição IA": item.get("model_rank"),
                                     "Posição final": item["rerank_rank"],
                                     "Score RRF": item["rrf_score"],
                                     "Score reranking": item.get("rerank_score"),
+                                    "Score de fusão": item.get("fusion_score"),
                                     "Justificativa": item.get("rerank_reason"),
                                 }
                                 for item in ranking

@@ -30,6 +30,7 @@ class RagRerankingIntegrationTests(unittest.TestCase):
             (
                 "chunk-1",
                 "74000000-0000-0000-0000-000000000001",
+                "Artigo de teste",
                 "Trecho rastreável",
                 9,
                 0.031,
@@ -49,6 +50,7 @@ class RagRerankingIntegrationTests(unittest.TestCase):
         self.assertIn("metadata_jsonb->>'source_type' = 'pdf'", sql)
         self.assertIn("metadata_jsonb ? 'page_start'", sql)
         self.assertEqual(resultado[0]["page_number"], 9)
+        self.assertEqual(resultado[0]["paper_title"], "Artigo de teste")
 
     @patch("backend.agentes.agente_rag._buscar_contexto_hibrido_detalhado")
     def test_interface_historica_da_busca_hibrida_e_preservada(self, busca):

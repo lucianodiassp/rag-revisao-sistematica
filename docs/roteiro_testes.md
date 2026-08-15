@@ -83,7 +83,7 @@ registrada em `screening_reassessments`, sem apagar a decisão anterior.
 1. No terminal do sistema, observe a execução do Motor de Busca (RAG).
 2. O sistema responderá a uma pergunta científica baseada na literatura indexada.
 3. Abra **"Como as evidências foram selecionadas"** abaixo da resposta.
-4. Compare a posição original do RRF com a posição final e a justificativa do reranking.
+4. Compare as posições RRF, IA e final, o score de fusão e a justificativa do reranking.
 5. Em seguida, será realizada uma pergunta fora do escopo.
 
    *Exemplo:* *"Qual é a capital do Brasil?"*
@@ -92,7 +92,7 @@ registrada em `screening_reassessments`, sem apagar a decisão anterior.
 
 * O sistema deve citar artigo e página no formato `[paper_id, p. página]`.
 * Marcadores como `[5]` ou `[36]` devem aparecer identificados como referências bibliográficas internas, e não como páginas.
-* O diagnóstico deve mostrar o status do reranking e os rankings antes/depois.
+* O diagnóstico deve mostrar o status do reranking e as posições RRF, IA e final.
 * Se o reranking falhar ou estiver desativado, a resposta deve usar o fallback RRF.
 * Perguntas fora do escopo da literatura indexada devem ser recusadas de forma educada.
 * Não devem ocorrer alucinações ou respostas sem fundamentação documental.
@@ -115,7 +115,10 @@ usar a própria IA como fonte da verdade.
 ### ✅ Critério de Sucesso
 
 * Cada alteração deve aumentar a versão do Golden Set.
-* O painel deve comparar RRF e reranking em Precision, Recall, Hit Rate, MRR e nDCG.
+* O painel deve comparar RRF, reranking da IA e fusão configurada em Precision,
+  Recall, Hit Rate, MRR e nDCG.
+* A calibração deve testar pesos entre 0 e 1 sem realizar novas chamadas à API.
+* Com menos de dez perguntas respondíveis, a recomendação deve aparecer como exploratória.
 * A pergunta fora do corpus deve contribuir para a taxa de recusa correta.
 * O resultado deve informar a versão e o hash do gabarito usado.
 * Erros transitórios `429` ou `503` devem acionar novas tentativas com espera progressiva.
