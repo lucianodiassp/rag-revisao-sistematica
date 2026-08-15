@@ -1,6 +1,7 @@
 """Reranking rastreável das evidências recuperadas pelo RRF."""
 
 import json
+import re
 
 from backend.app.ai_config import TASK_RERANKING, get_ai_settings, get_reranking_config
 from backend.app.ai_service import generate_content
@@ -11,6 +12,7 @@ STATUS_SUCCESS = "success"
 STATUS_FALLBACK = "fallback_rrf"
 STATUS_DISABLED = "disabled"
 FUSION_RANK_CONSTANT = 60
+DEFAULT_RERANK_MAX_ATTEMPTS = 2
 
 
 def _candidato_auditavel(candidato, incluir_texto=False):
@@ -39,13 +41,24 @@ def _candidato_auditavel(candidato, incluir_texto=False):
 
 
 def _erro_seguro(erro):
-    mensagem = str(erro).strip() or erro.__class__.__name__
+    mensagem = " ".join(str(erro).split()) or erro.__class__.__name__
     try:
         segredo = get_ai_settings().api_key
     except Exception:
         segredo = None
     if segredo:
         mensagem = mensagem.replace(str(segredo), "[REDACTED]")
+    mensagem = re.sub(
+        r"(?i)(\b(?:api[_-]?key|x-goog-api-key|authorization|key)\b\s*[:=]\s*)"
+        r"[^\s,;&]+",
+        r"\1[REDACTED]",
+        mensagem,
+    )
+    mensagem = re.sub(
+        r"(?i)\bBearer\s+[^\s,;]+",
+        "Bearer [REDACTED]",
+        mensagem,
+    )
     return f"{erro.__class__.__name__}: {mensagem}"[:500]
 
 
@@ -162,6 +175,7 @@ def reranquear_candidatos(
     config=None,
     generator=None,
     logger=None,
+    max_attempts=DEFAULT_RERANK_MAX_ATTEMPTS,
 ):
     """Reordena candidatos e devolve seleção e trilha de auditoria."""
     config = config or get_reranking_config()
@@ -179,10 +193,16 @@ def reranquear_candidatos(
             "reranked_ranking": [],
             "final_ranking": [],
             "error": None,
+            "errors": [],
+            "attempts": 0,
+            "retry_count": 0,
+            "recovered_after_retry": False,
             "configuration": config.metadata(),
         }
 
     erro = None
+    erros = []
+    tentativas = 0
     if not config.enabled:
         status = STATUS_DISABLED
         ranking_modelo = []
@@ -219,24 +239,31 @@ Regras:
 - ordene do mais relevante para o menos relevante;
 - use uma justificativa curta baseada apenas no trecho.
 """
-        try:
-            resposta = generator(
-                TASK_RERANKING,
-                contents=prompt,
-                response_mime_type="application/json",
-            )
-            ranking_modelo = _normalizar_ranking(
-                resposta.text, candidatos, len(candidatos)
-            )
-            ranking_completo = fundir_rankings(
-                ranking_modelo,
-                config.rrf_weight,
-            )
-            selecionados = ranking_completo[:limite_final]
-            status = STATUS_SUCCESS
-        except Exception as excecao:
+        max_attempts = max(1, int(max_attempts or 1))
+        ranking_modelo = []
+        for tentativa in range(1, max_attempts + 1):
+            tentativas = tentativa
+            try:
+                resposta = generator(
+                    TASK_RERANKING,
+                    contents=prompt,
+                    response_mime_type="application/json",
+                )
+                ranking_modelo = _normalizar_ranking(
+                    resposta.text, candidatos, len(candidatos)
+                )
+                ranking_completo = fundir_rankings(
+                    ranking_modelo,
+                    config.rrf_weight,
+                )
+                selecionados = ranking_completo[:limite_final]
+                status = STATUS_SUCCESS
+                break
+            except Exception as excecao:
+                erros.append(_erro_seguro(excecao))
+        else:
             status = STATUS_FALLBACK
-            erro = _erro_seguro(excecao)
+            erro = erros[-1]
             ranking_modelo = []
             ranking_completo = _selecionar_por_rrf(candidatos, len(candidatos))
             selecionados = ranking_completo[:limite_final]
@@ -251,6 +278,10 @@ Regras:
         "reranked_ranking": ranking_reranqueado,
         "final_ranking": ranking_final,
         "error": erro,
+        "errors": erros,
+        "attempts": tentativas,
+        "retry_count": max(0, tentativas - 1),
+        "recovered_after_retry": status == STATUS_SUCCESS and tentativas > 1,
         "configuration": config.metadata(),
     }
     logger(
@@ -267,6 +298,10 @@ Regras:
             "selected": ranking_final,
             "selected_count": len(selecionados),
             "fallback_error": erro,
+            "attempts": tentativas,
+            "retry_count": max(0, tentativas - 1),
+            "attempt_errors": erros,
+            "recovered_after_retry": status == STATUS_SUCCESS and tentativas > 1,
         },
         config.metadata(),
     )

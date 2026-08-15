@@ -309,6 +309,17 @@ with benchmark_tab:
         )
 
         comparison_rows = []
+        comparison = summary.get("comparison_cohort") or {}
+        has_comparison_control = "comparison_cohort" in summary
+        comparison_count = int(comparison.get("query_count") or 0)
+        if has_comparison_control:
+            comparison_rrf = comparison.get("rrf") or {}
+            comparison_model = comparison.get("model_reranked") or {}
+            comparison_fused = comparison.get("reranked") or {}
+        else:
+            comparison_rrf = summary.get("rrf") or {}
+            comparison_model = summary.get("model_reranked") or {}
+            comparison_fused = summary.get("reranked") or {}
         for key, label in (
             ("precision_at_5", "Precision@5"),
             ("recall_at_5", "Recall@5"),
@@ -318,16 +329,33 @@ with benchmark_tab:
         ):
             row = {
                 "Métrica": label,
-                "RRF": (summary.get("rrf") or {}).get(key, 0),
-                final_pipeline_label: (summary.get("reranked") or {}).get(key, 0),
+                "RRF": comparison_rrf.get(key, 0),
+                final_pipeline_label: comparison_fused.get(key, 0),
             }
-            if summary.get("model_reranked"):
-                row["Reranking IA"] = (summary.get("model_reranked") or {}).get(key, 0)
+            if comparison_model:
+                row["Reranking IA"] = comparison_model.get(key, 0)
             comparison_rows.append(row)
         comparison_df = pd.DataFrame(comparison_rows).set_index("Métrica")
         st.subheader("Comparação do ranking")
-        st.bar_chart(comparison_df)
-        st.dataframe(comparison_df, use_container_width=True)
+        if comparison_count:
+            excluded = int(comparison.get("excluded_answerable_query_count") or 0)
+            st.caption(
+                f"Comparação justa: {comparison_count} pergunta(s) com os três pipelines "
+                f"disponíveis. Excluídas por fallback/ausência do ranking da IA: {excluded}."
+            )
+        elif has_comparison_control:
+            st.warning(
+                "Nenhuma pergunta possui os três rankings nesta execução. "
+                "A comparação foi omitida para evitar denominadores incompatíveis."
+            )
+        else:
+            st.caption(
+                "Execução anterior ao controle de amostra comparável; os denominadores "
+                "podem diferir entre os pipelines."
+            )
+        if comparison_count or not has_comparison_control:
+            st.bar_chart(comparison_df)
+            st.dataframe(comparison_df, use_container_width=True)
 
         interpretation = summary.get("interpretation") or {}
         with st.expander("Interpretação automática das métricas", expanded=True):
@@ -354,14 +382,22 @@ with benchmark_tab:
                 f"{calibration.get('recommended_rrf_weight', 0):.2f}",
             )
             calibration_col3.metric(
-                "Perguntas usadas na calibração",
-                calibration.get("answerable_query_count", 0),
+                "Amostra comparável",
+                (
+                    f"{calibration.get('answerable_query_count', 0)}/"
+                    f"{calibration.get('total_answerable_query_count', calibration.get('answerable_query_count', 0))}"
+                ),
             )
             if calibration.get("status") == "exploratory":
                 st.warning(
                     "Esta recomendação é exploratória. Cadastre pelo menos "
                     f"{calibration.get('minimum_recommended_queries', 10)} perguntas "
                     "respondíveis e diversificadas antes de adotar o peso como estável."
+                )
+            if calibration.get("coverage_status") == "partial":
+                st.warning(
+                    "A sugestão de peso usa somente perguntas com ranking da IA. "
+                    "Repita a execução até eliminar os fallbacks antes de alterar a configuração."
                 )
             st.caption(
                 "Peso 0 usa somente a ordem da IA; peso 1 preserva somente a ordem RRF. "
@@ -399,7 +435,19 @@ with benchmark_tab:
                     "Status da execução": item.get("execution_status", "success"),
                     "Tentativas": item.get("execution_attempts", 1),
                     "Status do reranking": item.get("reranking_status"),
-                    "Erro": item.get("execution_error"),
+                    "Tentativas do reranking": item.get("reranking_attempts", 0),
+                    "Recuperado no reranking": item.get(
+                        "reranking_recovered_after_retry", False
+                    ),
+                    "Amostra comparável": item.get("comparison_eligible", False),
+                    "Motivo do fallback": item.get("reranking_error"),
+                    "Recusa reavaliada": (item.get("generation") or {}).get(
+                        "refusal_reconsidered", False
+                    ),
+                    "Recusa recuperada": (item.get("generation") or {}).get(
+                        "refusal_recovered", False
+                    ),
+                    "Erro da execução": item.get("execution_error"),
                 }
             )
         st.subheader("Resultados por pergunta")

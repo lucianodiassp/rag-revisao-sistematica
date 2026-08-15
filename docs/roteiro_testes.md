@@ -81,7 +81,8 @@ registrada em `screening_reassessments`, sem apagar a decisão anterior.
 ### Passos
 
 1. No terminal do sistema, observe a execução do Motor de Busca (RAG).
-2. O sistema responderá a uma pergunta científica baseada na literatura indexada.
+2. No menu lateral, confirme o rótulo **"Assistente de Revisão Sistemática"** e
+   faça uma pergunta científica baseada na literatura indexada.
 3. Abra **"Como as evidências foram selecionadas"** abaixo da resposta.
 4. Compare as posições RRF, IA e final, o score de fusão e a justificativa do reranking.
 5. Em seguida, será realizada uma pergunta fora do escopo.
@@ -94,6 +95,10 @@ registrada em `screening_reassessments`, sem apagar a decisão anterior.
 * Marcadores como `[5]` ou `[36]` devem aparecer identificados como referências bibliográficas internas, e não como páginas.
 * O diagnóstico deve mostrar o status do reranking e as posições RRF, IA e final.
 * Se o reranking falhar ou estiver desativado, a resposta deve usar o fallback RRF.
+* Se a primeira tentativa do reranking falhar, o diagnóstico deve informar a nova
+  tentativa e, se necessário, o motivo exato do fallback.
+* Uma recusa diante de evidência potencialmente forte deve passar por uma segunda
+  leitura conservadora, com o resultado registrado no diagnóstico.
 * Perguntas fora do escopo da literatura indexada devem ser recusadas de forma educada.
 * Não devem ocorrer alucinações ou respostas sem fundamentação documental.
 
@@ -116,7 +121,9 @@ usar a própria IA como fonte da verdade.
 
 * Cada alteração deve aumentar a versão do Golden Set.
 * O painel deve comparar RRF, reranking da IA e fusão configurada em Precision,
-  Recall, Hit Rate, MRR e nDCG.
+  Recall, Hit Rate, MRR e nDCG usando exatamente a mesma amostra.
+* O painel deve mostrar quantas perguntas entraram na amostra comparável e quantas
+  foram excluídas por fallback ou ausência do ranking da IA.
 * A calibração deve testar pesos entre 0 e 1 sem realizar novas chamadas à API.
 * Com menos de dez perguntas respondíveis, a recomendação deve aparecer como exploratória.
 * A pergunta fora do corpus deve contribuir para a taxa de recusa correta.
@@ -124,6 +131,8 @@ usar a própria IA como fonte da verdade.
 * Erros transitórios `429` ou `503` devem acionar novas tentativas com espera progressiva.
 * Se uma pergunta esgotar as tentativas, a execução deve registrar a falha e preservar
   os resultados das demais perguntas.
+* Os resultados por pergunta devem mostrar tentativas, motivo do fallback e eventual
+  recuperação do reranking ou de uma recusa inicial.
 * Os arquivos JSON e CSV devem ser exportados corretamente.
 
 ---
