@@ -4,6 +4,7 @@
 
 cryptography==48.0.0
 google-genai==2.8.0
+matplotlib==3.11.1
 pandas==2.3.3
 platformdirs==4.9.6
 plotly==5.24.1

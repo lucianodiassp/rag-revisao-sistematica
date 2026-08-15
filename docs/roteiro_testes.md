@@ -6,7 +6,31 @@ Bem-vindo(a)!
 
 Este documento guia a sua experiência de teste na plataforma. O objetivo é avaliar a fluidez, precisão e utilidade do sistema de triagem e extração de conhecimento baseado em Inteligência Artificial.
 
-**⏱️ Duração estimada:** 15 a 20 minutos.
+**⏱️ Duração estimada:** 20 a 25 minutos.
+
+---
+
+## 📍 Cenário de instalação: Docker Compose completo
+
+**Contexto:** Um novo usuário clonou o repositório e possui somente Git e Docker
+Desktop disponíveis.
+
+### Passos
+
+1. Com o Docker Desktop em execução, rode `docker compose up -d --build` na raiz.
+2. Execute `docker compose ps -a`.
+3. Confirme que `db` está saudável, `migrate` terminou com código `0` e `app`
+   está saudável.
+4. Abra `http://localhost:8501` e navegue até Configuração da Pesquisa.
+5. Reinicie com `docker compose down` e `docker compose up -d`.
+6. Confirme que projetos, PDFs e credenciais configuradas continuam disponíveis.
+
+### ✅ Critério de Sucesso
+
+* A interface deve iniciar sem instalação local do Python.
+* A aplicação só deve iniciar depois do banco saudável e das migrações concluídas.
+* A ausência de `backend/.env` não deve impedir a abertura da interface.
+* Os volumes e o diretório `data/pdfs` devem preservar os dados após a reinicialização.
 
 ---
 
