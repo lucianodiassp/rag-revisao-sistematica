@@ -206,39 +206,26 @@ flowchart LR
 
 ## Instalação local
 
-### Pré-requisitos
+### Caminho recomendado: aplicação completa com Docker Compose
+
+#### Pré-requisitos
 
 - Git.
-- Python 3.10 ou superior.
 - Docker Desktop em execução.
 - No Windows, Docker configurado para containers Linux; WSL 2 é recomendado.
 
-### 1. Clonar o repositório
+#### 1. Clonar o repositório
 
 ```bash
 git clone https://github.com/lucianodiassp/rag-revisao-sistematica.git
 cd rag-revisao-sistematica
 ```
 
-### 2. Criar o ambiente Python
+#### 2. Configurar credenciais opcionais
 
-Windows PowerShell:
-
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-Linux ou macOS:
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. Criar o arquivo de ambiente
+A aplicação inicia sem chave de IA e permite cadastrar as credenciais pelas telas
+**Configuração de IA** e **Fontes Bibliográficas**. Se preferir usar variáveis de
+ambiente como fallback, crie o arquivo local:
 
 Windows PowerShell:
 
@@ -252,52 +239,83 @@ Linux ou macOS:
 cp backend/.env.example backend/.env
 ```
 
-Configuração mínima de infraestrutura:
+O Compose lê `backend/.env` quando ele existe, mas sempre substitui a conexão local
+por `DB_HOST=db` dentro do container. O arquivo não é incorporado à imagem e continua
+ignorado pelo Git.
 
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=rag_systematic_review
-DB_USER=rag_user
-DB_PASSWORD=rag_password
-```
-
-Para a primeira execução, informe uma chave Gemini no arquivo ou cadastre-a depois
-pela página **Configuração de IA**:
-
-```env
-GEMINI_API_KEY="sua-chave-api-do-google-aqui"
-```
-
-Os modelos iniciais e as variáveis opcionais estão em
-[`backend/.env.example`](backend/.env.example). Como a disponibilidade varia entre
-contas, use a tela de IA para testar a chave e consultar os modelos liberados antes
-de executar o pipeline completo.
-
-> Nunca publique `backend/.env`. O arquivo é ignorado pelo Git.
-
-### 4. Subir PostgreSQL e pgAdmin
+#### 3. Subir a aplicação completa
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 docker compose ps
 ```
 
-| Serviço | Endereço/porta |
+O comando constrói a interface, inicia o PostgreSQL com `pgvector`, aguarda o banco
+ficar saudável, aplica todas as migrações e só então inicia o Streamlit.
+As portas são publicadas apenas em `127.0.0.1`, mantendo a instalação restrita à
+máquina local.
+Em Linux, usuários com UID/GID diferentes de `1000` podem definir `RAG_UID` e
+`RAG_GID` antes da primeira construção para manter permissão de escrita em
+`data/pdfs`.
+
+| Serviço | Endereço/resultado |
 |---|---|
+| Aplicação Streamlit | [http://localhost:8501](http://localhost:8501) |
 | PostgreSQL + pgvector | `localhost:5432` |
-| pgAdmin | [http://localhost:5050](http://localhost:5050) |
+| Migrações | Executadas automaticamente e encerradas com código `0` |
 
-Credenciais de desenvolvimento do pgAdmin:
-
-- E-mail: `admin@rag.com`
-- Senha: `admin`
-
-Substitua essas credenciais antes de qualquer implantação compartilhada.
-
-### 5. Iniciar a aplicação
+Na primeira construção, o download das imagens e das bibliotecas Python pode levar
+alguns minutos. Para acompanhar a inicialização:
 
 ```bash
+docker compose logs -f app
+```
+
+Os PDFs permanecem em `data/pdfs/` na máquina. A chave-mestra usada para cifrar
+credenciais é preservada no volume `rag_app_private_data`, enquanto o banco utiliza
+`rag_postgres_data`.
+
+#### 4. pgAdmin opcional
+
+O pgAdmin não é necessário para usar a aplicação e fica fora da inicialização
+padrão. Para ativá-lo:
+
+```bash
+docker compose --profile tools up -d pgadmin
+```
+
+Acesse [http://localhost:5050](http://localhost:5050), usando por padrão
+`admin@rag.com` e `admin`. Essas credenciais podem ser substituídas pelas variáveis
+`PGADMIN_DEFAULT_EMAIL` e `PGADMIN_DEFAULT_PASSWORD`.
+
+### Execução manual para desenvolvimento
+
+Python 3.10 ou superior é necessário somente quando a interface será executada fora
+do Docker.
+
+Windows PowerShell:
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item backend\.env.example backend\.env
+```
+
+Linux ou macOS:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp backend/.env.example backend/.env
+```
+
+Nesse modo, mantenha `DB_HOST=localhost` em `backend/.env` e execute:
+
+```bash
+docker compose up -d db
+docker compose run --rm migrate
 python -m streamlit run frontend/app.py
 ```
 
@@ -343,25 +361,30 @@ dentro do projeto demonstrativo; os demais projetos não são afetados.
 
 ## Atualização de um banco existente
 
-Os scripts de `docker-entrypoint-initdb.d` são executados automaticamente somente
-quando o volume do PostgreSQL é criado. Se já existe o volume
-`rag_postgres_data`, recrie apenas o container e aplique as migrações uma vez:
+O serviço `migrate` executa os scripts idempotentes em toda inicialização, inclusive
+quando o volume `rag_postgres_data` já existe. Depois de atualizar o código, basta:
 
 ```bash
-docker compose up -d --force-recreate db
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z98_project_isolation.sql
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/z99_traceable_evidence.sql
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz100_ai_configuration.sql
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz102_screening_reassessment.sql
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz103_explainable_deduplication.sql
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz104_reranking_configuration.sql
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz105_prisma_reporting.sql
-docker compose exec -T db psql -U rag_user -d rag_systematic_review -f /docker-entrypoint-initdb.d/zz106_rag_benchmark.sql
+git pull
+docker compose up -d --build
 ```
 
-As migrações são idempotentes e preservam os dados. A migração de isolamento cria
-um projeto legado quando encontra registros da versão anterior.
+Se esta máquina já executava a aplicação manualmente e possui credenciais cifradas
+no banco, importe uma vez a chave-mestra local para o volume privado:
+
+```bash
+python scripts/migrate_master_key_to_docker.py
+```
+
+O utilitário localiza a chave padrão do sistema, valida seu formato e a transfere
+diretamente para o container sem imprimi-la. Também aceita outro caminho com
+`--source`. Ele não substitui uma chave diferente já presente no volume sem a opção
+explícita `--force`. Instalações novas ou bancos sem credenciais salvas não precisam
+dessa etapa.
+
+Para auditar essa etapa, use `docker compose logs migrate`. Uma falha interrompe a
+inicialização da aplicação, evitando que uma versão nova rode sobre um schema
+incompatível. As migrações preservam os dados existentes.
 
 ## Configuração segura
 
@@ -533,7 +556,8 @@ python -m pytest -q
 
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
 importação BibTeX, deduplicação explicável, reranking com fallback, métricas do
-Golden Set, isolamento por projeto, indexação de PDFs e evidências rastreáveis.
+Golden Set, isolamento por projeto, indexação de PDFs, evidências rastreáveis e
+validação da chave-mestra usada na migração para Docker.
 
 Os testes SQL de integração ficam em `tests/*.sql`. Exemplo no PowerShell:
 
@@ -561,9 +585,12 @@ rag-revisao-sistematica/
 ├── frontend/
 │   ├── app.py                   # Chat RAG
 │   └── pages/                   # Fluxo multipágina do Streamlit
+├── scripts/                     # Utilitários seguros de migração da instalação
 ├── tests/                       # Testes unitários e SQL de integração
 ├── data/pdfs/                   # PDFs locais, ignorados pelo Git
-├── docker-compose.yml
+├── Dockerfile                   # Imagem da aplicação Streamlit
+├── .dockerignore                # Exclui segredos e artefatos da imagem
+├── docker-compose.yml           # Banco, migrações, aplicação e pgAdmin opcional
 └── requirements.txt
 ```
 
@@ -572,9 +599,11 @@ rag-revisao-sistematica/
 ### Arquivos e dados locais
 
 - `backend/.env` contém segredos de fallback e é ignorado pelo Git.
+- `.dockerignore` impede que esse arquivo seja enviado ao contexto da imagem.
 - `data/pdfs/*.pdf` é ignorado pelo Git.
 - O volume `rag_postgres_data` contém o PostgreSQL.
-- A chave-mestra local não está no banco nem no repositório.
+- No Compose, a chave-mestra fica no volume `rag_app_private_data`, fora do banco
+  e do repositório.
 - CSV e relatório Markdown são gerados para download pela interface.
 
 ### Backup mínimo
@@ -583,7 +612,8 @@ Para recuperar a revisão em outra máquina, considere separadamente:
 
 1. dump do banco PostgreSQL;
 2. diretório `data/pdfs`;
-3. chave-mestra local, caso as credenciais cifradas precisem ser reutilizadas.
+3. volume `rag_app_private_data`, ou a chave-mestra equivalente, caso as
+   credenciais cifradas precisem ser reutilizadas.
 
 Sem a chave-mestra, mantenha o banco e os PDFs e recadastre somente as chaves das APIs.
 
@@ -592,24 +622,26 @@ Sem a chave-mestra, mantenha o banco e os PDFs e recadastre somente as chaves da
 Sem remover o banco:
 
 ```bash
-docker compose down
+docker compose --profile tools down
 ```
 
-Removendo também o volume PostgreSQL:
+Removendo também os volumes do PostgreSQL e da chave-mestra:
 
 ```bash
-docker compose down -v
+docker compose --profile tools down -v
 ```
 
-> `docker compose down -v` remove permanentemente o banco do volume. Os PDFs da
-> pasta `data/pdfs` não são removidos por esse comando.
+> `docker compose down -v` remove permanentemente o banco e a chave-mestra dos
+> volumes Docker. Os PDFs da pasta `data/pdfs` não são removidos por esse comando.
 
 ## Solução de problemas
 
 | Sintoma | Verificação recomendada |
 |---|---|
 | `dockerDesktopLinuxEngine` não encontrado | Inicie o Docker Desktop e confirme o uso de containers Linux. |
-| Página informa migração ausente | Execute [Atualização de um banco existente](#atualização-de-um-banco-existente). |
+| Serviço `migrate` encerra com erro | Consulte `docker compose logs migrate`; a aplicação aguarda uma migração bem-sucedida. |
+| Serviço `app` não fica saudável | Consulte `docker compose logs app` e confirme se `db` está saudável e `migrate` terminou com código `0`. |
+| Porta `8501`, `5432` ou `5050` ocupada | Defina `RAG_APP_PORT`, `RAG_DB_PORT` ou `RAG_PGADMIN_PORT` antes de iniciar o Compose. |
 | Modelo Gemini indisponível | Abra **Configuração de IA**, teste a chave e escolha um modelo listado para a conta. |
 | Erro `429` em uma API | Aguarde a renovação do limite, reduza chamadas ou use uma credencial com cota adequada. |
 | PDF armazenado, mas não indexado | Execute a vetorização e consulte o motivo individual apresentado na página. |

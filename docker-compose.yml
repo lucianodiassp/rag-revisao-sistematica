@@ -1,46 +1,99 @@
 services:
-  # --------------------------------------------------------
-  # PostgreSQL com pgvector (Banco de Dados Principal)
-  # --------------------------------------------------------
   db:
     image: pgvector/pgvector:pg16
     container_name: rag_postgres_db
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: rag_user
       POSTGRES_PASSWORD: rag_password
       POSTGRES_DB: rag_systematic_review
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${RAG_DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql # Mapeamento para auto-executar o schema
-      - ./database/scripts/002_project_isolation.sql:/docker-entrypoint-initdb.d/z98_project_isolation.sql:ro
-      - ./database/scripts/003_traceable_evidence.sql:/docker-entrypoint-initdb.d/z99_traceable_evidence.sql:ro
-      - ./database/scripts/004_ai_configuration.sql:/docker-entrypoint-initdb.d/zz100_ai_configuration.sql:ro
-      - ./database/scripts/005_bibliographic_sources.sql:/docker-entrypoint-initdb.d/zz101_bibliographic_sources.sql:ro
-      - ./database/scripts/006_screening_reassessment.sql:/docker-entrypoint-initdb.d/zz102_screening_reassessment.sql:ro
-      - ./database/scripts/007_explainable_deduplication.sql:/docker-entrypoint-initdb.d/zz103_explainable_deduplication.sql:ro
-      - ./database/scripts/008_reranking_configuration.sql:/docker-entrypoint-initdb.d/zz104_reranking_configuration.sql:ro
-      - ./database/scripts/009_prisma_reporting.sql:/docker-entrypoint-initdb.d/zz105_prisma_reporting.sql:ro
-      - ./database/scripts/010_rag_benchmark.sql:/docker-entrypoint-initdb.d/zz106_rag_benchmark.sql:ro
+      - ./database/scripts/init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d rag_systematic_review"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     networks:
       - rag_network
 
-  # --------------------------------------------------------
-  # pgAdmin (Interface Gráfica de Gestão do Banco)
-  # --------------------------------------------------------
+  migrate:
+    image: pgvector/pgvector:pg16
+    container_name: rag_database_migrations
+    restart: "no"
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: rag_systematic_review
+      PGUSER: rag_user
+      PGPASSWORD: rag_password
+    volumes:
+      - ./database/scripts:/migrations:ro
+    entrypoint: ["/bin/sh", "/migrations/migrate.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - rag_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_UID: ${RAG_UID:-1000}
+        APP_GID: ${RAG_GID:-1000}
+    container_name: rag_streamlit_app
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: rag_systematic_review
+      DB_USER: rag_user
+      DB_PASSWORD: rag_password
+      AI_CONFIG_DATABASE_ENABLED: "true"
+      AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+    ports:
+      - "127.0.0.1:${RAG_APP_PORT:-8501}:8501"
+    volumes:
+      - ./data/pdfs:/app/data/pdfs
+      - app_private_data:/app/data/private
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=2)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - rag_network
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: rag_pgadmin
-    restart: always
+    restart: unless-stopped
+    profiles: ["tools"]
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@rag.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@rag.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
     ports:
-      - "5050:80"
+      - "127.0.0.1:${RAG_PGADMIN_PORT:-5050}:80"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - rag_network
 
@@ -51,3 +104,5 @@ networks:
 volumes:
   postgres_data:
     name: rag_postgres_data
+  app_private_data:
+    name: rag_app_private_data
