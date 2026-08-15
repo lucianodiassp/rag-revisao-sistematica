@@ -81,13 +81,28 @@ project_id = str(projeto["id"])
 st.title("📊 Matriz de Evidências Rastreáveis")
 st.caption(f"Projeto ativo: **{projeto['title']}**")
 
+if (((projeto.get("criteria_jsonb") or {}).get("_demo") or {}).get("seed_id")):
+    st.info(
+        "As extrações desta demonstração foram pré-carregadas a partir de cartões PDF "
+        "atribuídos, sem executar IA. Como não há embeddings artificiais, o contador de "
+        "PDFs indexados permanece zerado até que você processe os cartões com o modelo "
+        "configurado. Isso não impede a inspeção das fontes e da revisão humana."
+    )
+
 col_texto, col_acao = st.columns([3, 1])
 with col_texto:
-    st.markdown(
-        "A extração usa o **texto integral dos PDFs**. Cada informação precisa estar "
-        "ligada a um trecho literal e à página de origem antes de aparecer para revisão. "
-        "Somente itens aprovados nesta tela serão usados no relatório final."
-    )
+    if (((projeto.get("criteria_jsonb") or {}).get("_demo") or {}).get("seed_id")):
+        st.markdown(
+            "No fluxo real, a extração usa o **texto integral dos PDFs**. Neste exemplo, "
+            "ela usa os cartões claramente identificados como demonstração. Em ambos os "
+            "casos, cada informação permanece ligada a trecho e página antes da revisão."
+        )
+    else:
+        st.markdown(
+            "A extração usa o **texto integral dos PDFs**. Cada informação precisa estar "
+            "ligada a um trecho literal e à página de origem antes de aparecer para revisão. "
+            "Somente itens aprovados nesta tela serão usados no relatório final."
+        )
 with col_acao:
     if st.button("🔄 Extrair dos PDFs", type="primary", use_container_width=True):
         with st.spinner("Lendo os artigos e validando as citações literais..."):
@@ -120,10 +135,17 @@ col5.metric("Sem PDF", funil["sem_pdf"])
 col6.metric("Aguardando indexação", funil["aguardando_indexacao"])
 col7.metric("Aguardando extração", funil["aguardando_extracao"])
 col8.metric("Revisados", funil["revisados"])
-st.caption(
-    "Os números representam etapas do mesmo fluxo e não categorias que precisam ser "
-    "somadas. Um artigo extraído também está incluído, possui PDF e está indexado."
-)
+if (((projeto.get("criteria_jsonb") or {}).get("_demo") or {}).get("seed_id")):
+    st.caption(
+        "Os números representam etapas do mesmo fluxo e não categorias somáveis. "
+        "Nesta demonstração, os cartões já possuem extrações revisadas, mas permanecem "
+        "sem embeddings até a reindexação opcional."
+    )
+else:
+    st.caption(
+        "Os números representam etapas do mesmo fluxo e não categorias que precisam ser "
+        "somadas. Um artigo extraído também está incluído, possui PDF e está indexado."
+    )
 
 st.divider()
 extracoes = carregar_extracoes_projeto(project_id)

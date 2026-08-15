@@ -20,6 +20,7 @@ do relatório permanecem sob responsabilidade humana.
 - [Principais funcionalidades](#principais-funcionalidades)
 - [Arquitetura](#arquitetura)
 - [Instalação local](#instalação-local)
+- [Projeto demonstrativo](#projeto-demonstrativo)
 - [Atualização de um banco existente](#atualização-de-um-banco-existente)
 - [Configuração segura](#configuração-segura)
 - [Fluxo de uso](#fluxo-de-uso)
@@ -49,6 +50,18 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Versionamento da pergunta, PICO, critérios, estratégia de busca e perguntas de auditoria.
 - Identificador estável de artigo por projeto, baseado no DOI normalizado ou no título normalizado.
 - Consolidação de duplicatas com preservação da proveniência das diferentes fontes.
+
+### Projeto demonstrativo reproduzível
+
+- Carga idempotente com identificadores UUID determinísticos e isolamento próprio.
+- Sete registros de OpenAlex, PubMed e Semantic Scholar, consolidados em cinco
+  publicações reais, com duas duplicatas explicadas.
+- Protocolo PICO, triagem humana concluída, quatro inclusões, uma exclusão,
+  matriz rastreável, snapshot PRISMA e Golden Set inicial.
+- Quatro cartões PDF gerados localmente, com atribuição e aviso de escopo, sem
+  redistribuir os artigos integrais.
+- Nenhuma chamada à IA ou armazenamento de chave durante a carga.
+- Restauração explícita limitada ao projeto marcado como demonstração.
 
 ### Deduplicação explicável e revisável
 
@@ -290,6 +303,44 @@ python -m streamlit run frontend/app.py
 
 Acesse [http://localhost:8501](http://localhost:8501).
 
+## Projeto demonstrativo
+
+Na página **Configuração da Pesquisa**, abra **Projeto demonstrativo** no menu
+lateral e clique em **Criar / abrir demonstração**. A carga pode ser executada
+mais de uma vez: se o projeto já existir, ele apenas será selecionado e os cartões
+PDF ausentes serão recriados, sem duplicar registros.
+
+O exemplo apresenta o tema de aprendizado de máquina aplicado à triagem de
+revisões sistemáticas. Os metadados foram preparados a partir das páginas públicas
+das seguintes publicações:
+
+- [Feng et al. (2022), DOI 10.1093/jamia/ocac066](https://pmc.ncbi.nlm.nih.gov/articles/PMC9277646/)
+- [Callaghan e Müller-Hansen (2020), DOI 10.1186/s13643-020-01521-4](https://pmc.ncbi.nlm.nih.gov/articles/PMC7700715/)
+- [Pham et al. (2021), DOI 10.1186/s13643-021-01700-x](https://pmc.ncbi.nlm.nih.gov/articles/PMC8152711/)
+- [Chappell et al. (2023), DOI 10.1002/cesm.12021](https://pmc.ncbi.nlm.nih.gov/articles/PMC11795896/)
+- [Anderson et al. (2022), DOI 10.1016/j.jacr.2021.11.008](https://pubmed.ncbi.nlm.nih.gov/35065909/)
+
+Os PDFs criados são **cartões de evidência demonstrativos**: incluem metadados
+reais, uma síntese editorial e um trecho curto atribuído, mas não representam o
+artigo integral. Eles são gravados em `data/pdfs/`, permanecem fora do Git e podem
+ser regenerados a qualquer momento.
+
+A carga inicial não cria embeddings artificiais nem consome a API configurada.
+Por isso, a Gestão de PDFs informa que os cartões aguardam reindexação, enquanto
+a matriz pré-carregada continua disponível para inspeção. Se você optar por
+processar os cartões com o modelo ativo, execute novamente a extração rastreável
+depois da indexação.
+
+Também é possível carregar ou abrir o exemplo pelo terminal:
+
+```bash
+python -m backend.app.demo_project
+```
+
+Para voltar ao estado original pela interface, marque a confirmação e use
+**Restaurar dados originais**. Essa operação apaga somente alterações realizadas
+dentro do projeto demonstrativo; os demais projetos não são afetados.
+
 ## Atualização de um banco existente
 
 Os scripts de `docker-entrypoint-initdb.d` são executados automaticamente somente
@@ -362,6 +413,15 @@ Ao restaurar o banco em outro computador sem a chave-mestra correspondente,
 recadastre as credenciais pelas telas de configuração.
 
 ## Fluxo de uso
+
+### 0. Explorar a demonstração opcional
+
+- Abra **Configuração da Pesquisa > Projeto demonstrativo**.
+- Crie ou abra o exemplo e percorra Deduplicação, Triagem, Gestão de PDFs,
+  Matriz de Evidências, Avaliação Quantitativa e Relatório Final.
+- Confira o aviso permanente no menu lateral para não confundir a demonstração
+  com um projeto científico real.
+- Restaure o exemplo quando quiser repetir o roteiro desde o estado original.
 
 ### 1. Configurar a instalação
 
@@ -468,7 +528,7 @@ python backend/agentes/agente_avaliador.py
 Execute a suíte automatizada:
 
 ```bash
-python -m unittest discover -s tests -v
+python -m pytest -q
 ```
 
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
@@ -492,7 +552,7 @@ persistidos. O roteiro funcional está em
 rag-revisao-sistematica/
 ├── backend/
 │   ├── agentes/                 # Formulação, triagem, RAG, extração, auditoria e relatório
-│   ├── app/                     # Banco, configurações, segurança e utilitários
+│   ├── app/                     # Banco, configurações, demonstração, segurança e utilitários
 │   ├── coleta/                  # Coletores e orquestrador das fontes
 │   ├── processamento/           # PDFs, chunks, embeddings e recuperação
 │   └── .env.example
@@ -580,6 +640,8 @@ docker compose down -v
   qualidade do Golden Set; ele não é aplicado automaticamente à configuração global.
 - As métricas do benchmark refletem a qualidade do Golden Set humano; um gabarito
   pequeno, ambíguo ou incompleto pode produzir conclusões enganosas.
+- O projeto demonstrativo usa cartões de evidência, não os artigos integrais, e
+  não deve fundamentar conclusões científicas ou avaliações de desempenho reais.
 - O sistema não substitui protocolo metodológico, avaliação de risco de viés ou
   julgamento do pesquisador.
 

@@ -37,4 +37,11 @@ def selecionar_projeto_ativo(obrigatorio=True):
     st.sidebar.caption(
         f"Protocolo v{projeto['protocol_version']} · status: {projeto['status']}"
     )
+    demo = ((projeto.get("criteria_jsonb") or {}).get("_demo") or {})
+    if demo.get("seed_id"):
+        st.sidebar.info(
+            "🧪 **Projeto demonstrativo**\n\n"
+            "Metadados reais e cartões de evidência gerados localmente. "
+            "Não utilize seus resultados como conclusão científica."
+        )
     return projeto

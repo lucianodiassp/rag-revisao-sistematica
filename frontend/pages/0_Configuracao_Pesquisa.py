@@ -12,6 +12,7 @@ from backend.app.database import (  # noqa: E402
     criar_projeto,
     salvar_protocolo_projeto,
 )
+from backend.app.demo_project import ensure_demo_project  # noqa: E402
 from backend.coleta.orquestrador_coleta import iniciar_recolha  # noqa: E402
 from backend.coleta.importador_bibtex import (  # noqa: E402
     ErroBibTeX,
@@ -25,6 +26,44 @@ from frontend.project_selector import (  # noqa: E402
 
 
 st.set_page_config(page_title="Configuração da Pesquisa", page_icon="⚙️", layout="wide")
+
+
+with st.sidebar.expander("🧪 Projeto demonstrativo", expanded=False):
+    st.caption(
+        "Carrega um exemplo auditável com artigos reais, deduplicação, triagem, "
+        "cartões PDF, matriz de evidências, PRISMA e Golden Set. Não utiliza chaves de IA."
+    )
+    abrir_demo = st.button(
+        "Criar / abrir demonstração",
+        use_container_width=True,
+        key="open_demo_project",
+    )
+    confirmar_restauracao = st.checkbox(
+        "Confirmo que desejo descartar alterações feitas somente na demonstração",
+        key="confirm_demo_reset",
+    )
+    restaurar_demo = st.button(
+        "Restaurar dados originais",
+        use_container_width=True,
+        disabled=not confirmar_restauracao,
+        key="reset_demo_project",
+    )
+
+    if abrir_demo or restaurar_demo:
+        try:
+            resultado_demo = ensure_demo_project(reset=bool(restaurar_demo))
+        except Exception as erro:
+            st.error(f"Não foi possível preparar a demonstração: {erro}")
+        else:
+            demo_id = str(resultado_demo["project_id"])
+            st.session_state[CHAVE_PROJETO_ATIVO] = demo_id
+            st.session_state["project_selector_widget"] = demo_id
+            st.session_state["demo_project_message"] = (
+                "Demonstração restaurada com os dados originais."
+                if resultado_demo.get("restored")
+                else "Projeto demonstrativo pronto para exploração."
+            )
+            st.rerun()
 
 
 with st.sidebar.expander("➕ Novo projeto", expanded=False):
@@ -46,12 +85,23 @@ projeto = selecionar_projeto_ativo(obrigatorio=False)
 
 st.title("⚙️ Formulação da Pergunta de Pesquisa")
 
+mensagem_demo = st.session_state.pop("demo_project_message", None)
+if mensagem_demo:
+    st.success(mensagem_demo)
+
 if projeto is None:
     st.info("Crie o primeiro projeto no painel lateral para iniciar a revisão.")
     st.stop()
 
 project_id = str(projeto["id"])
 protocolo_atual = projeto.get("criteria_jsonb") or {}
+
+if (protocolo_atual.get("_demo") or {}).get("seed_id"):
+    st.info(
+        "Esta demonstração usa metadados de publicações reais e cartões de evidência "
+        "gerados localmente. Ela permite percorrer o fluxo sem consumir APIs; os cartões "
+        "não substituem a leitura dos artigos integrais."
+    )
 
 st.caption(f"Projeto ativo: **{projeto['title']}** · protocolo v{projeto['protocol_version']}")
 st.markdown(

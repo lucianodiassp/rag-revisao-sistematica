@@ -56,6 +56,12 @@ st.title("📂 Gestão de arquivos e Vetorização")
 projeto = selecionar_projeto_ativo()
 project_id = str(projeto["id"])
 st.caption(f"Projeto ativo: **{projeto['title']}**")
+if (((projeto.get("criteria_jsonb") or {}).get("_demo") or {}).get("seed_id")):
+    st.info(
+        "Os arquivos deste projeto são cartões PDF demonstrativos, não os artigos "
+        "integrais. Eles são carregados sem embeddings para não consumir sua API; "
+        "por isso aparecem como aguardando reindexação até o processamento opcional."
+    )
 st.markdown("""
 Faça o upload dos documentos na íntegra para os artigos aprovados e acione a indexação 
 vetorial para alimentar o cérebro do motor RAG.
