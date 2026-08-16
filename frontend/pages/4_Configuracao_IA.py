@@ -156,8 +156,8 @@ with col_testar:
 with st.expander("Onde fica a chave-mestra local?"):
     st.code(str(get_master_key_path()))
     st.caption(
-        "Esse arquivo não pertence ao repositório. Para restaurar um backup do banco em "
-        "outra máquina, será necessário cadastrar novamente a chave da API."
+        "Esse arquivo não pertence ao repositório. O backup completo criado pela página "
+        "Backup e Restauração pode incluí-lo dentro do arquivo protegido por senha."
     )
 
 st.divider()
