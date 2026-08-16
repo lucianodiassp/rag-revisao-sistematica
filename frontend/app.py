@@ -52,6 +52,11 @@ pages = [
         title="Avaliação Quantitativa do RAG",
         icon="🧪",
     ),
+    st.Page(
+        "pages/9_Backup_Restauracao.py",
+        title="Backup e Restauração",
+        icon="🛡️",
+    ),
 ]
 
 selected_page = st.navigation(pages)

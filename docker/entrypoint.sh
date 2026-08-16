@@ -10,4 +10,10 @@ if ! gosu ragapp test -w /app/data/pdfs; then
     exit 1
 fi
 
+if ! gosu ragapp test -w /app/data/backups; then
+    echo "Sem permissão de escrita em /app/data/backups." >&2
+    echo "Em Linux, reconstrua definindo RAG_UID e RAG_GID para o usuário local." >&2
+    exit 1
+fi
+
 exec gosu ragapp "$@"

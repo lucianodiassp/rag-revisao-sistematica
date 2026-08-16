@@ -15,4 +15,6 @@ research_question.json
 
 # Ignorar PDFs de artigos
 data/pdfs/*.pdf
+data/backups/*
+!data/backups/.gitkeep
 data/docs_auxiliares/*.*

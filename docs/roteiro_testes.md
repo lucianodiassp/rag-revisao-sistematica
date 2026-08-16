@@ -62,6 +62,32 @@ executar chamadas externas de IA.
 
 ---
 
+## 📍 Cenário de segurança: Backup e restauração
+
+**Contexto:** O usuário precisa preservar toda a instalação ou transferi-la para
+outra máquina sem separar manualmente banco, PDFs e chave-mestra.
+
+### Passos
+
+1. Abra **Backup e Restauração**.
+2. Crie um backup com uma senha de ao menos 12 caracteres e faça o download.
+3. Confirme que uma cópia também aparece em `data/backups/`.
+4. Envie o mesmo arquivo, informe uma senha incorreta e tente validá-lo.
+5. Informe a senha correta e valide novamente.
+6. Confira as contagens do manifesto sem executar a restauração.
+7. Em uma instalação de teste, marque a confirmação, digite `RESTAURAR BACKUP` e
+   execute a restauração.
+
+### ✅ Critério de Sucesso
+
+* A senha incorreta deve ser rejeitada sem expor conteúdo do arquivo.
+* O manifesto deve mostrar projetos, artigos, PDFs e interações esperados.
+* A restauração deve criar antes um arquivo `pre-restore-*.ragbackup`.
+* Banco, PDFs e credenciais devem voltar ao estado registrado no backup.
+* Uma falha deve acionar o retorno automático ao estado anterior.
+
+---
+
 ## 📍 Cenário 1: Configuração e Coleta
 
 **Contexto:** É necessário iniciar um novo projeto de revisão e definir a estratégia de busca.

@@ -63,6 +63,17 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Nenhuma chamada à IA ou armazenamento de chave durante a carga.
 - Restauração explícita limitada ao projeto marcado como demonstração.
 
+### Backup e restauração seguros
+
+- Backup completo do PostgreSQL, PDFs e chave-mestra em um único `.ragbackup`.
+- Proteção por senha com `scrypt` e AES-256-GCM, sem armazenar a senha.
+- Manifesto com versão, contagens, tamanhos e hashes SHA-256 dos componentes.
+- Validação somente leitura antes de habilitar a restauração.
+- Confirmação textual para operações destrutivas.
+- Backup automático do estado atual antes de restaurar outro arquivo.
+- Restauração transacional do banco, seguida pelas migrações idempotentes.
+- Retorno automático ao estado anterior quando uma etapa da restauração falha.
+
 ### Deduplicação explicável e revisável
 
 - Cada registro recuperado recebe regra, pontuação, justificativa e evidências comparativas.
@@ -271,9 +282,9 @@ alguns minutos. Para acompanhar a inicialização:
 docker compose logs -f app
 ```
 
-Os PDFs permanecem em `data/pdfs/` na máquina. A chave-mestra usada para cifrar
-credenciais é preservada no volume `rag_app_private_data`, enquanto o banco utiliza
-`rag_postgres_data`.
+Os PDFs permanecem em `data/pdfs/` na máquina e os backups criptografados em
+`data/backups/`. A chave-mestra usada para cifrar credenciais é preservada no volume
+`rag_app_private_data`, enquanto o banco utiliza `rag_postgres_data`.
 
 #### 4. pgAdmin opcional
 
@@ -588,6 +599,7 @@ rag-revisao-sistematica/
 ├── scripts/                     # Utilitários seguros de migração da instalação
 ├── tests/                       # Testes unitários e SQL de integração
 ├── data/pdfs/                   # PDFs locais, ignorados pelo Git
+├── data/backups/                # Backups criptografados, ignorados pelo Git
 ├── Dockerfile                   # Imagem da aplicação Streamlit
 ├── .dockerignore                # Exclui segredos e artefatos da imagem
 ├── docker-compose.yml           # Banco, migrações, aplicação e pgAdmin opcional
@@ -601,21 +613,30 @@ rag-revisao-sistematica/
 - `backend/.env` contém segredos de fallback e é ignorado pelo Git.
 - `.dockerignore` impede que esse arquivo seja enviado ao contexto da imagem.
 - `data/pdfs/*.pdf` é ignorado pelo Git.
+- `data/backups/*` é ignorado pelo Git.
 - O volume `rag_postgres_data` contém o PostgreSQL.
 - No Compose, a chave-mestra fica no volume `rag_app_private_data`, fora do banco
   e do repositório.
 - CSV e relatório Markdown são gerados para download pela interface.
 
-### Backup mínimo
+### Backup completo pela interface
 
-Para recuperar a revisão em outra máquina, considere separadamente:
+Abra **Backup e Restauração** no menu lateral, informe e confirme uma senha com pelo
+menos 12 caracteres e gere o arquivo. A aplicação:
 
-1. dump do banco PostgreSQL;
-2. diretório `data/pdfs`;
-3. volume `rag_app_private_data`, ou a chave-mestra equivalente, caso as
-   credenciais cifradas precisem ser reutilizadas.
+1. cria um dump consistente do PostgreSQL;
+2. inclui todos os PDFs e, quando existente, a chave-mestra;
+3. registra contagens, tamanhos e hashes em um manifesto;
+4. criptografa o conjunto antes de gravá-lo em `data/backups/`;
+5. disponibiliza o mesmo arquivo para download.
 
-Sem a chave-mestra, mantenha o banco e os PDFs e recadastre somente as chaves das APIs.
+A senha não é armazenada e não pode ser recuperada pela aplicação. Guarde o arquivo
+e a senha separadamente.
+
+Para restaurar, envie o `.ragbackup`, informe a senha e use primeiro **Validar
+backup**. Somente depois da validação a confirmação destrutiva será habilitada. A
+aplicação cria um arquivo `pre-restore-*.ragbackup` com o estado atual antes de
+substituir banco, PDFs e chave-mestra. Não use outras telas durante a restauração.
 
 ### Parar os serviços
 
@@ -642,6 +663,8 @@ docker compose --profile tools down -v
 | Serviço `migrate` encerra com erro | Consulte `docker compose logs migrate`; a aplicação aguarda uma migração bem-sucedida. |
 | Serviço `app` não fica saudável | Consulte `docker compose logs app` e confirme se `db` está saudável e `migrate` terminou com código `0`. |
 | Porta `8501`, `5432` ou `5050` ocupada | Defina `RAG_APP_PORT`, `RAG_DB_PORT` ou `RAG_PGADMIN_PORT` antes de iniciar o Compose. |
+| Backup não pode ser validado | Confirme a senha e se o arquivo `.ragbackup` terminou de ser copiado ou baixado. |
+| Restauração falhou | Preserve o arquivo `pre-restore-*.ragbackup` criado em `data/backups/` e consulte a mensagem apresentada. |
 | Modelo Gemini indisponível | Abra **Configuração de IA**, teste a chave e escolha um modelo listado para a conta. |
 | Erro `429` em uma API | Aguarde a renovação do limite, reduza chamadas ou use uma credencial com cota adequada. |
 | PDF armazenado, mas não indexado | Execute a vetorização e consulte o motivo individual apresentado na página. |
@@ -674,6 +697,8 @@ docker compose --profile tools down -v
   pequeno, ambíguo ou incompleto pode produzir conclusões enganosas.
 - O projeto demonstrativo usa cartões de evidência, não os artigos integrais, e
   não deve fundamentar conclusões científicas ou avaliações de desempenho reais.
+- O backup atual restaura a instalação completa; importação seletiva de apenas um
+  projeto ainda não está disponível.
 - O sistema não substitui protocolo metodológico, avaliação de risco de viés ou
   julgamento do pesquisador.
 
