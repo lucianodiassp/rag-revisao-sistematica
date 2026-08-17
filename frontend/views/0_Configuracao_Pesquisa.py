@@ -13,6 +13,11 @@ from backend.app.database import (  # noqa: E402
     salvar_protocolo_projeto,
 )
 from backend.app.demo_project import ensure_demo_project  # noqa: E402
+from backend.app.reproducibility_import import (  # noqa: E402
+    ReproducibilityImportError,
+    import_reproducibility_package,
+    validate_reproducibility_package,
+)
 from backend.coleta.orquestrador_coleta import iniciar_recolha  # noqa: E402
 from backend.coleta.importador_bibtex import (  # noqa: E402
     ErroBibTeX,
@@ -87,6 +92,74 @@ with st.sidebar.expander("➕ Novo projeto", expanded=False):
                 st.rerun()
 
 
+with st.sidebar.expander("📦 Importar projeto", expanded=False):
+    st.caption(
+        "Cria um novo projeto a partir de um pacote de reprodutibilidade. "
+        "A instalação atual e os demais projetos não são substituídos."
+    )
+    arquivo_pacote = st.file_uploader(
+        "Pacote de reprodutibilidade (.zip)",
+        type=["zip"],
+        key="reproducibility_package_uploader",
+    )
+    if arquivo_pacote is not None:
+        conteudo_pacote = arquivo_pacote.getvalue()
+        try:
+            previa_pacote = validate_reproducibility_package(conteudo_pacote)
+        except ReproducibilityImportError as erro:
+            st.error(f"Pacote inválido: {erro}")
+        except Exception as erro:
+            st.error(f"Não foi possível validar o pacote: {erro}")
+        else:
+            manifesto = previa_pacote["manifest"]
+            projeto_origem = manifesto["project"]
+            contagens = manifesto.get("counts") or {}
+            st.success("Integridade e formato validados.")
+            st.caption(
+                f"Origem: **{projeto_origem['title']}** · "
+                f"{contagens.get('unique_papers', 0)} artigo(s) · "
+                f"{contagens.get('screening_decisions', 0)} decisão(ões) de triagem · "
+                f"SHA-256 `{previa_pacote['sha256'][:16]}…`"
+            )
+            titulo_importado = st.text_input(
+                "Título do novo projeto",
+                value=f"{projeto_origem['title']} — importado",
+                key=f"import_title_{previa_pacote['sha256'][:12]}",
+            )
+            for aviso in previa_pacote["warnings"]:
+                st.warning(aviso)
+            confirmar_importacao = st.checkbox(
+                "Entendo que PDFs e embeddings deverão ser adicionados novamente.",
+                key=f"confirm_import_{previa_pacote['sha256'][:12]}",
+            )
+            if st.button(
+                "Importar como novo projeto",
+                type="primary",
+                width="stretch",
+                disabled=not confirmar_importacao,
+                key=f"run_import_{previa_pacote['sha256'][:12]}",
+            ):
+                try:
+                    with st.spinner("A reconstruir o projeto e suas trilhas de auditoria..."):
+                        resultado_importacao = import_reproducibility_package(
+                            conteudo_pacote,
+                            title=titulo_importado,
+                        )
+                except ReproducibilityImportError as erro:
+                    st.error(str(erro))
+                except Exception as erro:
+                    st.error(f"Não foi possível importar o projeto: {erro}")
+                else:
+                    novo_id = str(resultado_importacao["project_id"])
+                    st.session_state[CHAVE_PROJETO_ATIVO] = novo_id
+                    st.session_state["project_selector_widget"] = novo_id
+                    st.session_state["imported_project_message"] = (
+                        "Projeto importado com integridade validada. Adicione os PDFs dos "
+                        "artigos incluídos antes de reativar o RAG."
+                    )
+                    st.rerun()
+
+
 projeto = selecionar_projeto_ativo(obrigatorio=False)
 
 st.title("⚙️ Formulação da Pergunta de Pesquisa")
@@ -94,6 +167,9 @@ st.title("⚙️ Formulação da Pergunta de Pesquisa")
 mensagem_demo = st.session_state.pop("demo_project_message", None)
 if mensagem_demo:
     st.success(mensagem_demo)
+mensagem_importacao = st.session_state.pop("imported_project_message", None)
+if mensagem_importacao:
+    st.success(mensagem_importacao)
 
 if projeto is None:
     st.info("Crie o primeiro projeto no painel lateral para iniciar a revisão.")
