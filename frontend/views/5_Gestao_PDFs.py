@@ -10,6 +10,7 @@ from backend.processamento.leitor_pdf import (
     processar_pdfs,
     resumir_status_fluxo,
 )
+from backend.processamento.ocr_pdf import get_pdf_ocr_config
 from backend.app.screening_reassessment import (
     ACTION_EXCLUDE,
     ACTION_RETURN_TO_SCREENING,
@@ -123,7 +124,7 @@ else:
             arquivo_upload = st.file_uploader("2. Envie o ficheiro PDF do artigo", type=['pdf'])
             
             if arquivo_upload is not None:
-                if st.button("💾 Salvar e Relacionar PDF", type="primary", use_container_width=True):
+                if st.button("💾 Salvar e Relacionar PDF", type="primary", width="stretch"):
                     caminho_salvo = os.path.join(DIRETORIO_PDFS, f"{uuid_alvo}.pdf")
                     
                     with open(caminho_salvo, "wb") as f:
@@ -158,7 +159,7 @@ else:
                     )
                     confirmar_reavaliacao = st.form_submit_button(
                         "Registrar reavaliação",
-                        use_container_width=True,
+                        width="stretch",
                     )
 
                 if confirmar_reavaliacao:
@@ -189,14 +190,23 @@ else:
         st.subheader(f"✅ PDFs Armazenados ({len(df_concluidos)})")
         if not df_concluidos.empty:
             st.dataframe(
-                df_concluidos[['title', 'paper_id', 'Situação', 'chunks_rastreaveis']],
+                df_concluidos[
+                    [
+                        'title',
+                        'paper_id',
+                        'Situação',
+                        'chunks_rastreaveis',
+                        'paginas_ocr',
+                    ]
+                ],
                 column_config={
                     "title": "Artigo",
                     "paper_id": "UUID",
                     "chunks_rastreaveis": "Trechos rastreáveis",
+                    "paginas_ocr": "Páginas com OCR",
                 },
                 hide_index=True, 
-                use_container_width=True
+                width="stretch"
             )
         else:
             st.info("Ainda não há arquivos PDF armazenados no sistema.")
@@ -205,15 +215,34 @@ else:
 
     # --- NOVA SECÇÃO: ENGENHARIA VETORIAL AUTOMÁTICA ---
     st.header("🧠 Central de Indexação Vetorial Avançada")
-    st.markdown("""
-    Clique no botão abaixo para acionar o processador do sistema. O motor irá abrir cada PDF armazenado, 
-    extrair o texto completo, dividi-lo em blocos lógicos, registrar a página de cada trecho e gerar os
-    *embeddings* com o provedor configurado. Índices antigos sem página serão atualizados
-    automaticamente; PDFs que já possuem rastreabilidade serão ignorados para evitar custo duplicado.
-    """)
+    ocr_config = get_pdf_ocr_config()
+    st.markdown(
+        "Clique no botão abaixo para extrair o texto, dividi-lo em blocos com "
+        "página de origem e gerar os *embeddings*. Índices antigos sem página "
+        "serão atualizados; PDFs já rastreáveis serão ignorados para evitar "
+        "custo duplicado."
+    )
+    if ocr_config.enabled:
+        st.info(
+            "OCR local ativo para páginas digitalizadas: "
+            f"idiomas **{ocr_config.languages}**, **{ocr_config.dpi} DPI**, "
+            "acionado quando a camada nativa possui menos de "
+            f"**{ocr_config.min_native_characters} caracteres alfanuméricos**. "
+            "O método de extração fica registrado em cada trecho. Textos reconhecidos "
+            "por OCR devem ser conferidos visualmente no PDF durante a revisão humana."
+        )
+    else:
+        st.warning(
+            "OCR local desativado. PDFs formados somente por imagens poderão não "
+            "produzir texto para indexação."
+        )
 
     # Botão de ignição do backend
-    if st.button("⚡ Executar Processamento e Vetorização de PDFs", type="secondary", use_container_width=True):
+    if st.button(
+        "⚡ Executar Processamento e Vetorização de PDFs",
+        type="secondary",
+        width="stretch",
+    ):
         with st.spinner("O sistema está a ler, fatiar e vetorizar os documentos na íntegra... Isto pode demorar alguns minutos consoante o tamanho dos artigos."):
             try:
                 # Invoca a função do leitor_pdf.py diretamente
@@ -244,16 +273,38 @@ else:
         else:
             st.info("Nenhum novo PDF precisou ser indexado.")
 
+        if resumo.get("paginas_ocr"):
+            st.caption(
+                f"OCR aplicado com sucesso em {resumo['paginas_ocr']} página(s)."
+            )
+        if resumo.get("falhas_ocr"):
+            st.warning(
+                f"O OCR não produziu texto melhor em {resumo['falhas_ocr']} "
+                "página(s). Consulte o resultado por artigo e confira o PDF."
+            )
+
         if resumo["resultados"]:
             resultados = pd.DataFrame(resumo["resultados"])
             resultados["Resultado"] = resultados["status"].map(ROTULOS_RESULTADO)
+            colunas_resultado = [
+                "title",
+                "Resultado",
+                "chunks",
+                "pages_total",
+                "pages_ocr",
+                "ocr_failures",
+                "error",
+            ]
             st.dataframe(
-                resultados[["title", "Resultado", "chunks", "error"]],
+                resultados.reindex(columns=colunas_resultado),
                 column_config={
                     "title": "Artigo",
                     "chunks": "Trechos processados",
+                    "pages_total": "Páginas do PDF",
+                    "pages_ocr": "Páginas com OCR",
+                    "ocr_failures": "Avisos de OCR",
                     "error": "Motivo da falha",
                 },
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )

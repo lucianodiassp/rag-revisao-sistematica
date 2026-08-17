@@ -9,13 +9,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONPATH=/app \
+    TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata \
+    OMP_THREAD_LIMIT=2 \
     PATH=/usr/lib/postgresql/16/bin:${PATH}
 
 WORKDIR /app
 
 COPY requirements.txt ./requirements.txt
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends gosu libpq5 libreadline8 \
+    && apt-get install --yes --no-install-recommends \
+        gosu \
+        libpq5 \
+        libreadline8 \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-por \
     && rm -rf /var/lib/apt/lists/* \
     && python -m pip install --upgrade pip \
     && python -m pip install --requirement requirements.txt
