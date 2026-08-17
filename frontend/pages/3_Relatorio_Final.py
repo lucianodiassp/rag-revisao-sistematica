@@ -18,6 +18,7 @@ from backend.app.prisma import (
     prisma_para_json,
     salvar_snapshot_prisma,
 )
+from backend.app.reproducibility_package import generate_reproducibility_package
 from backend.app.screening_service import EXCLUSION_REASON_LABELS
 from frontend.project_selector import selecionar_projeto_ativo
 
@@ -33,6 +34,14 @@ def carregar_metricas_auditoria(project_id):
         return None
     resultados = (execucao.get("metrics") or {}).get("results", [])
     return pd.DataFrame(resultados) if resultados else None
+
+
+def formatar_tamanho(valor):
+    tamanho = float(valor)
+    for unidade in ("B", "KB", "MB", "GB"):
+        if tamanho < 1024 or unidade == "GB":
+            return f"{tamanho:.1f} {unidade}"
+        tamanho /= 1024
 
 # ==========================================
 # INTERFACE GRÁFICA (STREAMLIT)
@@ -257,4 +266,57 @@ if relatorio_compilado is not None:
         file_name="Relatorio_Final_Revisao_Sistematica.md",
         mime="text/markdown",
         type="primary"
+    )
+
+st.divider()
+
+# --- 4. PACOTE DE REPRODUTIBILIDADE ---
+st.header("4. Pacote de Reprodutibilidade do Projeto")
+st.markdown(
+    "Gere um ZIP somente leitura com protocolo, buscas, deduplicação, triagem, "
+    "evidências, PRISMA, Golden Set, avaliações, interações dos agentes e o último "
+    "relatório persistido. Cada arquivo é registrado no manifesto com tamanho e SHA-256."
+)
+st.info(
+    "O pacote não inclui PDFs, texto integral dos chunks, embeddings, chaves de API, "
+    "senhas, e-mails de contato da instalação ou a chave-mestra. Ele serve para "
+    "auditoria e compartilhamento acadêmico; o backup operacional continua sendo o .ragbackup."
+)
+
+if "pacotes_reprodutibilidade" not in st.session_state:
+    st.session_state.pacotes_reprodutibilidade = {}
+
+if st.button(
+    "📦 Gerar pacote auditável do projeto",
+    type="primary",
+    use_container_width=True,
+):
+    try:
+        with st.spinner("Coletando o snapshot e calculando a integridade dos arquivos..."):
+            st.session_state.pacotes_reprodutibilidade[project_id] = (
+                generate_reproducibility_package(project_id)
+            )
+        st.success("Pacote de reprodutibilidade gerado sem alterar os dados do projeto.")
+    except Exception as exc:
+        st.error(f"Não foi possível gerar o pacote de reprodutibilidade: {exc}")
+
+pacote = st.session_state.pacotes_reprodutibilidade.get(project_id)
+if pacote:
+    contagens = pacote["manifest"]["counts"]
+    col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+    col_p1.metric("Registros recuperados", contagens["retrieved_records"])
+    col_p2.metric("Artigos únicos", contagens["unique_papers"])
+    col_p3.metric("Evidências", contagens["evidence_extractions"])
+    col_p4.metric("Interações de agentes", contagens["agent_interactions"])
+    st.caption(
+        f"Arquivo: {pacote['filename']} · {formatar_tamanho(pacote['size'])} · "
+        f"SHA-256 do ZIP: {pacote['sha256']}"
+    )
+    st.download_button(
+        "⬇️ Baixar pacote de reprodutibilidade (ZIP)",
+        data=pacote["data"],
+        file_name=pacote["filename"],
+        mime="application/zip",
+        type="primary",
+        use_container_width=True,
     )

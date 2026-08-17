@@ -88,6 +88,34 @@ outra máquina sem separar manualmente banco, PDFs e chave-mestra.
 
 ---
 
+## 📍 Cenário de reprodutibilidade: Exportar um projeto auditável
+
+**Contexto:** O pesquisador deseja compartilhar os métodos, decisões e resultados
+de um projeto sem enviar PDFs, credenciais ou o backup completo da instalação.
+
+### Passos
+
+1. Selecione um projeto que possua protocolo, coleta e decisões de triagem.
+2. Abra **Relatório Final** e localize **Pacote de Reprodutibilidade do Projeto**.
+3. Clique em **Gerar pacote auditável do projeto**.
+4. Confirme que as contagens exibidas correspondem ao projeto ativo.
+5. Baixe o ZIP e confirme a presença de `README.md` e `manifest.json`.
+6. Confira no manifesto o UUID, o título, a versão do protocolo e o SHA-256 dos arquivos.
+7. Abra `05_evidencias/matriz_evidencias.csv` no Excel e verifique a acentuação.
+8. Quando houver relatório persistido, confirme `08_relatorio/relatorio_final.md`.
+9. Confirme que não existem PDFs, vetores, arquivos `.env`, chaves ou senhas no ZIP.
+10. Gere o pacote de outro projeto e confirme que não há registros do projeto anterior.
+
+### ✅ Critério de Sucesso
+
+* O ZIP deve conter somente registros vinculados ao projeto selecionado.
+* Os hashes e tamanhos do manifesto devem corresponder aos arquivos internos.
+* Os CSV devem abrir com acentuação correta.
+* Campos sensíveis devem estar ausentes ou marcados como removidos.
+* A geração não deve criar, atualizar ou excluir registros no banco.
+
+---
+
 ## 📍 Cenário 1: Configuração e Coleta
 
 **Contexto:** É necessário iniciar um novo projeto de revisão e definir a estratégia de busca.
