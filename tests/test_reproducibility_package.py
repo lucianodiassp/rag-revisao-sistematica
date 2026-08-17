@@ -127,6 +127,45 @@ def _dataset():
                 "quote_validated": True,
             }
         ],
+        "methodological_instruments": [
+            {
+                "id": "instrument-1",
+                "version": 1,
+                "name": "Checklist genérico",
+                "domains_jsonb": [{"code": "study_design", "label": "Desenho"}],
+                "is_active": True,
+            }
+        ],
+        "methodological_assessments": [
+            {
+                "id": "assessment-1",
+                "paper_id": PAPER_ID,
+                "paper_title": "Título científico",
+                "instrument_id": "instrument-1",
+                "instrument_version": 1,
+                "human_assessment_jsonb": {
+                    "domains": [
+                        {
+                            "domain_code": "study_design",
+                            "response": "yes",
+                            "justification": "Desenho claramente descrito.",
+                        }
+                    ]
+                },
+                "overall_rating": "low",
+                "review_status": "reviewed",
+            }
+        ],
+        "methodological_sources": [
+            {
+                "assessment_id": "assessment-1",
+                "paper_id": PAPER_ID,
+                "domain_code": "study_design",
+                "page_number": 3,
+                "quote": "Trecho metodológico literal.",
+                "human_validated": True,
+            }
+        ],
         "document_index": [
             {
                 "paper_id": PAPER_ID,
@@ -171,6 +210,8 @@ def test_package_contains_readable_artifacts_and_manifest_hashes():
         assert "README.md" in names
         assert "manifest.json" in names
         assert "05_evidencias/matriz_evidencias.csv" in names
+        assert "06_avaliacao/avaliacoes_metodologicas.json" in names
+        assert "06_avaliacao/fontes_metodologicas.csv" in names
         assert "08_relatorio/relatorio_final.md" in names
         assert not any(name.lower().endswith(".pdf") for name in names)
 
@@ -179,6 +220,7 @@ def test_package_contains_readable_artifacts_and_manifest_hashes():
         assert manifest["version"] == PACKAGE_VERSION
         assert manifest["counts"]["unique_papers"] == 1
         assert manifest["counts"]["indexed_papers"] == 1
+        assert manifest["counts"]["reviewed_methodological_assessments"] == 1
         assert manifest["scope"]["secrets_excluded"] is True
         for entry in manifest["integrity"]["files"]:
             content = archive.read(entry["path"])

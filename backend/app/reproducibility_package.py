@@ -252,6 +252,47 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
                 """,
                 (project_id,),
             )
+            methodological_instruments = _fetch_all(
+                cursor,
+                """
+                SELECT id, project_id, version, name, description, schema_version,
+                       domains_jsonb, change_reason, is_active, created_at
+                FROM methodological_assessment_instruments
+                WHERE project_id = %s
+                ORDER BY version
+                """,
+                (project_id,),
+            )
+            methodological_assessments = _fetch_all(
+                cursor,
+                """
+                SELECT a.id, a.project_id, a.paper_id, p.title AS paper_title,
+                       a.instrument_id, i.version AS instrument_version,
+                       a.ai_suggestion_jsonb, a.human_assessment_jsonb,
+                       a.overall_rating, a.review_status, a.review_notes,
+                       a.created_at, a.updated_at, a.reviewed_at
+                FROM methodological_assessments a
+                JOIN deduplicated_papers p ON p.id = a.paper_id
+                JOIN methodological_assessment_instruments i ON i.id = a.instrument_id
+                WHERE a.project_id = %s
+                ORDER BY i.version, p.title, a.id
+                """,
+                (project_id,),
+            )
+            methodological_sources = _fetch_all(
+                cursor,
+                """
+                SELECT s.id, s.assessment_id, a.paper_id, p.title AS paper_title,
+                       s.domain_code, s.evidence_order, s.chunk_id, s.page_number,
+                       s.quote, s.quote_validated, s.human_validated, s.created_at
+                FROM methodological_assessment_sources s
+                JOIN methodological_assessments a ON a.id = s.assessment_id
+                JOIN deduplicated_papers p ON p.id = a.paper_id
+                WHERE a.project_id = %s
+                ORDER BY p.title, s.domain_code, s.evidence_order, s.id
+                """,
+                (project_id,),
+            )
             document_index = _fetch_all(
                 cursor,
                 """
@@ -355,6 +396,12 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
     for extraction in extractions:
         extraction["validated_sources"] = sources_by_extraction.get(str(extraction["id"]), [])
 
+    sources_by_assessment = {}
+    for source in methodological_sources:
+        sources_by_assessment.setdefault(str(source["assessment_id"]), []).append(source)
+    for assessment in methodological_assessments:
+        assessment["sources"] = sources_by_assessment.get(str(assessment["id"]), [])
+
     relevances_by_query = {}
     for relevance in golden_relevances:
         relevances_by_query.setdefault(str(relevance["golden_query_id"]), []).append(relevance)
@@ -373,6 +420,9 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
             "reassessments": reassessments,
             "extractions": extractions,
             "evidence_sources": evidence_sources,
+            "methodological_instruments": methodological_instruments,
+            "methodological_assessments": methodological_assessments,
+            "methodological_sources": methodological_sources,
             "document_index": document_index,
             "interactions": interactions,
             "evaluations": evaluations,
@@ -453,6 +503,13 @@ def _counts(dataset: dict) -> dict:
         "screening_reassessments": len(dataset.get("reassessments") or []),
         "evidence_extractions": len(dataset.get("extractions") or []),
         "literal_evidence_sources": len(dataset.get("evidence_sources") or []),
+        "methodological_instrument_versions": len(dataset.get("methodological_instruments") or []),
+        "methodological_assessments": len(dataset.get("methodological_assessments") or []),
+        "reviewed_methodological_assessments": sum(
+            1
+            for item in dataset.get("methodological_assessments") or []
+            if item.get("review_status") == "reviewed"
+        ),
         "indexed_papers": sum(
             1
             for item in dataset.get("document_index") or []
@@ -496,6 +553,7 @@ literais já usados como evidência permanecem presentes para permitir a auditor
 - Decisões de triagem: {counts['screening_decisions']}
 - Extrações de evidências: {counts['evidence_extractions']}
 - Fontes literais: {counts['literal_evidence_sources']}
+- Avaliações metodológicas revisadas: {counts['reviewed_methodological_assessments']}
 - Interações de agentes: {counts['agent_interactions']}
 - Execuções de avaliação: {counts['evaluation_runs']}
 - Snapshots PRISMA: {counts['prisma_snapshots']}
@@ -507,7 +565,7 @@ literais já usados como evidência permanecem presentes para permitir a auditor
 - `03_selecao/`: artigos, deduplicação, triagem e reavaliações.
 - `04_documentos/`: inventário de indexação, sem PDFs, chunks ou vetores.
 - `05_evidencias/`: matriz, extrações e fontes literais rastreáveis.
-- `06_avaliacao/`: PRISMA, Golden Set e execuções de avaliação/benchmark.
+- `06_avaliacao/`: instrumentos e avaliações metodológicas, PRISMA, Golden Set e benchmarks.
 - `07_agentes/`: interações JSONB e configurações de modelos registradas.
 - `08_relatorio/`: última síntese persistida, quando disponível.
 - `manifest.json`: versão, escopo, contagens, tamanho e SHA-256 de cada arquivo.
@@ -575,6 +633,9 @@ def build_reproducibility_package(dataset: dict, generated_at: str | None = None
         "05_evidencias/matriz_evidencias.csv": _csv_bytes(matrix),
         "05_evidencias/extracoes_rastreaveis.json": _json_bytes(dataset.get("extractions") or []),
         "05_evidencias/fontes_literais.csv": _csv_bytes(dataset.get("evidence_sources") or []),
+        "06_avaliacao/instrumentos_metodologicos.json": _json_bytes(dataset.get("methodological_instruments") or []),
+        "06_avaliacao/avaliacoes_metodologicas.json": _json_bytes(dataset.get("methodological_assessments") or []),
+        "06_avaliacao/fontes_metodologicas.csv": _csv_bytes(dataset.get("methodological_sources") or []),
         "06_avaliacao/prisma_snapshots.json": _json_bytes(dataset.get("prisma_snapshots") or []),
         "06_avaliacao/golden_set_atual.json": _json_bytes(dataset.get("golden_queries") or []),
         "06_avaliacao/golden_set_versoes.json": _json_bytes(dataset.get("golden_versions") or []),

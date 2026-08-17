@@ -303,6 +303,7 @@ def _database_counts(settings: DatabaseSettings) -> dict[str, int]:
         "papers": "deduplicated_papers",
         "chunks": "paper_chunks",
         "extractions": "extracted_evidence",
+        "methodological_assessments": "methodological_assessments",
         "agent_interactions": "agent_interactions",
         "evaluation_runs": "evaluation_runs",
     }

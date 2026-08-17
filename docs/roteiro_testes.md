@@ -46,7 +46,7 @@ executar chamadas externas de IA.
 3. Clique em **Criar / abrir demonstração**.
 4. Confirme que o seletor identifica o projeto como demonstrativo.
 5. Percorra Deduplicação, Triagem, Gestão de PDFs, Matriz de Evidências,
-   Avaliação Quantitativa do RAG e Relatório Final.
+   Qualidade Metodológica, Avaliação Quantitativa do RAG e Relatório Final.
 6. Volte à configuração, marque a confirmação e restaure os dados originais.
 
 ### ✅ Critério de Sucesso
@@ -56,6 +56,8 @@ executar chamadas externas de IA.
   avaliáveis e 4 estudos na síntese.
 * A deduplicação deve mostrar 5 novos artigos e 2 mesclagens por DOI.
 * A matriz deve apresentar 4 extrações revisadas e fontes literais atribuídas.
+* A qualidade metodológica deve mostrar 4 avaliações humanas **incertas**, deixando
+  claro que os cartões não permitem avaliar o texto integral.
 * O Golden Set deve iniciar na versão 1 com 5 perguntas.
 * A segunda carga não deve duplicar registros.
 * A restauração não deve modificar nenhum outro projeto.
@@ -240,6 +242,36 @@ usar a própria IA como fonte da verdade.
 * Os resultados por pergunta devem mostrar tentativas, motivo do fallback e eventual
   recuperação do reranking ou de uma recusa inicial.
 * Os arquivos JSON e CSV devem ser exportados corretamente.
+
+---
+
+## 📍 Cenário: Qualidade metodológica rastreável
+
+**Contexto:** O pesquisador precisa avaliar possíveis limitações dos estudos sem
+delegar a decisão científica à IA.
+
+### Passos
+
+1. Selecione um projeto com artigos incluídos e PDFs indexados.
+2. Abra **Qualidade Metodológica** e confira nome, versão e domínios do instrumento.
+3. Em um artigo, gere a sugestão da IA e confira respostas, justificativas, páginas e trechos.
+4. Altere ao menos uma resposta ou justificativa, confirme somente as fontes conferidas
+   e registre a classificação final humana.
+5. Inicie outro artigo manualmente e confirme que o formulário funciona sem chamada à IA.
+6. Crie uma nova versão do instrumento alterando uma pergunta e informando o motivo.
+7. Confirme que a versão anterior permanece no histórico e que a nova começa sem avaliações.
+8. Abra **Relatório Final** e confira o resumo da versão ativa.
+9. Gere o pacote de reprodutibilidade e confira os arquivos metodológicos em `06_avaliacao/`.
+
+### ✅ Critério de Sucesso
+
+* Somente artigos incluídos com PDF indexado devem aparecer.
+* Uma resposta `yes` ou `no` da IA sem citação literal válida deve virar `uncertain`.
+* Sugestão da IA e decisão humana devem permanecer distintas.
+* Cada domínio humano deve exigir justificativa, e a decisão geral deve exigir confirmação.
+* Trocar o instrumento não deve apagar avaliações históricas.
+* Nenhuma classificação deve excluir automaticamente o artigo.
+* O relatório deve considerar somente avaliações humanas da versão ativa.
 
 ---
 

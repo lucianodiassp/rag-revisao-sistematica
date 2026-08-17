@@ -5,6 +5,7 @@ from dotenv import load_dotenv, find_dotenv
 from backend.app.ai_config import TASK_REPORT, get_generation_config
 from backend.app.ai_service import generate_content
 from backend.app.database import log_interacao_agente, resolver_project_id
+from backend.app.methodological_quality import methodological_summary
 from backend.app.prisma import calcular_fluxo_prisma, salvar_snapshot_prisma
 
 # ==========================================
@@ -88,6 +89,7 @@ def gerar_relatorio_final(project_id=None):
     
     print("📚 A recolher evidências extraídas...")
     evidencias = coletar_evidencias(project_id)
+    avaliacoes_metodologicas = methodological_summary(project_id)
     
     if not evidencias:
         return {
@@ -119,6 +121,9 @@ def gerar_relatorio_final(project_id=None):
     Abaixo estão apenas os dados aprovados ou corrigidos por revisão humana, junto
     com as citações literais validadas contra o PDF:
     {json.dumps(evidencias, indent=2, ensure_ascii=False)}
+
+    Avaliações metodológicas da versão ativa, registradas por revisão humana:
+    {json.dumps(avaliacoes_metodologicas, indent=2, ensure_ascii=False, default=str)}
     
     Sua tarefa:
     1. Abra com uma seção 'Fluxo PRISMA' e relate os números e motivos do snapshot exatamente como fornecidos.
@@ -126,9 +131,11 @@ def gerar_relatorio_final(project_id=None):
     3. Sintetize os principais 'Objetivos' e 'Métodos' encontrados.
     4. Destaque os 'Principais Resultados' de forma agregada (quais são as tendências ou consensos?).
     5. Identifique as 'Limitações' mais comuns relatadas pelos autores.
-    6. Mantenha um tom estritamente académico, imparcial e científico. Não invente dados, baseie-se APENAS no JSON fornecido.
-    7. Ao apresentar um achado, cite a fonte no formato [paper_id, p. página].
-    8. Não apresente um achado quando não houver uma fonte literal compatível no campo correspondente.
+    6. Inclua uma seção 'Qualidade metodológica e possíveis vieses' somente quando
+       houver avaliações humanas. Diferencie explicitamente a decisão humana da sugestão de IA.
+    7. Mantenha um tom estritamente académico, imparcial e científico. Não invente dados, baseie-se APENAS no JSON fornecido.
+    8. Ao apresentar um achado, cite a fonte no formato [paper_id, p. página].
+    9. Não apresente um achado quando não houver uma fonte literal compatível no campo correspondente.
     """
     
     try:
@@ -147,6 +154,9 @@ def gerar_relatorio_final(project_id=None):
             "prisma_snapshot_id": snapshot_prisma["id"],
             "metrics": metricas,
             "paper_ids": [item["paper_id"] for item in evidencias],
+            "methodological_assessment_ids": [
+                str(item["id"]) for item in avaliacoes_metodologicas
+            ],
         },
         {
             "report_markdown": texto_relatorio,
