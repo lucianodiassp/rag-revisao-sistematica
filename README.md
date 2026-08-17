@@ -79,6 +79,9 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 ### Pacote de reprodutibilidade por projeto
 
 - Exportação acadêmica de um projeto em ZIP, separada do backup operacional da instalação.
+- Importação seletiva do ZIP como novo projeto, sem substituir a instalação ou outros projetos.
+- Validação de formato, escopo, limites, contagens e SHA-256 antes de gravar qualquer dado.
+- Reconstrução transacional com novos UUIDs e remapeamento das referências internas.
 - Protocolo atual e histórico, buscas, registros recuperados, deduplicação, triagem e reavaliações.
 - Inventário da indexação sem copiar PDFs, texto integral dos chunks ou vetores de embedding.
 - Matriz de evidências em CSV, extrações com fontes literais e avaliações metodológicas.
@@ -520,7 +523,9 @@ recadastre as credenciais pelas telas de configuração.
 ### 2. Criar o projeto e o protocolo
 
 - Abra **0. Configuração da Pesquisa**.
-- Crie ou selecione um projeto.
+- Crie, selecione ou importe um projeto pelo painel lateral.
+- Para importar, envie o ZIP de reprodutibilidade, confira a prévia, defina o novo
+  título e confirme que PDFs e embeddings deverão ser adicionados novamente.
 - Informe a pergunta e solicite a estruturação PICO.
 - Revise critérios e estratégia de busca.
 - Consulte as APIs habilitadas e/ou importe um arquivo `.bib`.
@@ -665,7 +670,7 @@ rag-revisao-sistematica/
 ├── docs/                        # Blueprint e roteiro de testes funcionais
 ├── frontend/
 │   ├── app.py                   # Chat RAG
-│   └── pages/                   # Fluxo multipágina do Streamlit
+│   └── views/                   # Fluxo multipágina declarado pelo Streamlit
 ├── scripts/                     # Utilitários seguros de migração da instalação
 ├── tests/                       # Testes unitários e SQL de integração
 ├── data/pdfs/                   # PDFs locais, ignorados pelo Git
@@ -722,6 +727,23 @@ O pacote não reinstala a aplicação e não inclui material integral protegido 
 direitos autorais. Para recuperar o ambiente completo, continue usando o backup
 criptografado da tela **Backup e Restauração**.
 
+### Importação seletiva de um projeto
+
+Na página **Configuração da Pesquisa**, abra **Importar projeto** no painel lateral
+e envie um ZIP produzido pela aplicação. Antes de habilitar a importação, o sistema:
+
+1. rejeita caminhos inseguros, arquivos duplicados, pacotes incompatíveis ou excessivos;
+2. confere o escopo sem segredos e os hashes SHA-256 do manifesto;
+3. compara as contagens declaradas com os arquivos estruturados;
+4. apresenta a origem, as contagens e as limitações operacionais.
+
+A confirmação cria um projeto independente em uma única transação, com novos UUIDs
+e referências internas remapeadas. Protocolo, buscas, artigos, deduplicação, triagem,
+evidências, qualidade metodológica, PRISMA, Golden Set, benchmarks e interações são
+preservados quando presentes. Trechos literais tornam-se fontes de auditoria e não
+entram na recuperação do RAG. Como PDFs, chunks integrais e embeddings não pertencem
+ao pacote, eles devem ser associados e indexados novamente na instalação de destino.
+
 ### Parar os serviços
 
 Sem remover o banco:
@@ -758,6 +780,7 @@ docker compose --profile tools down -v
 | Acentos incorretos no CSV | Use o arquivo da interface; ele é exportado como UTF-8 com BOM. |
 | Resposta mostra "referência bibliográfica nº 36" | É uma referência interna do artigo, não uma página. A fonte rastreável aparece como `[paper_id, p. página]`. |
 | BibTeX não é aceito | Confirme a extensão `.bib`, o limite de 20 MB e se todas as chaves e aspas estão fechadas. |
+| Pacote de projeto não é aceito | Use o ZIP original gerado pela aplicação; não altere nem recomprima seus arquivos internos. |
 
 ## Limites atuais
 
@@ -784,10 +807,8 @@ docker compose --profile tools down -v
   pequeno, ambíguo ou incompleto pode produzir conclusões enganosas.
 - O projeto demonstrativo usa cartões de evidência, não os artigos integrais, e
   não deve fundamentar conclusões científicas ou avaliações de desempenho reais.
-- O backup atual restaura a instalação completa; importação seletiva de apenas um
-  projeto ainda não está disponível.
-- O pacote de reprodutibilidade é somente para exportação e auditoria; a importação
-  desse ZIP como um novo projeto ainda não está disponível.
+- O backup `.ragbackup` continua destinado à instalação completa; a portabilidade
+  seletiva usa o pacote ZIP de reprodutibilidade e não inclui PDFs ou embeddings.
 - O checklist metodológico genérico não substitui a escolha e aplicação de um
   instrumento oficial adequado ao desenho dos estudos, nem o julgamento do pesquisador.
 

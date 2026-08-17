@@ -118,6 +118,33 @@ de um projeto sem enviar PDFs, credenciais ou o backup completo da instalação.
 
 ---
 
+## 📍 Cenário de portabilidade: Importar um projeto auditável
+
+**Contexto:** Outro usuário recebeu o ZIP de reprodutibilidade e deseja reconstruir
+o projeto sem substituir sua instalação nem receber credenciais ou PDFs protegidos.
+
+### Passos
+
+1. Abra **Configuração da Pesquisa** e expanda **Importar projeto** no menu lateral.
+2. Envie o ZIP original gerado no cenário anterior.
+3. Confira título de origem, SHA-256, artigos e decisões apresentados na prévia.
+4. Defina um título diferente, aceite a confirmação e importe o projeto.
+5. Navegue por protocolo, Deduplicação, Triagem, Matriz de Evidências,
+   Qualidade Metodológica, Avaliação Quantitativa e Relatório Final.
+6. Em **Gestão de PDFs**, confirme que artigos incluídos aguardam os respectivos PDFs.
+7. Tente validar uma cópia do ZIP com algum arquivo interno alterado.
+
+### ✅ Critério de Sucesso
+
+* A importação deve criar um projeto novo, com UUID diferente e sem alterar a origem.
+* Contagens, decisões, fontes literais e versões devem corresponder ao manifesto.
+* Trechos importados devem permanecer auditáveis, mas não participar da busca RAG.
+* PDFs, embeddings e credenciais não devem ser criados pela importação.
+* Um pacote alterado deve ser rejeitado antes de gravar qualquer registro.
+* Uma falha de persistência deve desfazer toda a importação.
+
+---
+
 ## 📍 Cenário 1: Configuração e Coleta
 
 **Contexto:** É necessário iniciar um novo projeto de revisão e definir a estratégia de busca.
