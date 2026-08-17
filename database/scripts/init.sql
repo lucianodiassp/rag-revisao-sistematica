@@ -58,7 +58,8 @@ CREATE TABLE deduplicated_papers (
     title TEXT NOT NULL,
     abstract TEXT,
     merged_sources_jsonb JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (project_id, id)
 );
 
 -- Decisões explicáveis da deduplicação, incluindo candidatos que aguardam
@@ -187,6 +188,71 @@ CREATE TABLE evidence_field_sources (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Instrumentos versionados e avaliações humanas de qualidade metodológica.
+-- O instrumento genérico é configurável por projeto e não representa, por si só,
+-- conformidade com ferramentas oficiais como RoB 2 ou ROBINS-I.
+CREATE TABLE methodological_assessment_instruments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    description TEXT NOT NULL,
+    schema_version VARCHAR(50) NOT NULL DEFAULT 'generic-methodological-v1',
+    domains_jsonb JSONB NOT NULL,
+    change_reason TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (project_id, version),
+    UNIQUE (project_id, id),
+    CHECK (length(btrim(name)) >= 5),
+    CHECK (length(btrim(description)) >= 10),
+    CHECK (length(btrim(change_reason)) >= 5),
+    CHECK (jsonb_typeof(domains_jsonb) = 'array')
+);
+
+CREATE UNIQUE INDEX uq_methodological_instrument_active
+    ON methodological_assessment_instruments(project_id)
+    WHERE is_active = TRUE;
+
+CREATE TABLE methodological_assessments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    paper_id UUID NOT NULL REFERENCES deduplicated_papers(id) ON DELETE CASCADE,
+    instrument_id UUID NOT NULL REFERENCES methodological_assessment_instruments(id),
+    ai_suggestion_jsonb JSONB,
+    human_assessment_jsonb JSONB,
+    overall_rating VARCHAR(30),
+    review_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    review_notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE (project_id, paper_id, instrument_id),
+    FOREIGN KEY (project_id, paper_id)
+        REFERENCES deduplicated_papers(project_id, id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id, instrument_id)
+        REFERENCES methodological_assessment_instruments(project_id, id) ON DELETE CASCADE,
+    CHECK (review_status IN ('pending', 'reviewed')),
+    CHECK (overall_rating IS NULL OR overall_rating IN ('low', 'moderate', 'high', 'uncertain')),
+    CHECK (review_notes IS NULL OR length(btrim(review_notes)) >= 5)
+);
+
+CREATE TABLE methodological_assessment_sources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assessment_id UUID NOT NULL REFERENCES methodological_assessments(id) ON DELETE CASCADE,
+    domain_code VARCHAR(80) NOT NULL,
+    evidence_order INTEGER NOT NULL DEFAULT 0,
+    chunk_id UUID NOT NULL REFERENCES paper_chunks(id) ON DELETE CASCADE,
+    page_number INTEGER,
+    quote TEXT NOT NULL,
+    quote_validated BOOLEAN NOT NULL DEFAULT TRUE,
+    human_validated BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (assessment_id, domain_code, evidence_order),
+    CHECK (page_number IS NULL OR page_number > 0),
+    CHECK (length(btrim(quote)) >= 5)
+);
+
 -- Métricas e experimentos (Avaliação Quantitativa)
 CREATE TABLE evaluation_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -300,7 +366,7 @@ CREATE TABLE ai_model_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CHECK (task_type IN (
         'formulation', 'screening', 'rag', 'reranking', 'evaluation',
-        'extraction', 'report', 'embedding'
+        'extraction', 'methodological_quality', 'report', 'embedding'
     )),
     CHECK (scope_type IN ('installation', 'user', 'team')),
     CHECK (embedding_dimensions IS NULL OR embedding_dimensions > 0)
@@ -412,6 +478,10 @@ CREATE INDEX idx_paper_chunks_paper ON paper_chunks(paper_id);
 CREATE INDEX idx_embeddings_chunk ON embeddings_metadata(chunk_id);
 CREATE INDEX idx_evidence_sources_extraction ON evidence_field_sources(extraction_id);
 CREATE INDEX idx_evidence_sources_chunk ON evidence_field_sources(chunk_id);
+CREATE INDEX idx_methodological_instruments_project ON methodological_assessment_instruments(project_id, version DESC);
+CREATE INDEX idx_methodological_assessments_project ON methodological_assessments(project_id, review_status, updated_at DESC);
+CREATE INDEX idx_methodological_assessments_paper ON methodological_assessments(paper_id);
+CREATE INDEX idx_methodological_sources_assessment ON methodological_assessment_sources(assessment_id, domain_code);
 CREATE INDEX idx_ai_credentials_scope ON ai_provider_credentials(scope_type, scope_id, owner_user_id);
 CREATE INDEX idx_ai_model_settings_scope ON ai_model_settings(scope_type, scope_id, owner_user_id);
 CREATE INDEX idx_ai_configuration_audit_created ON ai_configuration_audit(created_at DESC);

@@ -19,6 +19,7 @@ from backend.app.ai_config import (  # noqa: E402
     TASK_EVALUATION,
     TASK_EXTRACTION,
     TASK_FORMULATION,
+    TASK_METHOD_QUALITY,
     TASK_RAG,
     TASK_RERANKING,
     TASK_REPORT,
@@ -38,6 +39,7 @@ TASK_LABELS = {
     TASK_RERANKING: "Reranking das evidências",
     TASK_EVALUATION: "Auditoria / juiz",
     TASK_EXTRACTION: "Extração de evidências",
+    TASK_METHOD_QUALITY: "Qualidade metodológica",
     TASK_REPORT: "Relatório final",
 }
 STATUS_LABELS = {

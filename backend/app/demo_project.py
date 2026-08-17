@@ -17,10 +17,16 @@ import fitz
 from psycopg2.extras import Json
 
 from backend.app.evidence_utils import FIELD_TYPES, NOT_REPORTED, SCHEMA_VERSION
+from backend.app.methodological_quality import (
+    DEFAULT_DOMAINS,
+    DEFAULT_INSTRUMENT_DESCRIPTION,
+    DEFAULT_INSTRUMENT_NAME,
+    INSTRUMENT_SCHEMA_VERSION,
+)
 
 
 DEMO_SEED_ID = "ml-screening-demo-v1"
-DEMO_SEED_VERSION = 1
+DEMO_SEED_VERSION = 2
 DEMO_PROJECT_ID = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{DEMO_SEED_ID}:project"))
 DEMO_PROJECT_TITLE = "Demonstração — IA na triagem de revisões sistemáticas"
 DEMO_QUESTION = (
@@ -305,6 +311,9 @@ def build_demo_dataset() -> dict:
         if not spec.get("excluded"):
             spec["chunk_id"] = _stable_id(f"chunk:{spec['key']}")
             spec["extraction_id"] = _stable_id(f"extraction:{spec['key']}")
+            spec["methodological_assessment_id"] = _stable_id(
+                f"methodological-assessment:{spec['key']}"
+            )
         paper_by_key[spec["key"]] = spec
         papers.append(spec)
 
@@ -337,6 +346,7 @@ def build_demo_dataset() -> dict:
 
     return {
         "project_id": DEMO_PROJECT_ID,
+        "methodological_instrument_id": _stable_id("methodological-instrument:1"),
         "protocol": deepcopy(DEMO_PROTOCOL),
         "queries": list(queries.values()),
         "papers": papers,
@@ -494,6 +504,23 @@ def _insert_dataset(cursor, dataset: dict) -> None:
         VALUES (%s, %s, %s, %s, 'search_ready', 1)
         """,
         (project_id, DEMO_PROJECT_TITLE, DEMO_QUESTION, Json(dataset["protocol"])),
+    )
+    cursor.execute(
+        """
+        INSERT INTO methodological_assessment_instruments
+            (id, project_id, version, name, description, schema_version,
+             domains_jsonb, change_reason, is_active)
+        VALUES (%s, %s, 1, %s, %s, %s, %s, %s, TRUE)
+        """,
+        (
+            dataset["methodological_instrument_id"],
+            project_id,
+            DEFAULT_INSTRUMENT_NAME,
+            DEFAULT_INSTRUMENT_DESCRIPTION,
+            INSTRUMENT_SCHEMA_VERSION,
+            Json(list(DEFAULT_DOMAINS)),
+            "Carga inicial do instrumento metodológico demonstrativo",
+        ),
     )
     cursor.execute(
         """
@@ -715,6 +742,40 @@ def _insert_dataset(cursor, dataset: dict) -> None:
                 paper["quote"],
             ),
         )
+        human_domains = [
+            {
+                "domain_code": domain["code"],
+                "response": "uncertain",
+                "justification": (
+                    "O cartão demonstrativo não contém o artigo integral necessário "
+                    "para julgar este domínio metodológico."
+                ),
+            }
+            for domain in DEFAULT_DOMAINS
+        ]
+        cursor.execute(
+            """
+            INSERT INTO methodological_assessments
+                (id, project_id, paper_id, instrument_id, human_assessment_jsonb,
+                 overall_rating, review_status, review_notes, reviewed_at)
+            VALUES (%s, %s, %s, %s, %s, 'uncertain', 'reviewed', %s, CURRENT_TIMESTAMP)
+            """,
+            (
+                paper["methodological_assessment_id"],
+                project_id,
+                paper["id"],
+                dataset["methodological_instrument_id"],
+                Json({
+                    "schema_version": INSTRUMENT_SCHEMA_VERSION,
+                    "domains": human_domains,
+                    "demo_fixture": True,
+                }),
+                (
+                    "Classificação incerta por decisão humana: os cartões demonstram a "
+                    "rastreabilidade, mas não substituem a avaliação do texto integral."
+                ),
+            ),
+        )
 
     for paper in dataset["papers"]:
         cursor.execute(
@@ -839,8 +900,8 @@ def ensure_demo_project(
         )
         existing = cursor.fetchone()
         if existing:
-            marker = ((existing[0] or {}).get("_demo") or {}).get("seed_id")
-            if marker != DEMO_SEED_ID:
+            marker = (existing[0] or {}).get("_demo") or {}
+            if marker.get("seed_id") != DEMO_SEED_ID:
                 raise RuntimeError(
                     "O identificador reservado da demonstração pertence a outro projeto."
                 )
@@ -853,8 +914,10 @@ def ensure_demo_project(
                     "project_id": DEMO_PROJECT_ID,
                     "created": False,
                     "restored": False,
+                    "outdated": marker.get("seed_version") != DEMO_SEED_VERSION,
                     "pdfs": pdf_result,
                     "seed_id": DEMO_SEED_ID,
+                    "seed_version": DEMO_SEED_VERSION,
                 }
 
         _insert_dataset(cursor, dataset)
@@ -874,6 +937,7 @@ def ensure_demo_project(
         "pdfs": pdf_result,
         "snapshot_version": snapshot["snapshot_version"],
         "seed_id": DEMO_SEED_ID,
+        "seed_version": DEMO_SEED_VERSION,
     }
 
 

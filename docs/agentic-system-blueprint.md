@@ -347,7 +347,9 @@ Configura ambiente, banco, chaves de API, modelos e execucao local.
 
 **Tabelas relacionadas:**
 
-- `extracted_evidence`
+- `methodological_assessment_instruments`
+- `methodological_assessments`
+- `methodological_assessment_sources`
 - `agent_interactions`
 
 **Observacao metodologica:** qualidade metodologica nao deve excluir automaticamente um estudo, salvo quando isso estiver definido no protocolo. Ela deve ponderar a forca da evidencia na sintese.

@@ -18,6 +18,7 @@ from backend.app.prisma import (
     prisma_para_json,
     salvar_snapshot_prisma,
 )
+from backend.app.methodological_quality import methodological_summary
 from backend.app.reproducibility_package import generate_reproducibility_package
 from backend.app.screening_service import EXCLUSION_REASON_LABELS
 from frontend.project_selector import selecionar_projeto_ativo
@@ -230,7 +231,32 @@ else:
 st.divider()
 
 # --- 3. SÍNTESE ACADÊMICA ---
-st.header("3. Compilação da Síntese Final")
+st.header("3. Qualidade metodológica revisada")
+avaliacoes_metodologicas = methodological_summary(project_id)
+if avaliacoes_metodologicas:
+    contagens_qualidade = {
+        codigo: sum(1 for item in avaliacoes_metodologicas if item["overall_rating"] == codigo)
+        for codigo in ("low", "moderate", "high", "uncertain")
+    }
+    q1, q2, q3, q4 = st.columns(4)
+    q1.metric("Baixo risco", contagens_qualidade["low"])
+    q2.metric("Moderado", contagens_qualidade["moderate"])
+    q3.metric("Alto risco", contagens_qualidade["high"])
+    q4.metric("Incerto", contagens_qualidade["uncertain"])
+    st.caption(
+        "Somente avaliações humanas da versão ativa do instrumento são consideradas. "
+        "Consulte os domínios e justificativas na página Qualidade Metodológica."
+    )
+else:
+    st.info(
+        "Ainda não há avaliações metodológicas humanas na versão ativa do instrumento. "
+        "O relatório poderá ser gerado, mas explicitará essa ausência."
+    )
+
+st.divider()
+
+# --- 4. SÍNTESE ACADÊMICA ---
+st.header("4. Compilação da Síntese Final")
 
 if "relatorios_por_projeto" not in st.session_state:
     st.session_state.relatorios_por_projeto = {}
@@ -270,8 +296,8 @@ if relatorio_compilado is not None:
 
 st.divider()
 
-# --- 4. PACOTE DE REPRODUTIBILIDADE ---
-st.header("4. Pacote de Reprodutibilidade do Projeto")
+# --- 5. PACOTE DE REPRODUTIBILIDADE ---
+st.header("5. Pacote de Reprodutibilidade do Projeto")
 st.markdown(
     "Gere um ZIP somente leitura com protocolo, buscas, deduplicação, triagem, "
     "evidências, PRISMA, Golden Set, avaliações, interações dos agentes e o último "

@@ -31,7 +31,8 @@ st.set_page_config(page_title="Configuração da Pesquisa", page_icon="⚙️", 
 with st.sidebar.expander("🧪 Projeto demonstrativo", expanded=False):
     st.caption(
         "Carrega um exemplo auditável com artigos reais, deduplicação, triagem, "
-        "cartões PDF, matriz de evidências, PRISMA e Golden Set. Não utiliza chaves de IA."
+        "cartões PDF, matriz de evidências, qualidade metodológica, PRISMA e Golden Set. "
+        "Não utiliza chaves de IA."
     )
     abrir_demo = st.button(
         "Criar / abrir demonstração",
@@ -58,11 +59,16 @@ with st.sidebar.expander("🧪 Projeto demonstrativo", expanded=False):
             demo_id = str(resultado_demo["project_id"])
             st.session_state[CHAVE_PROJETO_ATIVO] = demo_id
             st.session_state["project_selector_widget"] = demo_id
-            st.session_state["demo_project_message"] = (
-                "Demonstração restaurada com os dados originais."
-                if resultado_demo.get("restored")
-                else "Projeto demonstrativo pronto para exploração."
-            )
+            if resultado_demo.get("restored"):
+                mensagem = "Demonstração restaurada com os dados originais."
+            elif resultado_demo.get("outdated"):
+                mensagem = (
+                    "Uma versão anterior da demonstração foi aberta. Para incluir os "
+                    "novos exemplos metodológicos, use Restaurar dados originais."
+                )
+            else:
+                mensagem = "Projeto demonstrativo pronto para exploração."
+            st.session_state["demo_project_message"] = mensagem
             st.rerun()
 
 

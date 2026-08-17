@@ -3,6 +3,7 @@ import fitz
 from backend.app.demo_project import (
     DEMO_PROJECT_ID,
     DEMO_SEED_ID,
+    DEMO_SEED_VERSION,
     FIELD_TYPES,
     _extraction_for,
     build_demo_dataset,
@@ -48,6 +49,7 @@ def test_demo_dataset_is_deterministic_and_coherent():
     second = build_demo_dataset()
 
     assert first["project_id"] == DEMO_PROJECT_ID == second["project_id"]
+    assert first["protocol"]["_demo"]["seed_version"] == DEMO_SEED_VERSION == 2
     assert len(first["queries"]) == 3
     assert len(first["records"]) == 7
     assert len(first["papers"]) == 5
@@ -96,6 +98,7 @@ def test_existing_demo_is_opened_without_reinserting_database_rows(tmp_path):
     assert result["project_id"] == DEMO_PROJECT_ID
     assert result["created"] is False
     assert result["restored"] is False
+    assert result["outdated"] is True
     assert result["pdfs"]["created"] == 4
     assert len(connection.cursor_instance.statements) == 1
     assert connection.cursor_instance.statements[0][0].startswith(

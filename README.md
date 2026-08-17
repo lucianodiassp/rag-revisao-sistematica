@@ -8,7 +8,7 @@
 
 Aplicação local para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
-de evidências, revisão humana, auditoria e síntese final.
+de evidências, avaliação metodológica revisada por humano, auditoria e síntese final.
 
 O sistema foi projetado para manter o pesquisador no controle das decisões críticas.
 A IA sugere, extrai e sintetiza; inclusão de artigos, aprovação das evidências e uso
@@ -58,6 +58,8 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
   publicações reais, com duas duplicatas explicadas.
 - Protocolo PICO, triagem humana concluída, quatro inclusões, uma exclusão,
   matriz rastreável, snapshot PRISMA e Golden Set inicial.
+- Instrumento metodológico genérico v1 e quatro avaliações humanas marcadas como
+  incertas, pois os cartões demonstrativos não substituem os textos integrais.
 - Quatro cartões PDF gerados localmente, com atribuição e aviso de escopo, sem
   redistribuir os artigos integrais.
 - Nenhuma chamada à IA ou armazenamento de chave durante a carga.
@@ -79,7 +81,7 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Exportação acadêmica de um projeto em ZIP, separada do backup operacional da instalação.
 - Protocolo atual e histórico, buscas, registros recuperados, deduplicação, triagem e reavaliações.
 - Inventário da indexação sem copiar PDFs, texto integral dos chunks ou vetores de embedding.
-- Matriz de evidências em CSV e extrações com fontes literais em JSON.
+- Matriz de evidências em CSV, extrações com fontes literais e avaliações metodológicas.
 - Snapshots PRISMA, Golden Set, benchmarks, auditorias e interações dos agentes.
 - Configurações de modelos efetivamente registradas nas interações, sem credenciais.
 - Inclusão da última síntese persistida pelo Agente Relator, quando disponível.
@@ -115,7 +117,7 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Credencial cifrada no banco, com `backend/.env` como fallback.
 - Validação da chave pela listagem de modelos, sem gerar conteúdo.
 - Modelo e temperatura configuráveis para formulação, triagem, RAG, auditoria,
-  extração e relatório.
+  extração, qualidade metodológica e relatório.
 - Modelo de embedding configurável dentro do schema atual de 768 dimensões.
 - Histórico de alterações sem exposição da chave.
 
@@ -167,6 +169,20 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Funil separado para PDF associado, indexado, extraído e revisado.
 - Exportação CSV em UTF-8 com BOM, preservando acentuação no Excel.
 
+### Qualidade metodológica e possíveis vieses
+
+- Checklist genérico configurável e versionado por projeto, com oito domínios iniciais.
+- Nova versão preserva o histórico e exige nova avaliação dos estudos sob o instrumento ativo.
+- Avaliação manual disponível sem chamada à IA.
+- Sugestão opcional da IA baseada somente nos chunks do PDF do artigo selecionado.
+- Respostas afirmativas ou negativas sem citação literal válida são rebaixadas para **incertas**.
+- Registro separado da sugestão original, decisão humana, justificativa por domínio,
+  classificação final e fontes confirmadas pelo pesquisador.
+- Classificação sugerida determinística em baixo, moderado, alto ou incerto; a decisão
+  válida permanece humana e não exclui automaticamente estudos.
+- Síntese da versão ativa no Relatório Final e exportação integral no pacote de reprodutibilidade.
+- O checklist genérico não reivindica equivalência a RoB 2, ROBINS-I ou outro instrumento oficial.
+
 ### Auditoria e relatório final
 
 - Fluxo PRISMA operacional calculado diretamente dos dados do projeto, sem estimativas da IA.
@@ -211,9 +227,11 @@ flowchart LR
     F --> G["RAG híbrido: vetorial + lexical + RRF + reranking"]
     F --> H["Extração rastreável"]
     H --> I["Revisão humana da matriz"]
+    F --> Q["Qualidade metodológica + revisão humana"]
     G --> J["Auditoria LLM-as-a-Judge"]
     G --> L["Golden Set + métricas determinísticas"]
     I --> K["Síntese e relatório final"]
+    Q --> K
     J --> K
 ```
 
@@ -464,7 +482,7 @@ recadastre as credenciais pelas telas de configuração.
 
 - Abra **Configuração da Pesquisa > Projeto demonstrativo**.
 - Crie ou abra o exemplo e percorra Deduplicação, Triagem, Gestão de PDFs,
-  Matriz de Evidências, Avaliação Quantitativa e Relatório Final.
+  Matriz de Evidências, Qualidade Metodológica, Avaliação Quantitativa e Relatório Final.
 - Confira o aviso permanente no menu lateral para não confundir a demonstração
   com um projeto científico real.
 - Restaure o exemplo quando quiser repetir o roteiro desde o estado original.
@@ -520,7 +538,16 @@ recadastre as credenciais pelas telas de configuração.
 - Aprove, corrija ou rejeite cada extração.
 - Baixe a matriz em CSV quando necessário.
 
-### 8. Medir o RAG com Golden Set
+### 8. Avaliar qualidade metodológica
+
+- Abra **Qualidade Metodológica**.
+- Confira o instrumento ativo e adapte-o ao desenho dos estudos quando necessário;
+  cada alteração cria uma nova versão auditável.
+- Inicie manualmente ou gere uma sugestão da IA para cada artigo incluído com PDF indexado.
+- Revise resposta e justificativa de todos os domínios e confirme somente as fontes literais conferidas.
+- Registre a classificação final humana. Ela informa a síntese, mas não exclui estudos automaticamente.
+
+### 9. Medir o RAG com Golden Set
 
 - Abra **8. Avaliação Quantitativa RAG**.
 - Cadastre perguntas que o corpus deve responder e associe as fontes relevantes.
@@ -538,7 +565,7 @@ recadastre as credenciais pelas telas de configuração.
   reavaliação de uma recusa inicial.
 - Baixe o resultado em JSON ou CSV.
 
-### 9. Auditar e gerar o relatório
+### 10. Auditar e gerar o relatório
 
 - Abra **3. Relatório Final**.
 - Configure as perguntas de auditoria.
@@ -731,8 +758,8 @@ docker compose --profile tools down -v
   projeto ainda não está disponível.
 - O pacote de reprodutibilidade é somente para exportação e auditoria; a importação
   desse ZIP como um novo projeto ainda não está disponível.
-- O sistema não substitui protocolo metodológico, avaliação de risco de viés ou
-  julgamento do pesquisador.
+- O checklist metodológico genérico não substitui a escolha e aplicação de um
+  instrumento oficial adequado ao desenho dos estudos, nem o julgamento do pesquisador.
 
 ## Licença
 

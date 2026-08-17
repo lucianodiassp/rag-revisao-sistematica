@@ -36,6 +36,11 @@ pages = [
         icon="📑",
     ),
     st.Page(
+        "pages/10_Qualidade_Metodologica.py",
+        title="Qualidade Metodológica",
+        icon="🧭",
+    ),
+    st.Page(
         "pages/4_Configuracao_IA.py",
         title="Configuração de IA",
         icon="🔐",
