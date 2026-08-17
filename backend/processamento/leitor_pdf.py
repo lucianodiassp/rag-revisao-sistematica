@@ -1,11 +1,15 @@
 import os
-import fitz  # PyMuPDF
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
 from psycopg2.extras import Json
 from backend.app.ai_config import get_embedding_config
 from backend.app.ai_service import generate_embedding
 from backend.app.database import resolver_project_id
+from backend.processamento.ocr_pdf import (
+    extract_pdf_document,
+    get_pdf_ocr_config,
+    sanitize_pdf_text,
+)
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
@@ -50,6 +54,14 @@ def carregar_status_pdfs(project_id=None):
                                AND em.dimensions = %s
                          )
                    ) AS chunks_compativeis,
+                   COUNT(pc.id) FILTER (
+                       WHERE pc.chunk_type LIKE 'full_text_part_%%'
+                         AND pc.metadata_jsonb->>'traceability_version' = '2'
+                   ) AS chunks_extracao_v2,
+                   COUNT(DISTINCT (pc.metadata_jsonb->>'page_start')::INTEGER) FILTER (
+                       WHERE pc.chunk_type LIKE 'full_text_part_%%'
+                         AND pc.metadata_jsonb->>'text_extraction_method' = 'ocr'
+                   ) AS paginas_ocr,
                    e.schema_version,
                    e.human_review_status
             FROM deduplicated_papers d
@@ -84,6 +96,8 @@ def carregar_status_pdfs(project_id=None):
         total_chunks,
         chunks_rastreaveis,
         chunks_compativeis,
+        chunks_extracao_v2,
+        paginas_ocr,
         schema_version,
         human_review_status,
     ) in linhas:
@@ -93,6 +107,7 @@ def carregar_status_pdfs(project_id=None):
             total_chunks > 0
             and total_chunks == chunks_rastreaveis
             and total_chunks == chunks_compativeis
+            and total_chunks == chunks_extracao_v2
         )
         if not pdf_associado:
             situacao = "awaiting_pdf"
@@ -113,6 +128,7 @@ def carregar_status_pdfs(project_id=None):
                 "total_chunks": total_chunks,
                 "chunks_rastreaveis": chunks_rastreaveis,
                 "chunks_compativeis": chunks_compativeis,
+                "paginas_ocr": paginas_ocr,
                 "schema_version": schema_version,
                 "human_review_status": human_review_status,
             }
@@ -151,29 +167,39 @@ def resumir_status_fluxo(status_artigos):
 
 def sanitizar_texto_pdf(texto):
     """Remove caracteres NUL que o PostgreSQL não aceita em campos textuais."""
-    return (texto or "").replace("\x00", "")
+    return sanitize_pdf_text(texto)
 
-def extrair_paginas_pdf(caminho_pdf):
-    """Extrai o texto sem perder o número da página de origem."""
+
+def extrair_documento_pdf(caminho_pdf, ocr_config=None):
+    """Extrai texto e diagnóstico por página, incluindo o fallback OCR."""
     try:
-        paginas = []
-        caracteres_nulos_removidos = 0
-        with fitz.open(caminho_pdf) as documento:
-            for numero, pagina in enumerate(documento, start=1):
-                texto_extraido = pagina.get_text("text")
-                caracteres_nulos_removidos += texto_extraido.count("\x00")
-                texto = sanitizar_texto_pdf(texto_extraido).strip()
-                if texto:
-                    paginas.append({"page_number": numero, "text": texto})
-        if caracteres_nulos_removidos:
+        resultado = extract_pdf_document(
+            caminho_pdf,
+            config=ocr_config or get_pdf_ocr_config(),
+        )
+        if resultado["null_characters_removed"]:
             print(
-                f"🧹 {caracteres_nulos_removidos} caractere(s) NUL inválido(s) "
+                f"🧹 {resultado['null_characters_removed']} caractere(s) NUL inválido(s) "
                 "removido(s) do texto extraído."
             )
-        return paginas
-    except Exception as e:
-        print(f"❌ Erro ao ler {caminho_pdf}: {e}")
+        if resultado["ocr_pages"]:
+            print(
+                f"🔎 OCR aplicado em {resultado['ocr_pages']} de "
+                f"{resultado['total_pages']} página(s)."
+            )
+        for warning in resultado["warnings"]:
+            print(
+                f"⚠️ OCR da página {warning['page_number']}: {warning['message']}"
+            )
+        return resultado
+    except Exception as error:
+        print(f"❌ Erro ao ler {caminho_pdf}: {error}")
         return None
+
+def extrair_paginas_pdf(caminho_pdf):
+    """Compatibilidade para consumidores que esperam somente a lista de páginas."""
+    resultado = extrair_documento_pdf(caminho_pdf)
+    return None if resultado is None else resultado["pages"]
 
 
 def extrair_texto_pdf(caminho_pdf):
@@ -223,6 +249,13 @@ def criar_chunks_por_pagina(paginas, max_palavras=250, overlap=50):
                     "chunk_text": texto,
                     "page_number": pagina["page_number"],
                     "page_chunk_index": indice_pagina,
+                    "text_extraction_method": pagina.get(
+                        "text_extraction_method", "native"
+                    ),
+                    "native_character_count": pagina.get("native_character_count"),
+                    "ocr_attempted": bool(pagina.get("ocr_attempted")),
+                    "ocr_languages": pagina.get("ocr_languages"),
+                    "ocr_dpi": pagina.get("ocr_dpi"),
                 }
             )
     return resultado
@@ -236,6 +269,8 @@ def processar_pdfs(project_id=None):
         "processados": 0,
         "ignorados": 0,
         "falhas": 0,
+        "paginas_ocr": 0,
+        "falhas_ocr": 0,
         "resultados": [],
     }
     print(f"📂 A verificar diretório: {DIRETORIO_PDFS}")
@@ -290,7 +325,9 @@ def processar_pdfs(project_id=None):
                     WHERE em.chunk_id = paper_chunks.id
                       AND em.model_name = %s
                       AND em.dimensions = %s
-                )
+                   )
+            ), COUNT(*) FILTER (
+                WHERE metadata_jsonb->>'traceability_version' = '2'
             )
             FROM paper_chunks
             WHERE paper_id = %s AND chunk_type LIKE 'full_text_part_%%'
@@ -299,11 +336,17 @@ def processar_pdfs(project_id=None):
             embedding_config.dimensions,
             paper_id,
         ))
-        total_chunks, chunks_rastreaveis, chunks_compativeis = cursor.fetchone()
+        (
+            total_chunks,
+            chunks_rastreaveis,
+            chunks_compativeis,
+            chunks_extracao_v2,
+        ) = cursor.fetchone()
         ja_processado = (
             total_chunks > 0
             and total_chunks == chunks_rastreaveis
             and total_chunks == chunks_compativeis
+            and total_chunks == chunks_extracao_v2
         )
 
         if ja_processado:
@@ -315,6 +358,9 @@ def processar_pdfs(project_id=None):
                     "title": titulo,
                     "status": "already_indexed",
                     "chunks": total_chunks,
+                    "pages_total": None,
+                    "pages_ocr": None,
+                    "ocr_failures": None,
                     "error": None,
                 }
             )
@@ -322,11 +368,12 @@ def processar_pdfs(project_id=None):
 
 
         if total_chunks:
-            motivo = (
-                "modelo de embedding diferente"
-                if chunks_rastreaveis == total_chunks and chunks_compativeis != total_chunks
-                else "índice legado sem páginas"
-            )
+            if chunks_rastreaveis != total_chunks:
+                motivo = "índice legado sem páginas"
+            elif chunks_compativeis != total_chunks:
+                motivo = "modelo de embedding diferente"
+            else:
+                motivo = "índice anterior sem proveniência do método de extração"
             print(f"♻️ PDF {paper_id[:8]}... possui {motivo}; reconstruindo.")
             cursor.execute("""
                 UPDATE extracted_evidence
@@ -343,7 +390,11 @@ def processar_pdfs(project_id=None):
             """, (paper_id,))
 
         print(f"📖 A ler e extrair texto de: {arquivo}...")
-        paginas = extrair_paginas_pdf(caminho_completo)
+        documento_extraido = extrair_documento_pdf(caminho_completo)
+        paginas = documento_extraido["pages"] if documento_extraido else None
+        if documento_extraido:
+            resumo["paginas_ocr"] += documento_extraido["ocr_pages"]
+            resumo["falhas_ocr"] += documento_extraido["ocr_failed_pages"]
         
         if not paginas:
             conexao.rollback()
@@ -354,7 +405,22 @@ def processar_pdfs(project_id=None):
                     "title": titulo,
                     "status": "failed",
                     "chunks": 0,
-                    "error": "O PDF não possui texto extraível ou não pôde ser lido.",
+                    "pages_total": (
+                        documento_extraido.get("total_pages", 0)
+                        if documento_extraido else 0
+                    ),
+                    "pages_ocr": 0,
+                    "ocr_failures": (
+                        documento_extraido.get("ocr_failed_pages", 0)
+                        if documento_extraido else 0
+                    ),
+                    "error": (
+                        "O PDF não possui texto extraível. O OCR também não produziu "
+                        "texto utilizável; confira se o arquivo está legível e se os "
+                        "idiomas do OCR estão instalados."
+                        if documento_extraido and documento_extraido.get("ocr_attempted_pages")
+                        else "O PDF não possui texto extraível ou não pôde ser lido."
+                    ),
                 }
             )
             continue
@@ -392,7 +458,17 @@ def processar_pdfs(project_id=None):
                         "page_end": chunk["page_number"],
                         "page_chunk_index": chunk["page_chunk_index"],
                         "document_chunk_index": index + 1,
-                        "traceability_version": 1,
+                        "traceability_version": 2,
+                        "text_extraction_method": chunk["text_extraction_method"],
+                        "native_character_count": chunk["native_character_count"],
+                        "ocr_attempted": chunk["ocr_attempted"],
+                        "ocr_engine": (
+                            "tesseract"
+                            if chunk["text_extraction_method"] == "ocr"
+                            else None
+                        ),
+                        "ocr_languages": chunk["ocr_languages"],
+                        "ocr_dpi": chunk["ocr_dpi"],
                     }),
                 ))
                 chunk_id = cursor.fetchone()[0]
@@ -429,6 +505,9 @@ def processar_pdfs(project_id=None):
                     "title": titulo,
                     "status": "failed",
                     "chunks": chunks_inseridos,
+                    "pages_total": documento_extraido["total_pages"],
+                    "pages_ocr": documento_extraido["ocr_pages"],
+                    "ocr_failures": documento_extraido["ocr_failed_pages"],
                     "error": erro_indexacao or "A indexação não processou todos os trechos.",
                 }
             )
@@ -442,6 +521,9 @@ def processar_pdfs(project_id=None):
                 "title": titulo,
                 "status": "indexed",
                 "chunks": chunks_inseridos,
+                "pages_total": documento_extraido["total_pages"],
+                "pages_ocr": documento_extraido["ocr_pages"],
+                "ocr_failures": documento_extraido["ocr_failed_pages"],
                 "error": None,
             }
         )

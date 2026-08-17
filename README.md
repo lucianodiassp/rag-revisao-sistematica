@@ -134,6 +134,9 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 
 - Associação do PDF ao UUID do artigo incluído.
 - Extração de texto por página com PyMuPDF.
+- OCR local por página com Tesseract para documentos digitalizados, em português e inglês.
+- Detecção conservadora: o OCR só é acionado quando a camada nativa é insuficiente.
+- Proveniência do método de extração, idioma e DPI preservada nos chunks.
 - Remoção de caracteres NUL inválidos encontrados em alguns PDFs.
 - Chunking por página, com sobreposição e preservação da origem.
 - Embeddings armazenados em `vector(768)` no PostgreSQL.
@@ -291,8 +294,9 @@ docker compose up -d --build
 docker compose ps
 ```
 
-O comando constrói a interface, inicia o PostgreSQL com `pgvector`, aguarda o banco
-ficar saudável, aplica todas as migrações e só então inicia o Streamlit.
+O comando constrói a interface com Tesseract e os idiomas português/inglês, inicia
+o PostgreSQL com `pgvector`, aguarda o banco ficar saudável, aplica todas as
+migrações e só então inicia o Streamlit.
 As portas são publicadas apenas em `127.0.0.1`, mantendo a instalação restrita à
 máquina local.
 Em Linux, usuários com UID/GID diferentes de `1000` podem definir `RAG_UID` e
@@ -332,7 +336,9 @@ Acesse [http://localhost:5050](http://localhost:5050), usando por padrão
 ### Execução manual para desenvolvimento
 
 Python 3.10 ou superior é necessário somente quando a interface será executada fora
-do Docker.
+do Docker. Para processar PDFs digitalizados nesse modo, instale também o Tesseract
+e os dados de idioma `por` e `eng`; depois informe o diretório `tessdata` por
+`PDF_OCR_TESSDATA` caso ele não seja detectado automaticamente.
 
 Windows PowerShell:
 
@@ -462,6 +468,25 @@ os valores de `backend/.env`, incluindo:
 - `BIBLIOGRAPHIC_MAX_RETRIES`
 - variáveis específicas listadas em `backend/.env.example`
 
+### OCR de PDFs digitalizados
+
+O Docker já inclui o Tesseract e os idiomas português e inglês. Na página
+**5. Gestão de PDFs**, a configuração efetiva aparece antes da indexação.
+Os valores podem ser ajustados em `backend/.env`:
+
+| Variável | Padrão | Finalidade |
+|---|---:|---|
+| `PDF_OCR_ENABLED` | `true` | Ativa o fallback OCR local. |
+| `PDF_OCR_LANGUAGES` | `por+eng` | Idiomas Tesseract usados em conjunto. |
+| `PDF_OCR_DPI` | `300` | Resolução aplicada ao reconhecimento. |
+| `PDF_OCR_MIN_NATIVE_CHARACTERS` | `40` | Limite alfanumérico abaixo do qual a página tenta OCR. |
+| `PDF_OCR_TESSDATA` | automático | Caminho opcional para os arquivos de idioma. |
+
+O texto nativo continua tendo prioridade. Se o OCR não produzir conteúdo melhor,
+o sistema preserva o texto original existente e registra um aviso. Índices criados
+antes desta versão são reconstruídos uma vez para registrar a proveniência. Como
+embeddings são gerados novamente, essa atualização pode consumir cota do provedor.
+
 ### Chave-mestra local
 
 As credenciais são cifradas com Fernet antes de chegar ao PostgreSQL. A chave-mestra
@@ -520,6 +545,8 @@ recadastre as credenciais pelas telas de configuração.
 - Envie o PDF de cada artigo incluído.
 - Se o PDF não puder ser obtido legalmente, devolva o artigo à triagem ou exclua-o com justificativa.
 - Execute o processamento e acompanhe o resultado por documento.
+- Em PDFs digitalizados, confira quantas páginas usaram OCR e valide visualmente
+  no documento os trechos empregados como evidência.
 - Confirme no funil a diferença entre PDF armazenado e PDF indexado.
 
 ### 6. Consultar o corpus pelo RAG
@@ -725,6 +752,7 @@ docker compose --profile tools down -v
 | Modelo Gemini indisponível | Abra **Configuração de IA**, teste a chave e escolha um modelo listado para a conta. |
 | Erro `429` em uma API | Aguarde a renovação do limite, reduza chamadas ou use uma credencial com cota adequada. |
 | PDF armazenado, mas não indexado | Execute a vetorização e consulte o motivo individual apresentado na página. |
+| OCR não reconhece uma página | Confirme a legibilidade, os idiomas instalados e `PDF_OCR_LANGUAGES`; consulte os avisos por artigo. |
 | Vários projetos ao executar um script | Defina `PROJECT_ID` explicitamente. |
 | Credencial cifrada não pode ser aberta | Restaure a chave-mestra correta ou cadastre novamente a credencial. |
 | Acentos incorretos no CSV | Use o arquivo da interface; ele é exportado como UTF-8 com BOM. |
@@ -742,7 +770,9 @@ docker compose --profile tools down -v
 - O diagrama implementa um fluxo PRISMA operacional adaptado às etapas observáveis
   pela aplicação; ele não substitui a avaliação metodológica nem a conferência do
   checklist PRISMA 2020 pelo pesquisador.
-- PDFs baseados somente em imagem exigem OCR, ainda não integrado.
+- O OCR permite indexar texto presente em imagens, mas pode introduzir erros de
+  reconhecimento e exige conferência humana; figuras, diagramas e relações visuais
+  de tabelas ainda não são interpretados semanticamente.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
 - O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo e
   pode realizar uma segunda tentativa controlada quando a primeira saída falha.
