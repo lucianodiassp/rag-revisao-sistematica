@@ -74,6 +74,18 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Restauração transacional do banco, seguida pelas migrações idempotentes.
 - Retorno automático ao estado anterior quando uma etapa da restauração falha.
 
+### Pacote de reprodutibilidade por projeto
+
+- Exportação acadêmica de um projeto em ZIP, separada do backup operacional da instalação.
+- Protocolo atual e histórico, buscas, registros recuperados, deduplicação, triagem e reavaliações.
+- Inventário da indexação sem copiar PDFs, texto integral dos chunks ou vetores de embedding.
+- Matriz de evidências em CSV e extrações com fontes literais em JSON.
+- Snapshots PRISMA, Golden Set, benchmarks, auditorias e interações dos agentes.
+- Configurações de modelos efetivamente registradas nas interações, sem credenciais.
+- Inclusão da última síntese persistida pelo Agente Relator, quando disponível.
+- Manifesto versionado com contagens, tamanho e hash SHA-256 de cada arquivo.
+- Remoção defensiva de campos sensíveis e arquivos CSV em UTF-8 com BOM.
+
 ### Deduplicação explicável e revisável
 
 - Cada registro recuperado recebe regra, pontuação, justificativa e evidências comparativas.
@@ -533,6 +545,8 @@ recadastre as credenciais pelas telas de configuração.
 - Execute o juiz e analise fidelidade e relevância.
 - Gere a síntese após aprovar ou corrigir as evidências.
 - Baixe o relatório em Markdown.
+- Gere o **Pacote de Reprodutibilidade do Projeto** e confira as contagens e o
+  SHA-256 apresentados antes de baixar o ZIP.
 
 ### Execução opcional pelo terminal
 
@@ -568,7 +582,9 @@ python -m pytest -q
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
 importação BibTeX, deduplicação explicável, reranking com fallback, métricas do
 Golden Set, isolamento por projeto, indexação de PDFs, evidências rastreáveis e
-validação da chave-mestra usada na migração para Docker.
+validação da chave-mestra usada na migração para Docker. Também verifica criptografia,
+integridade e recuperação automática dos backups, além da estrutura, privacidade,
+acentuação e manifesto do pacote de reprodutibilidade.
 
 Os testes SQL de integração ficam em `tests/*.sql`. Exemplo no PowerShell:
 
@@ -618,6 +634,8 @@ rag-revisao-sistematica/
 - No Compose, a chave-mestra fica no volume `rag_app_private_data`, fora do banco
   e do repositório.
 - CSV e relatório Markdown são gerados para download pela interface.
+- O pacote de reprodutibilidade é gerado em memória e disponibilizado como ZIP;
+  ele não contém credenciais, PDFs, chunks integrais ou embeddings.
 
 ### Backup completo pela interface
 
@@ -637,6 +655,18 @@ Para restaurar, envie o `.ragbackup`, informe a senha e use primeiro **Validar
 backup**. Somente depois da validação a confirmação destrutiva será habilitada. A
 aplicação cria um arquivo `pre-restore-*.ragbackup` com o estado atual antes de
 substituir banco, PDFs e chave-mestra. Não use outras telas durante a restauração.
+
+### Exportação acadêmica de um projeto
+
+Na página **Relatório Final**, abra a seção **Pacote de Reprodutibilidade do
+Projeto** e gere o ZIP. Diferentemente do `.ragbackup`, esse arquivo é legível e
+destinado a auditoria, compartilhamento e preservação dos métodos e resultados de
+uma única revisão. Um `README.md` interno descreve o conteúdo e um `manifest.json`
+registra o escopo, as contagens e o SHA-256 de cada arquivo.
+
+O pacote não reinstala a aplicação e não inclui material integral protegido por
+direitos autorais. Para recuperar o ambiente completo, continue usando o backup
+criptografado da tela **Backup e Restauração**.
 
 ### Parar os serviços
 
@@ -699,6 +729,8 @@ docker compose --profile tools down -v
   não deve fundamentar conclusões científicas ou avaliações de desempenho reais.
 - O backup atual restaura a instalação completa; importação seletiva de apenas um
   projeto ainda não está disponível.
+- O pacote de reprodutibilidade é somente para exportação e auditoria; a importação
+  desse ZIP como um novo projeto ainda não está disponível.
 - O sistema não substitui protocolo metodológico, avaliação de risco de viés ou
   julgamento do pesquisador.
 
