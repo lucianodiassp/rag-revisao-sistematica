@@ -8,6 +8,7 @@ from google.genai.errors import APIError
 from backend.app.ai_config import TASK_SCREENING, get_generation_config
 from backend.app.ai_service import generate_content
 from backend.app.database import obter_projeto, resolver_project_id
+from backend.app.screening_service import UNUSABLE_ABSTRACTS
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
@@ -24,25 +25,21 @@ def get_conexao():
         password=os.environ["DB_PASSWORD"]
     )
 
-def buscar_artigos_sem_analise(project_id):
-    conexao = get_conexao()
-    cursor = conexao.cursor()
-    cursor.execute("""
-        SELECT id, title, abstract 
-        FROM deduplicated_papers 
-        WHERE project_id = %s
-          AND id NOT IN (SELECT paper_id FROM screening_decisions)
-          AND abstract IS NOT NULL 
-          AND abstract != ''
-          AND abstract NOT IN (
-              'Abstract indisponível.',
-              'Abstract extraído do índice (simplificado para este exemplo).',
-              'Abstract via PubMed E-Summary (Requer E-Fetch para texto completo).'
-          );
-    """, (project_id,))
-    artigos = cursor.fetchall()
-    conexao.close()
-    return artigos
+def buscar_artigos_sem_analise(project_id, connection_factory=None):
+    connection_factory = connection_factory or get_conexao
+    with connection_factory() as connection, connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT d.id, d.title, d.abstract
+            FROM deduplicated_papers d
+            WHERE d.project_id = %s
+              AND NOT EXISTS (
+                  SELECT 1 FROM screening_decisions s WHERE s.paper_id = d.id
+              )
+              AND NULLIF(BTRIM(d.abstract), '') IS NOT NULL
+              AND BTRIM(d.abstract) NOT IN (%s, %s, %s)
+            ORDER BY d.created_at, d.id;
+        """, (project_id, *UNUSABLE_ABSTRACTS))
+        return cursor.fetchall()
 
 def carregar_criterios_dinamicos(project_id):
     """Lê os critérios versionados do projeto no PostgreSQL."""

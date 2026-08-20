@@ -187,14 +187,25 @@ A plataforma deve:
 ### Passos
 
 1. Navegue para o menu **"Triagem"**.
-2. Leia a sugestão e a justificativa fornecidas pela Inteligência Artificial para o primeiro artigo da lista.
-3. Concorde ou discorde da recomendação clicando em **"Aprovar"** ou **"Rejeitar"**.
+2. Confira se **Artigos únicos** corresponde à soma de aguardando IA, sem resumo,
+   aguardando humano, incluídos, excluídos e marcados como Talvez.
+3. Se houver artigos em **Aguardando IA**, execute **"Rodar IA nos Novos Artigos"**.
+4. Leia a sugestão, a confiança e a justificativa fornecidas pela IA para o primeiro artigo.
+5. Registre a decisão humana como **Incluir**, **Excluir** ou **Talvez**; justifique
+   obrigatoriamente uma exclusão ou divergência da sugestão.
+6. Troque de projeto e confirme que todas as contagens e o artigo apresentado mudam
+   para o escopo selecionado.
 
 ### ✅ Critério de Sucesso
 
-* O painel de progresso deve ser atualizado automaticamente.
-* O artigo deve transitar para a próxima fase.
-* Nenhuma mensagem de erro deve ser apresentada.
+* Aguardando IA deve contar apenas artigos com resumo adequado e sem parecer automático.
+* Aguardando humano deve contar pareceres da IA ainda sem decisão humana.
+* Artigos sem resumo e pendências da deduplicação devem aparecer separadamente.
+* O botão da IA deve ficar desabilitado quando não houver artigo processável.
+* A mensagem de conclusão só deve aparecer quando todos os artigos tiverem decisão
+  humana final e não houver pendência na deduplicação.
+* Cada decisão deve atualizar imediatamente as contagens e carregar o próximo artigo.
+* O painel de progresso da IA deve ser atualizado automaticamente e sem erros.
 
 ### Reavaliação por indisponibilidade do PDF
 

@@ -1,66 +1,20 @@
-import os
+from pathlib import Path
 import sys
-import psycopg2
+
 import streamlit as st
-from dotenv import load_dotenv
 
 # Adiciona o caminho raiz para podermos importar o agente de triagem
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Importação da função geradora (UI-ready) do backend
 from backend.agentes.agente_triagem import executar_pipeline_triagem_ui
 from backend.app.screening_service import (
     EXCLUSION_REASON_LABELS,
+    get_next_pending_human_screening,
+    get_screening_summary,
     save_human_screening_decision,
 )
 from frontend.project_selector import selecionar_projeto_ativo
-
-# ==========================================
-# CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
-# ==========================================
-load_dotenv()
-
-def get_conexao():
-    """Estabelece a conexão estritamente via variáveis de ambiente."""
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        dbname=os.getenv("DB_NAME", "rag_systematic_review"),
-        user=os.environ["DB_USER"],
-        password=os.environ["DB_PASSWORD"]
-    )
-
-def buscar_artigo_pendente(project_id):
-    """Busca 1 artigo triado pela IA, mas que ainda aguarda a validação do Humano."""
-    try:
-        conexao = get_conexao()
-        cursor = conexao.cursor()
-        
-        # Fazemos um JOIN para pegar os dados do artigo E a sugestão da IA
-        cursor.execute("""
-            SELECT d.id, d.title, d.abstract, s.suggested_decision, s.rationale_jsonb,
-                   r.reason_code, r.reason, r.created_at
-            FROM deduplicated_papers d
-            JOIN screening_decisions s ON d.id = s.paper_id
-            LEFT JOIN LATERAL (
-                SELECT reason_code, reason, created_at
-                FROM screening_reassessments sr
-                WHERE sr.paper_id = d.id
-                  AND sr.project_id = d.project_id
-                  AND sr.action = 'return_to_screening'
-                ORDER BY sr.created_at DESC
-                LIMIT 1
-            ) r ON TRUE
-            WHERE d.project_id = %s
-              AND s.human_decision IS NULL
-            LIMIT 1;
-        """, (project_id,))
-        artigo = cursor.fetchone()
-        conexao.close()
-        return artigo
-    except Exception as e:
-        st.error(f"Erro ao conectar ao banco de dados: {e}")
-        return None
 
 # ==========================================
 # INTERFACE GRÁFICA (STREAMLIT)
@@ -72,12 +26,28 @@ project_id = str(projeto["id"])
 st.title("🧑‍⚕️ Triagem Humana (Human-in-the-Loop)")
 st.caption(f"Projeto ativo: **{projeto['title']}**")
 
+try:
+    resumo = get_screening_summary(project_id)
+except Exception as exc:
+    st.error(f"Não foi possível calcular as pendências da triagem: {exc}")
+    st.stop()
+
 # --- CABEÇALHO COM BOTÃO DE AÇÃO INTERATIVO ---
 col1, col2 = st.columns([2, 1])
 with col1:
     st.markdown("Revise a sugestão da Inteligência Artificial e tome a decisão final sobre os artigos recolhidos.")
 with col2:
-    if st.button("🤖 Rodar IA nos Novos Artigos", type="primary", use_container_width=True):
+    if st.button(
+        "🤖 Rodar IA nos Novos Artigos",
+        type="primary",
+        use_container_width=True,
+        disabled=resumo["awaiting_ai"] == 0,
+        help=(
+            f"{resumo['awaiting_ai']} artigo(s) possui(em) resumo e ainda aguardam a IA."
+            if resumo["awaiting_ai"]
+            else "Não há artigos com resumo adequado aguardando avaliação da IA."
+        ),
+    ):
         # Componentes visuais para suavizar a espera (Requisito de UX)
         barra_progresso = st.progress(0)
         texto_status = st.empty()
@@ -104,7 +74,33 @@ with col2:
 
 st.divider()
 
-artigo_atual = buscar_artigo_pendente(project_id)
+st.subheader("Situação da triagem")
+metricas = st.columns(5)
+metricas[0].metric("Artigos únicos", resumo["total_papers"])
+metricas[1].metric("Aguardando IA", resumo["awaiting_ai"])
+metricas[2].metric("Aguardando humano", resumo["awaiting_human"])
+metricas[3].metric("Decisões finais", resumo["final_decisions"])
+metricas[4].metric("Talvez", resumo["maybe"])
+
+st.caption(
+    f"Incluídos: {resumo['included']} · Excluídos: {resumo['excluded']} · "
+    f"Sem resumo adequado: {resumo['without_usable_abstract']} · "
+    f"Pendentes na deduplicação: {resumo['awaiting_deduplication']}"
+)
+
+if resumo["accounted_papers"] != resumo["total_papers"] or resumo["unknown_decision"]:
+    st.error(
+        "A contagem encontrou um estado de triagem não reconhecido. "
+        "Consulte os registros antes de continuar."
+    )
+
+st.divider()
+
+try:
+    artigo_atual = get_next_pending_human_screening(project_id)
+except Exception as exc:
+    st.error(f"Não foi possível carregar a fila de validação humana: {exc}")
+    st.stop()
 
 if artigo_atual:
     (
@@ -198,6 +194,28 @@ if artigo_atual:
                 except Exception as exc:
                     st.error(f"Erro ao gravar a decisão no banco de dados: {exc}")
 else:
-    st.balloons()
-    st.success("🎉 Todos os artigos já foram validados por você!")
-    st.info("👉 Se acabou de realizar uma nova pesquisa, clique no botão superior direito **'🤖 Rodar IA nos Novos Artigos'** para que o agente processe as novidades.")
+    if resumo["awaiting_ai"]:
+        st.warning(
+            f"🤖 **{resumo['awaiting_ai']} artigo(s) aguardam avaliação da IA.** "
+            "Use o botão superior para processar essa fila."
+        )
+    if resumo["without_usable_abstract"]:
+        st.warning(
+            f"📄 **{resumo['without_usable_abstract']} artigo(s) não possuem resumo adequado "
+            "para avaliação automática.** Complete os metadados ou avalie a origem antes "
+            "de concluir a triagem."
+        )
+    if resumo["maybe"]:
+        st.info(
+            f"🟡 **{resumo['maybe']} artigo(s) estão marcados como Talvez.** "
+            "Eles foram revisados, mas ainda não possuem decisão final de inclusão ou exclusão."
+        )
+    if resumo["awaiting_deduplication"]:
+        st.info(
+            f"🔎 **{resumo['awaiting_deduplication']} registro(s) aguardam revisão na "
+            "Deduplicação.** Eles só entrarão nesta fila depois dessa decisão."
+        )
+    if resumo["is_complete"]:
+        st.success("🎉 Todos os artigos passaram pela IA e receberam uma decisão humana final!")
+    elif resumo["total_papers"] == 0 and not resumo["awaiting_deduplication"]:
+        st.info("Ainda não há artigos liberados para triagem neste projeto.")
