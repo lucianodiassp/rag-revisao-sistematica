@@ -127,6 +127,8 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 ### Triagem humana assistida
 
 - Sugestão de inclusão ou exclusão, com confiança e justificativa.
+- Painel por projeto com artigos aguardando IA, validação humana, decisão final ou revisão como **Talvez**.
+- Identificação separada de artigos sem resumo adequado e registros ainda pendentes na deduplicação.
 - Decisão humana entre **Incluir**, **Excluir** e **Talvez**.
 - Exclusão com categoria metodológica estruturada e justificativa textual obrigatória.
 - Somente artigos incluídos seguem para PDFs, RAG e extração.
