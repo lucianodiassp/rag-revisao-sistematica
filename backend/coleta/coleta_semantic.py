@@ -8,7 +8,7 @@ from backend.app.bibliographic_config import (
 )
 from backend.coleta.http_utils import safe_request_error
 
-def recolher_artigos_semantic(query_term, max_resultados=100):
+def recolher_artigos_semantic(query_term, max_resultados=100, raise_on_error=False):
     """
     Pesquisa artigos no Semantic Scholar com mecanismo de retry e suporte a API Key (Premium Tier).
     """
@@ -137,7 +137,13 @@ def recolher_artigos_semantic(query_term, max_resultados=100):
                 f"{tentativa}: {safe_request_error(e, api_key)}"
             )
             if tentativa == max_tentativas:
+                if raise_on_error:
+                    raise
                 return [] 
             time.sleep(3)
             
+    if raise_on_error:
+        raise RuntimeError(
+            "O Semantic Scholar manteve o limite temporário após todas as tentativas."
+        )
     return []

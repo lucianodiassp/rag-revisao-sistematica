@@ -161,6 +161,55 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
                 """,
                 (project_id,),
             )
+            calibration_sentinels = _fetch_all(
+                cursor,
+                """
+                SELECT id, project_id, title, canonical_doi, notes, is_active,
+                       created_at, updated_at
+                FROM search_calibration_sentinels
+                WHERE project_id = %s
+                ORDER BY created_at, id
+                """,
+                (project_id,),
+            )
+            calibration_runs = _fetch_all(
+                cursor,
+                """
+                SELECT id, project_id, protocol_version, protocol_fingerprint,
+                       max_results_per_source, status, queries_jsonb,
+                       sentinel_snapshot_jsonb, source_results_jsonb,
+                       summary_jsonb, created_at
+                FROM search_calibration_runs
+                WHERE project_id = %s
+                ORDER BY created_at, id
+                """,
+                (project_id,),
+            )
+            calibration_matches = _fetch_all(
+                cursor,
+                """
+                SELECT m.id, m.run_id, m.sentinel_id, m.source_code,
+                       m.result_rank, m.match_method, m.similarity_score,
+                       m.matched_title, m.matched_doi, m.evidence_jsonb, m.created_at
+                FROM search_calibration_matches m
+                JOIN search_calibration_runs r ON r.id = m.run_id
+                WHERE r.project_id = %s
+                ORDER BY r.created_at, m.source_code, m.result_rank, m.id
+                """,
+                (project_id,),
+            )
+            press_reviews = _fetch_all(
+                cursor,
+                """
+                SELECT id, project_id, protocol_version, protocol_fingerprint,
+                       checklist_jsonb, overall_decision, reviewer_name,
+                       review_notes, reviewed_at, updated_at
+                FROM press_search_reviews
+                WHERE project_id = %s
+                ORDER BY protocol_version, id
+                """,
+                (project_id,),
+            )
             retrieved_records = _fetch_all(
                 cursor,
                 """
@@ -413,6 +462,10 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
             "project": project,
             "protocol_versions": protocol_versions,
             "searches": searches,
+            "calibration_sentinels": calibration_sentinels,
+            "calibration_runs": calibration_runs,
+            "calibration_matches": calibration_matches,
+            "press_reviews": press_reviews,
             "retrieved_records": retrieved_records,
             "papers": papers,
             "deduplication": deduplication,
@@ -496,6 +549,9 @@ def _counts(dataset: dict) -> dict:
     return {
         "protocol_versions": len(dataset.get("protocol_versions") or []),
         "search_executions": len(dataset.get("searches") or []),
+        "calibration_sentinels": len(dataset.get("calibration_sentinels") or []),
+        "calibration_runs": len(dataset.get("calibration_runs") or []),
+        "press_reviews": len(dataset.get("press_reviews") or []),
         "retrieved_records": len(dataset.get("retrieved_records") or []),
         "unique_papers": len(dataset.get("papers") or []),
         "deduplication_decisions": len(dataset.get("deduplication") or []),
@@ -548,6 +604,9 @@ literais já usados como evidência permanecem presentes para permitir a auditor
 
 - Versões do protocolo: {counts['protocol_versions']}
 - Execuções de busca/importação: {counts['search_executions']}
+- Artigos sentinela: {counts['calibration_sentinels']}
+- Buscas piloto de calibração: {counts['calibration_runs']}
+- Revisões humanas PRESS: {counts['press_reviews']}
 - Registros recuperados: {counts['retrieved_records']}
 - Artigos únicos: {counts['unique_papers']}
 - Decisões de triagem: {counts['screening_decisions']}
@@ -620,6 +679,11 @@ def build_reproducibility_package(dataset: dict, generated_at: str | None = None
         "02_buscas/execucoes.json": _json_bytes(dataset.get("searches") or []),
         "02_buscas/execucoes.csv": _csv_bytes(dataset.get("searches") or []),
         "02_buscas/registros_recuperados.json": _json_bytes(dataset.get("retrieved_records") or []),
+        "02_buscas/artigos_sentinela.json": _json_bytes(dataset.get("calibration_sentinels") or []),
+        "02_buscas/calibracoes.json": _json_bytes(dataset.get("calibration_runs") or []),
+        "02_buscas/calibracao_correspondencias.json": _json_bytes(dataset.get("calibration_matches") or []),
+        "02_buscas/calibracao_correspondencias.csv": _csv_bytes(dataset.get("calibration_matches") or []),
+        "02_buscas/revisoes_press.json": _json_bytes(dataset.get("press_reviews") or []),
         "03_selecao/artigos_unicos.json": _json_bytes(dataset.get("papers") or []),
         "03_selecao/artigos_unicos.csv": _csv_bytes(dataset.get("papers") or []),
         "03_selecao/deduplicacao.json": _json_bytes(dataset.get("deduplication") or []),

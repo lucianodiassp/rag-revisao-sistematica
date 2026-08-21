@@ -24,6 +24,11 @@ pages = [
         title="Configuração da Pesquisa",
         icon="⚙️",
     ),
+    st.Page(
+        "views/11_Calibracao_Busca.py",
+        title="Calibração da Busca",
+        icon="🎯",
+    ),
     st.Page("views/1_Triagem.py", title="Triagem", icon="🧑‍⚕️"),
     st.Page(
         "views/2_Matriz_Evidencias.py",
