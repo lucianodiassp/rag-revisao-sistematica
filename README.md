@@ -92,6 +92,7 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Inventário da indexação sem copiar PDFs, texto integral dos chunks ou vetores de embedding.
 - Matriz de evidências em CSV, extrações com fontes literais e avaliações metodológicas.
 - Snapshots PRISMA, Golden Set, benchmarks, auditorias e interações dos agentes.
+- Artigos sentinela, buscas piloto, correspondências explicáveis e revisões PRESS.
 - Configurações de modelos efetivamente registradas nas interações, sem credenciais.
 - Inclusão da última síntese persistida pelo Agente Relator, quando disponível.
 - Manifesto versionado com contagens, tamanho e hash SHA-256 de cada arquivo.
@@ -121,6 +122,18 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Uso da string confirmada por fonte, com fallback explícito para a estratégia geral.
 - Registro auditável do arquivo importado por nome, hash SHA-256, codificação e resultado.
 - Preservação da entrada BibTeX bruta e encaminhamento de candidatos por título à revisão humana.
+
+### Calibração rastreável da estratégia de busca
+
+- Cadastro de artigos sentinela relevantes conhecidos, com DOI, título, justificativa e estado ativo.
+- Busca piloto isolada nas fontes habilitadas, sem inserir resultados no corpus ou na triagem.
+- Correspondência explicável por DOI exato, título exato ou título muito semelhante.
+- Sensibilidade em artigos conhecidos global e por fonte, posição de cada sentinela e lista de ausentes.
+- Execuções imutáveis ligadas à versão, ao hash e às strings do protocolo.
+- Comparação entre pilotos de versões diferentes e exportação das evidências em JSON e CSV.
+- Checklist humano adaptado aos seis domínios do PRESS 2015, com decisão e histórico por versão.
+- Inclusão de sentinelas, pilotos, correspondências e revisões PRESS no pacote de reprodutibilidade.
+- O indicador não estima a sensibilidade total da revisão; mede apenas a recuperação dos sentinelas cadastrados.
 
 ### Configuração central de IA
 
@@ -540,6 +553,10 @@ recadastre as credenciais pelas telas de configuração.
 - Informe a pergunta e, opcionalmente, solicite um rascunho PICO/PICOS à IA.
 - Edite critérios, elegibilidade, conceitos, sinônimos e strings por fonte.
 - Informe o motivo, confirme a revisão humana e crie a versão do protocolo.
+- Abra **Calibração da Busca**, cadastre artigos sentinela e execute um piloto.
+- Confira a sensibilidade conhecida, as posições e os sentinelas ausentes; refine o
+  protocolo e compare uma nova versão quando necessário.
+- Preencha e registre a revisão humana PRESS da versão que seguirá para a coleta.
 - Consulte as APIs habilitadas e/ou importe um arquivo `.bib`.
 - Confira a prévia e o relatório da importação antes de seguir para a triagem.
 
@@ -651,11 +668,16 @@ python -m pytest -q
 ```
 
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
-importação BibTeX, deduplicação explicável, reranking com fallback, métricas do
+importação BibTeX, calibração da estratégia de busca, deduplicação explicável,
+reranking com fallback, métricas do
 Golden Set, isolamento por projeto, indexação de PDFs, evidências rastreáveis e
 validação da chave-mestra usada na migração para Docker. Também verifica criptografia,
 integridade e recuperação automática dos backups, além da estrutura, privacidade,
 acentuação e manifesto do pacote de reprodutibilidade.
+
+A revisão PRESS implementada é uma adaptação operacional dos seis domínios do
+[PRESS 2015 Guideline Statement](https://pubmed.ncbi.nlm.nih.gov/27005575/); ela
+apoia a revisão humana, mas não substitui a avaliação por um especialista em informação.
 
 Os testes SQL de integração ficam em `tests/*.sql`. Exemplo no PowerShell:
 

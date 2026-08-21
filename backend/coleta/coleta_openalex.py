@@ -36,7 +36,7 @@ def reconstruir_abstract_openalex(inverted_index):
         print(f"Erro ao reconstruir abstract do OpenAlex: {e}")
         return "Abstract indisponível."
 
-def recolher_artigos_openalex(query_term, max_resultados=10):
+def recolher_artigos_openalex(query_term, max_resultados=10, raise_on_error=False):
     """
     Pesquisa artigos no OpenAlex utilizando autenticação via API Key
     e formata-os para o contrato de dados do sistema.
@@ -135,6 +135,8 @@ def recolher_artigos_openalex(query_term, max_resultados=10):
 
     except requests.exceptions.RequestException as e:
         print(f"❌ Erro ao contactar o OpenAlex: {safe_request_error(e, api_key)}")
+        if raise_on_error:
+            raise
         return []
 
 if __name__ == "__main__":

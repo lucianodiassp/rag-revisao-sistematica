@@ -164,10 +164,16 @@ o projeto sem substituir sua instalação nem receber credenciais ou PDFs proteg
 7. Abra o histórico e confira a pergunta, os critérios, o PICO/PICOS, a string e o hash.
 8. Em um projeto que já possua artigos, confirme o alerta sobre repetição de buscas
    ou reavaliação da triagem.
-9. Na seção de coleta, consulte as strings confirmadas por fonte.
-10. Abra a aba **Importar BibTeX**, selecione um `.bib`, confira a prévia e importe.
-11. Opcionalmente, use **Consultar APIs** para combinar as duas formas de coleta.
-12. Abra **Deduplicação**, compare os candidatos e registre as decisões justificadas.
+9. Abra **Calibração da Busca** e cadastre pelo menos dois artigos sentinela, preferindo DOI.
+10. Execute a busca piloto e confira a sensibilidade conhecida global e por fonte,
+    a posição das correspondências e os sentinelas ausentes.
+11. Confirme que a quantidade de artigos e a Triagem não mudaram após o piloto.
+12. Preencha os seis domínios PRESS, confirme a revisão humana e registre a decisão.
+13. Refine a string, crie outra versão do protocolo, repita o piloto e compare as execuções.
+14. Na seção de coleta, consulte as strings confirmadas por fonte.
+15. Abra a aba **Importar BibTeX**, selecione um `.bib`, confira a prévia e importe.
+16. Opcionalmente, use **Consultar APIs** para combinar as duas formas de coleta.
+17. Abra **Deduplicação**, compare os candidatos e registre as decisões justificadas.
 
 ### ✅ Critério de Sucesso
 
@@ -178,6 +184,9 @@ A plataforma deve:
 * Uma versão só deve ser criada após confirmação humana e justificativa.
 * O histórico anterior deve permanecer inalterado e consultável.
 * Cada busca deve registrar versão e hash do protocolo em `query_jsonb`.
+* O piloto deve permanecer fora de `retrieved_records`, `deduplicated_papers` e da Triagem.
+* Cada correspondência deve mostrar regra, similaridade, fonte e posição no resultado.
+* O histórico deve preservar métricas, strings, versão, hash, sentinelas e revisão PRESS.
 * Novos pareceres da IA devem registrar a mesma referência e o retrato dos critérios.
 * Strings específicas devem ser usadas por fonte; campos vazios devem usar a geral.
 * Exibir a prévia do BibTeX e informar entradas válidas, sem DOI e sem abstract.

@@ -46,7 +46,14 @@ REQUIRED_JSON_FILES = {
     "07_agentes/interacoes.json": "interactions",
 }
 
-LIST_DATASETS = set(REQUIRED_JSON_FILES.values()) - {"project"}
+OPTIONAL_JSON_FILES = {
+    "02_buscas/artigos_sentinela.json": "calibration_sentinels",
+    "02_buscas/calibracoes.json": "calibration_runs",
+    "02_buscas/calibracao_correspondencias.json": "calibration_matches",
+    "02_buscas/revisoes_press.json": "press_reviews",
+}
+
+LIST_DATASETS = (set(REQUIRED_JSON_FILES.values()) | set(OPTIONAL_JSON_FILES.values())) - {"project"}
 UUID_PATTERN = re.compile(
     r"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b"
 )
@@ -218,6 +225,8 @@ def validate_reproducibility_package(data: bytes) -> dict:
             target: _read_json(archive, path)
             for path, target in REQUIRED_JSON_FILES.items()
         }
+        for path, target in OPTIONAL_JSON_FILES.items():
+            dataset[target] = _read_json(archive, path) if path in actual else []
 
     if not isinstance(dataset["project"], dict):
         raise ReproducibilityImportError("Os dados do projeto possuem formato inválido.")
@@ -307,6 +316,18 @@ def _prepare_import(dataset: dict, title: str | None = None) -> dict:
         "project": {source_project_id: new_project_id},
         "protocol": _new_id_map(dataset["protocol_versions"], "protocolos", False),
         "search": _new_id_map(dataset["searches"], "buscas", False),
+        "calibration_sentinel": _new_id_map(
+            dataset["calibration_sentinels"], "artigos sentinela", False
+        ),
+        "calibration_run": _new_id_map(
+            dataset["calibration_runs"], "calibrações de busca", False
+        ),
+        "calibration_match": _new_id_map(
+            dataset["calibration_matches"], "correspondências de calibração", False
+        ),
+        "press_review": _new_id_map(
+            dataset["press_reviews"], "revisões PRESS", False
+        ),
         "record": _new_id_map(dataset["retrieved_records"], "registros", False),
         "paper": _new_id_map(dataset["papers"], "artigos"),
         "dedup": _new_id_map(dataset["deduplication"], "deduplicações", False),
@@ -426,6 +447,95 @@ def _insert_import(cursor, dataset: dict, prepared: dict) -> None:
                 maps["search"][_source_id(row, "search")], project_id,
                 row.get("source") or "imported_package", row.get("query_text") or "",
                 Json(_remap_json(row.get("query_jsonb") or {}, remap)), row.get("executed_at"),
+            ),
+        )
+
+    for row in dataset["calibration_sentinels"]:
+        cursor.execute(
+            """
+            INSERT INTO search_calibration_sentinels
+                (id, project_id, title, canonical_doi, notes, is_active,
+                 created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP),
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["calibration_sentinel"][_source_id(row, "calibration_sentinel")],
+                project_id, row.get("title") or "Artigo sentinela importado",
+                row.get("canonical_doi"), row.get("notes"), bool(row.get("is_active", True)),
+                row.get("created_at"), row.get("updated_at"),
+            ),
+        )
+
+    for row in dataset["calibration_runs"]:
+        cursor.execute(
+            """
+            INSERT INTO search_calibration_runs
+                (id, project_id, protocol_version, protocol_fingerprint,
+                 max_results_per_source, status, queries_jsonb,
+                 sentinel_snapshot_jsonb, source_results_jsonb, summary_jsonb, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["calibration_run"][_source_id(row, "calibration_run")], project_id,
+                int(row.get("protocol_version") or 1),
+                row.get("protocol_fingerprint") or ("0" * 64),
+                int(row.get("max_results_per_source") or 100),
+                row.get("status") or "completed",
+                Json(_remap_json(row.get("queries_jsonb") or {}, remap)),
+                Json(_remap_json(row.get("sentinel_snapshot_jsonb") or [], remap)),
+                Json(_remap_json(row.get("source_results_jsonb") or {}, remap)),
+                Json(_remap_json(row.get("summary_jsonb") or {}, remap)),
+                row.get("created_at"),
+            ),
+        )
+
+    for row in dataset["calibration_matches"]:
+        cursor.execute(
+            """
+            INSERT INTO search_calibration_matches
+                (id, run_id, sentinel_id, source_code, result_rank, match_method,
+                 similarity_score, matched_title, matched_doi, evidence_jsonb, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["calibration_match"][_source_id(row, "calibration_match")],
+                _mapped(maps["calibration_run"], row.get("run_id"), "execução de calibração"),
+                _mapped(
+                    maps["calibration_sentinel"], row.get("sentinel_id"),
+                    "artigo sentinela", False,
+                ),
+                row.get("source_code") or "openalex", int(row.get("result_rank") or 1),
+                row.get("match_method") or "title_exact",
+                row.get("similarity_score") or 0,
+                row.get("matched_title") or "Título importado", row.get("matched_doi"),
+                Json(_remap_json(row.get("evidence_jsonb") or {}, remap)),
+                row.get("created_at"),
+            ),
+        )
+
+    for row in dataset["press_reviews"]:
+        cursor.execute(
+            """
+            INSERT INTO press_search_reviews
+                (id, project_id, protocol_version, protocol_fingerprint,
+                 checklist_jsonb, overall_decision, reviewer_name, review_notes,
+                 reviewed_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP),
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["press_review"][_source_id(row, "press_review")], project_id,
+                int(row.get("protocol_version") or 1),
+                row.get("protocol_fingerprint") or ("0" * 64),
+                Json(_remap_json(row.get("checklist_jsonb") or [], remap)),
+                row.get("overall_decision") or "changes_requested",
+                row.get("reviewer_name"), row.get("review_notes"),
+                row.get("reviewed_at"), row.get("updated_at"),
             ),
         )
 

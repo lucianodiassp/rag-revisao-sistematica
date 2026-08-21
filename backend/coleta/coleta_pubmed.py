@@ -16,7 +16,7 @@ def _adicionar_identificacao_pubmed(params, config):
         params["tool"] = config.tool_name
     return params
 
-def recolher_artigos_pubmed(query_term, max_resultados=10):
+def recolher_artigos_pubmed(query_term, max_resultados=10, raise_on_error=False):
     """
     Pesquisa artigos no PubMed (NCBI) e formata-os para o contrato de dados da equipa,
     extraindo o Abstract real por meio do serviço E-Fetch.
@@ -154,7 +154,11 @@ def recolher_artigos_pubmed(query_term, max_resultados=10):
 
     except requests.exceptions.RequestException as e:
         print(f"❌ Erro ao contactar o PubMed: {safe_request_error(e, config.api_key)}")
+        if raise_on_error:
+            raise
         return []
     except ET.ParseError as e:
         print(f"❌ Erro ao processar o XML de abstracts do PubMed: {e}")
+        if raise_on_error:
+            raise
         return []
