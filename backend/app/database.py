@@ -16,6 +16,7 @@ from backend.app.project_utils import (
     normalizar_doi,
     normalizar_titulo,
 )
+from backend.app.protocol_service import protocol_fingerprint
 
 
 load_dotenv()
@@ -148,11 +149,25 @@ def registrar_busca(project_id, fonte, query_text, parametros=None):
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
+            SELECT protocol_version, criteria_jsonb
+            FROM review_projects
+            WHERE id = %s
+            """,
+            (project_id,),
+        )
+        projeto = cursor.fetchone()
+        if not projeto:
+            raise ValueError("Projeto não encontrado ao registrar a busca.")
+        metadados = dict(parametros or {})
+        metadados["protocol_version"] = int(projeto[0])
+        metadados["protocol_fingerprint"] = protocol_fingerprint(projeto[1])
+        cursor.execute(
+            """
             INSERT INTO search_queries (project_id, source, query_text, query_jsonb)
             VALUES (%s, %s, %s, %s)
             RETURNING id
             """,
-            (project_id, fonte, query_text, Json(parametros or {})),
+            (project_id, fonte, query_text, Json(metadados)),
         )
         return cursor.fetchone()[0]
 
@@ -163,7 +178,8 @@ def atualizar_metadados_busca(project_id, search_query_id, parametros):
         cursor.execute(
             """
             UPDATE search_queries
-            SET query_jsonb = %s
+            SET query_jsonb = COALESCE(query_jsonb, '{}'::jsonb)
+                || (%s::jsonb - 'protocol_version' - 'protocol_fingerprint')
             WHERE id = %s AND project_id = %s
             """,
             (Json(parametros or {}), search_query_id, project_id),

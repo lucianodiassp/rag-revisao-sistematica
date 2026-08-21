@@ -18,12 +18,33 @@ def estruturar_pergunta_pesquisa(pergunta_livre, project_id=None):
             "population": "Definição da População ou Problema",
             "intervention": "Definição da Intervenção ou Método",
             "comparison": "Comparação (se aplicável, ou 'Não se aplica')",
-            "outcome": "Desfechos esperados ou métricas"
+            "outcome": "Desfechos esperados ou métricas",
+            "study_design": "Desenhos de estudo adequados (PICOS)"
         }},
-        "inclusion_criteria": ["Critério 1", "Critério 2"],
-        "exclusion_criteria": ["Critério 1", "Critério 2"],
-        "search_string": "Uma string booleana rigorosa otimizada para PubMed/Scopus/IEEE usando AND/OR e parênteses."
+        "eligibility": {{
+            "year_from": null,
+            "year_to": null,
+            "languages": ["Idioma aceito"],
+            "publication_types": ["Tipo de publicação aceito"],
+            "study_designs": ["Desenho de estudo aceito"]
+        }},
+        "inclusion_criteria": ["Condição objetiva de inclusão 1", "Condição objetiva de inclusão 2"],
+        "exclusion_criteria": ["Condição objetiva de exclusão 1", "Condição objetiva de exclusão 2"],
+        "search_concepts": [
+            {{"concept": "População ou problema", "terms": ["termo livre", "sinônimo"]}},
+            {{"concept": "Intervenção ou método", "terms": ["termo livre", "sinônimo"]}}
+        ],
+        "search_string": "String booleana geral rigorosa usando AND/OR e parênteses",
+        "source_search_strings": {{
+            "openalex": "Consulta adequada ao OpenAlex",
+            "pubmed": "Consulta adequada ao PubMed, incluindo MeSH quando pertinente",
+            "semantic_scholar": "Consulta adequada ao Semantic Scholar"
+        }}
     }}
+
+    Os critérios devem ser observáveis no título/resumo sempre que possível. Não exclua
+    automaticamente por acesso ao texto integral. Diferencie conceitos usados para ampliar
+    a busca de condições aplicadas posteriormente na triagem.
     """
     
     try:
