@@ -47,7 +47,13 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 
 - Criação e seleção de múltiplos projetos de pesquisa.
 - Isolamento do corpus e dos resultados por `project_id`.
-- Versionamento da pergunta, PICO, critérios, estratégia de busca e perguntas de auditoria.
+- Rascunho da IA separado da versão metodológica confirmada pelo pesquisador.
+- Editor de pergunta, PICO/PICOS, período, idiomas, tipos de publicação e desenhos de estudo.
+- Critérios de inclusão e exclusão editáveis, com matriz de conceitos e sinônimos.
+- String geral e strings opcionais específicas para OpenAlex, PubMed e Semantic Scholar.
+- Confirmação humana e motivo obrigatório antes de criar uma versão imutável.
+- Histórico consultável com pergunta, critérios, PICO/PICOS, estratégia e hash SHA-256.
+- Alerta de impacto quando já existem buscas, artigos ou pareceres de triagem.
 - Identificador estável de artigo por projeto, baseado no DOI normalizado ou no título normalizado.
 - Consolidação de duplicatas com preservação da proveniência das diferentes fontes.
 
@@ -111,6 +117,8 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Teste de acesso sem persistir artigos.
 - Retry limitado para falhas transitórias e respostas `429`.
 - Registro da configuração pública usada na busca, sem segredos ou e-mail literal.
+- Registro automático da versão e do hash do protocolo usado em cada consulta ou importação.
+- Uso da string confirmada por fonte, com fallback explícito para a estratégia geral.
 - Registro auditável do arquivo importado por nome, hash SHA-256, codificação e resultado.
 - Preservação da entrada BibTeX bruta e encaminhamento de candidatos por título à revisão humana.
 
@@ -127,6 +135,7 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 ### Triagem humana assistida
 
 - Sugestão de inclusão ou exclusão, com confiança e justificativa.
+- Parecer da IA vinculado à versão, ao hash e ao retrato dos critérios de elegibilidade utilizados.
 - Painel por projeto com artigos aguardando IA, validação humana, decisão final ou revisão como **Talvez**.
 - Identificação separada de artigos sem resumo adequado e registros ainda pendentes na deduplicação.
 - Decisão humana entre **Incluir**, **Excluir** e **Talvez**.
@@ -528,8 +537,9 @@ recadastre as credenciais pelas telas de configuração.
 - Crie, selecione ou importe um projeto pelo painel lateral.
 - Para importar, envie o ZIP de reprodutibilidade, confira a prévia, defina o novo
   título e confirme que PDFs e embeddings deverão ser adicionados novamente.
-- Informe a pergunta e solicite a estruturação PICO.
-- Revise critérios e estratégia de busca.
+- Informe a pergunta e, opcionalmente, solicite um rascunho PICO/PICOS à IA.
+- Edite critérios, elegibilidade, conceitos, sinônimos e strings por fonte.
+- Informe o motivo, confirme a revisão humana e crie a versão do protocolo.
 - Consulte as APIs habilitadas e/ou importe um arquivo `.bib`.
 - Confira a prévia e o relatório da importação antes de seguir para a triagem.
 

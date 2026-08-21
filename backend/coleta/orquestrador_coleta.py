@@ -31,8 +31,9 @@ def gerar_id_deterministico(artigo, project_id):
     return gerar_id_artigo(artigo, project_id)
 
 
-def iniciar_recolha(query, project_id=None, max_por_fonte=5):
+def iniciar_recolha(query, project_id=None, max_por_fonte=5, source_queries=None):
     project_id = resolver_project_id(project_id)
+    source_queries = source_queries or {}
     print("=======================================================")
     print(f"🚀 A iniciar a coleta do projeto {project_id}: '{query}'")
     print("=======================================================\n")
@@ -58,13 +59,16 @@ def iniciar_recolha(query, project_id=None, max_por_fonte=5):
 
     for indice, (source_code, nome_fonte, coletor, config) in enumerate(fontes, 1):
         print(f"[Fonte {indice}/{len(fontes)}] A contactar {nome_fonte}...")
-        artigos = coletor(query, max_resultados=max_por_fonte)
+        source_query = str(source_queries.get(source_code) or query).strip()
+        artigos = coletor(source_query, max_resultados=max_por_fonte)
         busca_id = registrar_busca(
             project_id,
             nome_fonte,
-            query,
+            source_query,
             {
                 "source_code": source_code,
+                "general_query": query,
+                "source_specific_query": source_query != query,
                 "max_resultados": max_por_fonte,
                 "resultados_retornados": len(artigos),
                 "source_configuration": config.public_metadata(),

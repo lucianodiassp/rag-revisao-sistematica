@@ -1,6 +1,8 @@
 import os
 import sys
+import uuid
 
+import pandas as pd
 import streamlit as st
 
 
@@ -13,6 +15,14 @@ from backend.app.database import (  # noqa: E402
     salvar_protocolo_projeto,
 )
 from backend.app.demo_project import ensure_demo_project  # noqa: E402
+from backend.app.protocol_service import (  # noqa: E402
+    compare_protocols,
+    get_protocol_change_impact,
+    get_protocol_history,
+    normalize_protocol,
+    protocol_fingerprint,
+    validate_protocol,
+)
 from backend.app.reproducibility_import import (  # noqa: E402
     ReproducibilityImportError,
     import_reproducibility_package,
@@ -187,73 +197,362 @@ if (protocolo_atual.get("_demo") or {}).get("seed_id"):
 
 st.caption(f"Projeto ativo: **{projeto['title']}** · protocolo v{projeto['protocol_version']}")
 st.markdown(
-    "Defina o escopo da revisão. A IA ajuda a estruturar a pergunta em PICO e a "
-    "gerar a estratégia de busca, mas cada versão permanece registrada para auditoria."
+    "Defina e confirme o escopo da revisão antes da coleta. A IA pode propor um "
+    "rascunho PICO/PICOS, critérios e strings, mas somente a confirmação humana cria "
+    "uma nova versão do protocolo."
 )
 st.divider()
 
-pergunta_livre = st.text_area(
-    "Qual é a sua pergunta de pesquisa ou tema principal?",
+draft_key = f"protocol_draft_{project_id}"
+pergunta_para_ia = st.text_area(
+    "Pergunta de pesquisa usada para gerar um rascunho",
     value=projeto.get("question") or "",
     height=100,
+    help="A geração pela IA não altera a versão confirmada do protocolo.",
 )
 
-if st.button("🧠 Estruturar Pergunta (IA)", type="primary"):
-    if not pergunta_livre.strip():
+if st.button("🧠 Gerar rascunho com IA", type="primary"):
+    if not pergunta_para_ia.strip():
         st.warning("Digite uma pergunta ou tema de pesquisa.")
     else:
-        with st.spinner("A estruturar a pergunta e gerar a estratégia de busca..."):
-            resultado = estruturar_pergunta_pesquisa(pergunta_livre, project_id)
+        with st.spinner("A propor PICO/PICOS, critérios, conceitos e estratégias..."):
+            resultado = estruturar_pergunta_pesquisa(pergunta_para_ia, project_id)
 
         if resultado:
             resultado["audit_questions"] = protocolo_atual.get("audit_questions", [])
-            versao = salvar_protocolo_projeto(
-                project_id,
-                pergunta_livre,
-                resultado,
-                motivo="Estruturação da pergunta pela IA com confirmação humana",
-            )
-            st.session_state[f"protocol_preview_{project_id}"] = resultado
-            st.success(f"Protocolo salvo como versão {versao}.")
-            protocolo_atual = resultado
+            for key, value in protocolo_atual.items():
+                if str(key).startswith("_"):
+                    resultado[key] = value
+            st.session_state[draft_key] = {
+                "question": pergunta_para_ia.strip(),
+                "protocol": normalize_protocol(resultado),
+                "origin": "ai",
+                "token": f"ai-{uuid.uuid4().hex}",
+            }
+            st.success("Rascunho gerado. Revise todos os campos antes de confirmar.")
+            st.rerun()
         else:
-            st.error("Não foi possível gerar a estrutura. Tente novamente.")
+            st.error("Não foi possível gerar o rascunho. Tente novamente.")
 
-protocolo_exibido = st.session_state.get(f"protocol_preview_{project_id}", protocolo_atual)
+protocolo_normalizado = normalize_protocol(protocolo_atual)
+protocol_is_confirmed = bool(
+    projeto.get("status") == "search_ready" and protocolo_normalizado.get("search_string")
+)
+draft = st.session_state.get(draft_key) or {
+    "question": projeto.get("question") or "",
+    "protocol": protocolo_normalizado,
+    "origin": "confirmed",
+    "token": f"confirmed-{projeto['protocol_version']}",
+}
+draft_protocol = normalize_protocol(draft["protocol"])
+impacto = get_protocol_change_impact(project_id)
 
-if protocolo_exibido.get("pico"):
-    st.subheader("1. Estrutura PICO")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.info(f"**População (P):**\n{protocolo_exibido['pico'].get('population', '')}")
-    col2.success(f"**Intervenção (I):**\n{protocolo_exibido['pico'].get('intervention', '')}")
-    col3.warning(f"**Comparação (C):**\n{protocolo_exibido['pico'].get('comparison', '')}")
-    col4.error(f"**Desfecho (O):**\n{protocolo_exibido['pico'].get('outcome', '')}")
+st.subheader("1. Editor do protocolo")
+if draft["origin"] == "ai":
+    if protocol_is_confirmed:
+        st.info(
+            "Este conteúdo é somente um **rascunho proposto pela IA**. A versão "
+            f"confirmada continua sendo a v{projeto['protocol_version']}."
+        )
+    else:
+        st.info(
+            "Este conteúdo é somente um **rascunho proposto pela IA**. O projeto "
+            "ainda não possui uma versão metodológica confirmada."
+        )
+else:
+    if protocol_is_confirmed:
+        st.success(f"Editando uma cópia da versão confirmada v{projeto['protocol_version']}.")
+    else:
+        st.info("Prepare e confirme a primeira versão metodológica deste projeto.")
 
-    st.subheader("2. Critérios de elegibilidade")
-    inclusao, exclusao = st.columns(2)
-    with inclusao:
-        st.write("**Inclusão**")
-        for criterio in protocolo_exibido.get("inclusion_criteria", []):
-            st.write(f"- ✅ {criterio}")
-    with exclusao:
-        st.write("**Exclusão**")
-        for criterio in protocolo_exibido.get("exclusion_criteria", []):
-            st.write(f"- ❌ {criterio}")
+if impacto["requires_attention"]:
+    st.warning(
+        "Este projeto já possui "
+        f"{impacto['searches']} busca(s), {impacto['papers']} artigo(s) e "
+        f"{impacto['screening_decisions']} parecer(es) de triagem. Uma nova versão "
+        "não altera registros anteriores; avalie se será necessário repetir buscas ou "
+        "reavaliar artigos."
+    )
+
+token = draft["token"]
+with st.form(f"protocol_editor_{project_id}_{token}"):
+    pergunta_editada = st.text_area(
+        "Pergunta de pesquisa confirmada",
+        value=draft["question"],
+        height=100,
+    )
+
+    st.markdown("#### Estrutura PICO/PICOS")
+    pico = draft_protocol["pico"]
+    p1, p2 = st.columns(2)
+    population = p1.text_area("População ou problema (P) *", value=pico["population"])
+    intervention = p2.text_area(
+        "Intervenção, exposição ou método (I) *", value=pico["intervention"]
+    )
+    p3, p4 = st.columns(2)
+    comparison = p3.text_area("Comparação (C)", value=pico["comparison"])
+    outcome = p4.text_area("Desfechos ou métricas (O) *", value=pico["outcome"])
+    study_design = st.text_area(
+        "Desenhos de estudo esperados (S)", value=pico["study_design"]
+    )
+
+    st.markdown("#### Elegibilidade estruturada")
+    eligibility = draft_protocol["eligibility"]
+    e1, e2, e3 = st.columns([1, 1, 2])
+    year_from = e1.text_input(
+        "Ano inicial", value=str(eligibility["year_from"] or "")
+    )
+    year_to = e2.text_input("Ano final", value=str(eligibility["year_to"] or ""))
+    languages = e3.text_input(
+        "Idiomas (separados por vírgula)",
+        value=", ".join(eligibility["languages"]),
+    )
+    e4, e5 = st.columns(2)
+    publication_types = e4.text_area(
+        "Tipos de publicação aceitos — um por linha",
+        value="\n".join(eligibility["publication_types"]),
+    )
+    study_designs = e5.text_area(
+        "Desenhos de estudo aceitos — um por linha",
+        value="\n".join(eligibility["study_designs"]),
+    )
+
+    st.markdown("#### Critérios operacionais")
+    c1, c2 = st.columns(2)
+    inclusion_text = c1.text_area(
+        "Critérios de inclusão — um por linha *",
+        value="\n".join(draft_protocol["inclusion_criteria"]),
+        height=180,
+    )
+    exclusion_text = c2.text_area(
+        "Critérios de exclusão — um por linha *",
+        value="\n".join(draft_protocol["exclusion_criteria"]),
+        height=180,
+    )
+
+    st.markdown("#### Matriz de conceitos e sinônimos")
+    concept_rows = [
+        {
+            "Conceito": item["concept"],
+            "Termos e sinônimos (separados por ;)": "; ".join(item["terms"]),
+        }
+        for item in draft_protocol["search_concepts"]
+    ]
+    concept_table = st.data_editor(
+        pd.DataFrame(concept_rows, columns=["Conceito", "Termos e sinônimos (separados por ;)"]),
+        num_rows="dynamic",
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    st.markdown("#### Estratégias de busca")
+    general_query = st.text_area(
+        "String booleana geral *",
+        value=draft_protocol["search_string"],
+        height=130,
+    )
+    st.caption(
+        "As strings específicas são opcionais. Quando vazias, a fonte utiliza a string geral."
+    )
+    q1, q2, q3 = st.columns(3)
+    openalex_query = q1.text_area(
+        "OpenAlex", value=draft_protocol["source_search_strings"]["openalex"], height=120
+    )
+    pubmed_query = q2.text_area(
+        "PubMed", value=draft_protocol["source_search_strings"]["pubmed"], height=120
+    )
+    semantic_query = q3.text_area(
+        "Semantic Scholar",
+        value=draft_protocol["source_search_strings"]["semantic_scholar"],
+        height=120,
+    )
+
+    motivo_versao = st.text_input(
+        "Motivo da nova versão *",
+        placeholder="Ex.: refinamento dos sinônimos após busca piloto",
+    )
+    confirmar_protocolo = st.checkbox(
+        "Revisei os campos e confirmo que esta versão representa as decisões metodológicas humanas."
+    )
+    salvar_versao = st.form_submit_button(
+        "💾 Confirmar e criar nova versão", type="primary", use_container_width=True
+    )
+
+if salvar_versao:
+    concepts = []
+    for row in concept_table.to_dict("records"):
+        concepts.append(
+            {
+                "concept": row.get("Conceito"),
+                "terms": str(row.get("Termos e sinônimos (separados por ;)") or "").split(";"),
+            }
+        )
+    protocol_candidate = {
+        **{key: value for key, value in protocolo_atual.items() if str(key).startswith("_")},
+        "pico": {
+            "population": population,
+            "intervention": intervention,
+            "comparison": comparison,
+            "outcome": outcome,
+            "study_design": study_design,
+        },
+        "eligibility": {
+            "year_from": year_from,
+            "year_to": year_to,
+            "languages": languages.replace(",", "\n").splitlines(),
+            "publication_types": publication_types.splitlines(),
+            "study_designs": study_designs.splitlines(),
+        },
+        "inclusion_criteria": inclusion_text.splitlines(),
+        "exclusion_criteria": exclusion_text.splitlines(),
+        "search_concepts": concepts,
+        "search_string": general_query,
+        "source_search_strings": {
+            "openalex": openalex_query,
+            "pubmed": pubmed_query,
+            "semantic_scholar": semantic_query,
+        },
+        "audit_questions": protocolo_atual.get("audit_questions", []),
+    }
+    try:
+        question, validated_protocol, reason = validate_protocol(
+            pergunta_editada, protocol_candidate, motivo_versao
+        )
+        unchanged = (
+            question == (projeto.get("question") or "").strip()
+            and protocol_fingerprint(validated_protocol)
+            == protocol_fingerprint(protocolo_atual)
+        )
+        if unchanged:
+            raise ValueError("O rascunho não possui alterações em relação à versão confirmada.")
+        if not confirmar_protocolo:
+            raise ValueError("Confirme a revisão humana antes de criar a nova versão.")
+        versao = salvar_protocolo_projeto(
+            project_id, question, validated_protocol, motivo=reason
+        )
+    except ValueError as erro:
+        st.warning(str(erro))
+    except Exception as erro:
+        st.error(f"Não foi possível salvar o protocolo: {erro}")
+    else:
+        st.session_state.pop(draft_key, None)
+        st.success(f"Protocolo confirmado e salvo como versão {versao}.")
+        st.rerun()
+
+if draft["origin"] == "ai" and st.button("Descartar rascunho da IA"):
+    st.session_state.pop(draft_key, None)
+    st.rerun()
+
+with st.expander("📚 Histórico imutável do protocolo", expanded=False):
+    history = get_protocol_history(project_id)
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Versão": item["version"],
+                    "Data": item["created_at"],
+                    "Motivo": item["change_reason"],
+                    "Inclusão": len(item["criteria_jsonb"]["inclusion_criteria"]),
+                    "Exclusão": len(item["criteria_jsonb"]["exclusion_criteria"]),
+                    "Hash": protocol_fingerprint(item["criteria_jsonb"])[:12],
+                }
+                for item in history
+            ]
+        ),
+        hide_index=True,
+        use_container_width=True,
+    )
+    if history:
+        version_by_number = {item["version"]: item for item in history}
+        version_numbers = list(version_by_number)
+        selector1, selector2 = st.columns(2)
+        base_version = selector1.selectbox(
+            "Versão de referência",
+            options=version_numbers,
+            index=min(1, len(version_numbers) - 1),
+            key=f"protocol_base_{project_id}",
+        )
+        target_version = selector2.selectbox(
+            "Comparar com",
+            options=version_numbers,
+            index=0,
+            key=f"protocol_target_{project_id}",
+        )
+        base_item = version_by_number[base_version]
+        target_item = version_by_number[target_version]
+        changes = compare_protocols(
+            base_item["question"],
+            base_item["criteria_jsonb"],
+            target_item["question"],
+            target_item["criteria_jsonb"],
+        )
+        if changes:
+            st.info("Seções alteradas: **" + " · ".join(changes) + "**")
+        else:
+            st.success("As versões selecionadas possuem o mesmo conteúdo metodológico.")
+
+        for column, item in zip(st.columns(2), (base_item, target_item)):
+            old_protocol = item["criteria_jsonb"]
+            with column:
+                st.markdown(f"#### Protocolo v{item['version']}")
+                st.caption(
+                    f"{item['change_reason'] or 'Sem motivo registrado'} · "
+                    f"hash `{protocol_fingerprint(old_protocol)[:12]}`"
+                )
+                st.markdown("**Pergunta**")
+                st.write(item["question"])
+                st.markdown("**PICO/PICOS**")
+                for field, label in (
+                    ("population", "P"),
+                    ("intervention", "I"),
+                    ("comparison", "C"),
+                    ("outcome", "O"),
+                    ("study_design", "S"),
+                ):
+                    st.write(f"**{label}:** {old_protocol['pico'].get(field) or '—'}")
+                st.markdown("**Inclusão**")
+                st.write(
+                    "\n".join(
+                        f"- {criterion}"
+                        for criterion in old_protocol["inclusion_criteria"]
+                    )
+                    or "—"
+                )
+                st.markdown("**Exclusão**")
+                st.write(
+                    "\n".join(
+                        f"- {criterion}"
+                        for criterion in old_protocol["exclusion_criteria"]
+                    )
+                    or "—"
+                )
+                st.markdown("**String geral**")
+                st.code(old_protocol["search_string"] or "—", language=None)
 
 st.divider()
-st.subheader("3. Estratégia de busca e coleta")
+st.subheader("2. Coleta com o protocolo confirmado")
 
-termo_busca = protocolo_exibido.get("search_string", "")
+termo_busca = protocolo_normalizado.get("search_string", "")
 if not termo_busca:
-    st.info("Estruture a pergunta antes de iniciar a coleta.")
+    st.info("Confirme uma versão com estratégia de busca antes de iniciar a coleta.")
     st.stop()
 
-string_manual = st.text_area(
-    "String de busca booleana",
-    value=termo_busca,
-    height=150,
-    help="A alteração será registrada como uma nova versão do protocolo ao iniciar a coleta.",
+st.code(termo_busca, language=None)
+st.caption(
+    f"As próximas buscas serão vinculadas ao protocolo v{projeto['protocol_version']} · "
+    f"hash `{protocol_fingerprint(protocolo_normalizado)[:12]}…`"
 )
+with st.expander("Consultar strings confirmadas por fonte", expanded=False):
+    for source_code, source_label in (
+        ("openalex", "OpenAlex"),
+        ("pubmed", "PubMed"),
+        ("semantic_scholar", "Semantic Scholar"),
+    ):
+        source_query = protocolo_normalizado["source_search_strings"].get(source_code)
+        st.markdown(f"**{source_label}**")
+        st.code(source_query or termo_busca, language=None)
+        if not source_query:
+            st.caption("Usará a string geral.")
 aba_apis, aba_bibtex = st.tabs(["Consultar APIs", "Importar BibTeX"])
 
 with aba_apis:
@@ -284,44 +583,30 @@ with aba_apis:
         use_container_width=True,
         disabled=not fontes_ativas,
     ):
-        nova_string = string_manual.strip()
-        if not nova_string:
-            st.error("A string de busca não pode estar vazia.")
-        else:
-            if nova_string != termo_busca:
-                protocolo_atualizado = dict(protocolo_exibido)
-                protocolo_atualizado["search_string"] = nova_string
-                salvar_protocolo_projeto(
-                    project_id,
-                    pergunta_livre,
-                    protocolo_atualizado,
-                    motivo="Ajuste manual da estratégia antes da coleta",
+        with st.spinner("A consultar as bases e registrar protocolo e proveniência..."):
+            try:
+                qtd_salvos, qtd_encontrados, qtd_mesclados, qtd_pendentes = iniciar_recolha(
+                    termo_busca,
+                    project_id=project_id,
+                    max_por_fonte=qtd_artigos,
+                    source_queries=protocolo_normalizado.get("source_search_strings"),
                 )
-                st.session_state[f"protocol_preview_{project_id}"] = protocolo_atualizado
-
-            with st.spinner("A consultar as bases e registrar a proveniência por fonte..."):
-                try:
-                    qtd_salvos, qtd_encontrados, qtd_mesclados, qtd_pendentes = iniciar_recolha(
-                        nova_string,
-                        project_id=project_id,
-                        max_por_fonte=qtd_artigos,
+                if qtd_encontrados == 0:
+                    st.warning("Nenhum artigo foi encontrado. Ajuste o rascunho do protocolo.")
+                elif qtd_salvos == 0 and qtd_pendentes == 0:
+                    st.info(
+                        f"Os {qtd_encontrados} registros já existiam neste projeto; "
+                        "a proveniência das fontes foi atualizada."
                     )
-                    if qtd_encontrados == 0:
-                        st.warning("Nenhum artigo foi encontrado. Ajuste a estratégia de busca.")
-                    elif qtd_salvos == 0 and qtd_pendentes == 0:
-                        st.info(
-                            f"Os {qtd_encontrados} registros já existiam neste projeto; "
-                            "a proveniência das fontes foi atualizada."
-                        )
-                    else:
-                        st.success(
-                            f"Coleta concluída: {qtd_salvos} novo(s), "
-                            f"{qtd_mesclados} mesclado(s) por DOI e "
-                            f"{qtd_pendentes} candidato(s) aguardando revisão, em "
-                            f"{qtd_encontrados} registro(s) recuperado(s)."
-                        )
-                except Exception as erro:
-                    st.error(f"Erro durante a coleta: {erro}")
+                else:
+                    st.success(
+                        f"Coleta concluída: {qtd_salvos} novo(s), "
+                        f"{qtd_mesclados} mesclado(s) por DOI e "
+                        f"{qtd_pendentes} candidato(s) aguardando revisão, em "
+                        f"{qtd_encontrados} registro(s) recuperado(s)."
+                    )
+            except Exception as erro:
+                st.error(f"Erro durante a coleta: {erro}")
 
 with aba_bibtex:
     st.markdown(

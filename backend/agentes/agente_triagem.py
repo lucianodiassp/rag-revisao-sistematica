@@ -8,6 +8,7 @@ from google.genai.errors import APIError
 from backend.app.ai_config import TASK_SCREENING, get_generation_config
 from backend.app.ai_service import generate_content
 from backend.app.database import obter_projeto, resolver_project_id
+from backend.app.protocol_service import normalize_protocol, protocol_fingerprint
 from backend.app.screening_service import UNUSABLE_ABSTRACTS
 
 # ==========================================
@@ -41,23 +42,57 @@ def buscar_artigos_sem_analise(project_id, connection_factory=None):
         """, (project_id, *UNUSABLE_ABSTRACTS))
         return cursor.fetchall()
 
-def carregar_criterios_dinamicos(project_id):
+def carregar_criterios_dinamicos(project_id, protocol=None):
     """Lê os critérios versionados do projeto no PostgreSQL."""
-    dados = obter_projeto(project_id).get("criteria_jsonb") or {}
+    dados = normalize_protocol(
+        protocol or obter_projeto(project_id).get("criteria_jsonb") or {}
+    )
+    pico = dados["pico"]
+    eligibility = dados["eligibility"]
+    scope_items = []
+    for field, label in (
+        ("population", "População ou problema"),
+        ("intervention", "Intervenção, exposição ou método"),
+        ("comparison", "Comparação"),
+        ("outcome", "Desfechos"),
+        ("study_design", "Desenhos de estudo esperados"),
+    ):
+        if pico.get(field):
+            scope_items.append(f"{label}: {pico[field]}")
+    if eligibility.get("year_from") or eligibility.get("year_to"):
+        scope_items.append(
+            "Período de publicação: "
+            f"{eligibility.get('year_from') or 'sem limite inicial'} a "
+            f"{eligibility.get('year_to') or 'sem limite final'}"
+        )
+    for field, label in (
+        ("languages", "Idiomas aceitos"),
+        ("publication_types", "Tipos de publicação aceitos"),
+        ("study_designs", "Desenhos de estudo aceitos"),
+    ):
+        if eligibility.get(field):
+            scope_items.append(f"{label}: {', '.join(eligibility[field])}")
+
+    escopo = "\n".join(f"- {item}" for item in scope_items) or "- Não estruturado"
     inclusao = "\n".join([f"- {c}" for c in dados.get("inclusion_criteria", [])])
     exclusao = "\n".join([f"- {c}" for c in dados.get("exclusion_criteria", [])])
-    
-    return inclusao, exclusao
 
-def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1):
+    return escopo, inclusao, exclusao
+
+def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1, protocol=None):
     """Submete o artigo ao Gemini com critérios injetados dinamicamente e rate limit."""
     
     # Busca os critérios do JSON
-    criterios_inclusao, criterios_exclusao = carregar_criterios_dinamicos(project_id)
+    escopo_elegibilidade, criterios_inclusao, criterios_exclusao = carregar_criterios_dinamicos(
+        project_id, protocol=protocol
+    )
     
     prompt = f"""
     Você é um agente especialista em triagem de artigos científicos para uma Revisão Sistemática.
     Sua tarefa é avaliar o artigo abaixo com base estrita nos critérios fornecidos.
+
+    [ESCOPO PICO/PICOS E ELEGIBILIDADE ESTRUTURADA]
+    {escopo_elegibilidade}
 
     [CRITÉRIOS DE INCLUSÃO]
     {criterios_inclusao}
@@ -91,7 +126,13 @@ def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1):
             tempo_espera = 60
             print(f"   ⏳ Limite atingido (429). A aguardar {tempo_espera}s antes da tentativa {tentativa + 1}/3...")
             time.sleep(tempo_espera)
-            return triar_artigo_com_ia(project_id, titulo, resumo, tentativa + 1)
+            return triar_artigo_com_ia(
+                project_id,
+                titulo,
+                resumo,
+                tentativa + 1,
+                protocol=protocol,
+            )
         else:
             print(f"❌ Falha persistente na API: {e}")
             return None
@@ -102,6 +143,10 @@ def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1):
 def executar_pipeline_triagem_ui(project_id=None):
     """Executa a triagem emitindo atualizações de estado (yield) para a interface gráfica."""
     project_id = resolver_project_id(project_id)
+    project = obter_projeto(project_id)
+    protocol = normalize_protocol(project.get("criteria_jsonb") or {})
+    protocol_version = int(project.get("protocol_version") or 1)
+    protocol_hash = protocol_fingerprint(protocol)
     artigos = buscar_artigos_sem_analise(project_id)
     
     if not artigos:
@@ -115,7 +160,9 @@ def executar_pipeline_triagem_ui(project_id=None):
     for i, (paper_id, titulo, abstract) in enumerate(artigos, 1):
         yield {"status": "processando", "atual": i, "total": total, "msg": f"🧠 A analisar {i}/{total}: '{titulo[:40]}...'"}
         
-        resultado_ia = triar_artigo_com_ia(project_id, titulo, abstract)
+        resultado_ia = triar_artigo_com_ia(
+            project_id, titulo, abstract, protocol=protocol
+        )
         
         if resultado_ia:
             decisao_id = str(uuid.uuid4())
@@ -128,6 +175,8 @@ def executar_pipeline_triagem_ui(project_id=None):
                 "agent_name": "screening_agent",
                 "model_provider": get_generation_config(TASK_SCREENING).provider,
                 "model_name": get_generation_config(TASK_SCREENING).model,
+                "protocol_version": protocol_version,
+                "protocol_fingerprint": protocol_hash,
             }
             
             cursor.execute("""
@@ -144,7 +193,21 @@ def executar_pipeline_triagem_ui(project_id=None):
                 str(uuid.uuid4()),
                 project_id,
                 "screening_agent",
-                json.dumps({"project_id": project_id, "paper_id": str(paper_id), "title": titulo}),
+                json.dumps(
+                    {
+                        "project_id": project_id,
+                        "paper_id": str(paper_id),
+                        "title": titulo,
+                        "protocol_version": protocol_version,
+                        "protocol_fingerprint": protocol_hash,
+                        "eligibility_snapshot": {
+                            "pico": protocol.get("pico"),
+                            "eligibility": protocol.get("eligibility"),
+                            "inclusion_criteria": protocol.get("inclusion_criteria"),
+                            "exclusion_criteria": protocol.get("exclusion_criteria"),
+                        },
+                    }
+                ),
                 json.dumps(resultado_ia),
                 json.dumps(get_generation_config(TASK_SCREENING).metadata())
             ))

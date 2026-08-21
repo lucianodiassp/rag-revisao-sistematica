@@ -157,19 +157,29 @@ o projeto sem substituir sua instalação nem receber credenciais ou PDFs proteg
 
    *Exemplo:* *"Como a IA apoia o diagnóstico em exames de imagem?"*
 
-3. Gere a string de busca (PICO).
-4. Na seção de coleta, abra a aba **"Importar BibTeX"** e selecione um arquivo `.bib`.
-5. Confira a prévia, as contagens e importe os registros para o projeto ativo.
-6. Opcionalmente, use também a aba **"Consultar APIs"** para combinar as duas formas de coleta.
-7. Abra **"Deduplicação"** e selecione um candidato pendente.
-8. Compare regra, pontuação, DOI, título, autores, ano, fontes e resumos.
-9. Mescle um candidato com justificativa e mantenha outro separado, quando houver.
+3. Clique em **Gerar rascunho com IA** e confirme que a versão do protocolo não muda.
+4. Revise e edite PICO/PICOS, elegibilidade estruturada, critérios, conceitos e strings.
+5. Tente salvar sem motivo ou sem confirmação humana e confira as mensagens de validação.
+6. Informe o motivo, marque a confirmação e crie uma nova versão.
+7. Abra o histórico e confira a pergunta, os critérios, o PICO/PICOS, a string e o hash.
+8. Em um projeto que já possua artigos, confirme o alerta sobre repetição de buscas
+   ou reavaliação da triagem.
+9. Na seção de coleta, consulte as strings confirmadas por fonte.
+10. Abra a aba **Importar BibTeX**, selecione um `.bib`, confira a prévia e importe.
+11. Opcionalmente, use **Consultar APIs** para combinar as duas formas de coleta.
+12. Abra **Deduplicação**, compare os candidatos e registre as decisões justificadas.
 
 ### ✅ Critério de Sucesso
 
 A plataforma deve:
 
-* Gerar a string de busca corretamente.
+* A IA deve gerar somente um rascunho, sem alterar o protocolo confirmado.
+* Campos obrigatórios, período, parênteses e aspas das strings devem ser validados.
+* Uma versão só deve ser criada após confirmação humana e justificativa.
+* O histórico anterior deve permanecer inalterado e consultável.
+* Cada busca deve registrar versão e hash do protocolo em `query_jsonb`.
+* Novos pareceres da IA devem registrar a mesma referência e o retrato dos critérios.
+* Strings específicas devem ser usadas por fonte; campos vazios devem usar a geral.
 * Exibir a prévia do BibTeX e informar entradas válidas, sem DOI e sem abstract.
 * Registrar os artigos importados e encaminhar os registros sem conflito para a triagem.
 * Consolidar automaticamente somente DOI idêntico, preservando a proveniência.
