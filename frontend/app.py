@@ -46,6 +46,11 @@ pages = [
         icon="🧭",
     ),
     st.Page(
+        "views/12_Limitacoes_Confianca.py",
+        title="Limitações e Confiança",
+        icon="⚖️",
+    ),
+    st.Page(
         "views/4_Configuracao_IA.py",
         title="Configuração de IA",
         icon="🔐",

@@ -21,6 +21,7 @@ from backend.app.prisma import (
 from backend.app.methodological_quality import methodological_summary
 from backend.app.reproducibility_package import generate_reproducibility_package
 from backend.app.screening_service import EXCLUSION_REASON_LABELS
+from backend.app.synthesis_confidence import confidence_summary
 from frontend.project_selector import selecionar_projeto_ativo
 
 # ==========================================
@@ -255,8 +256,44 @@ else:
 
 st.divider()
 
-# --- 4. SÍNTESE ACADÊMICA ---
-st.header("4. Compilação da Síntese Final")
+# --- 4. LIMITAÇÕES E CONFIANÇA ---
+st.header("4. Limitações e Confiança na Síntese")
+try:
+    resumo_confianca = confidence_summary(project_id)
+except Exception as exc:
+    st.error(f"Não foi possível carregar a confiança da síntese: {exc}")
+    resumo_confianca = None
+
+if resumo_confianca:
+    snapshot_confianca = resumo_confianca["latest_snapshot"]
+    limitacoes_validas = [
+        item for item in resumo_confianca["current_limitations"]
+        if item["status"] in ("confirmed", "mitigated")
+    ]
+    c_lim, c_conf, c_ver = st.columns(3)
+    c_lim.metric("Limitações consideradas", len(limitacoes_validas))
+    c_conf.metric(
+        "Confiança geral",
+        {
+            "high": "Alta", "moderate": "Moderada",
+            "low": "Baixa", "very_low": "Muito baixa",
+        }.get((snapshot_confianca or {}).get("overall_level"), "Não classificada"),
+    )
+    c_ver.metric(
+        "Snapshot",
+        f"v{snapshot_confianca['snapshot_version']}" if snapshot_confianca else "Ausente",
+    )
+    for warning in resumo_confianca["warnings"]:
+        st.warning(warning)
+    st.caption(
+        "A classificação válida é humana e versionada. Revise os sinais e registre o snapshot "
+        "na página Limitações e Confiança antes de compilar a versão final."
+    )
+
+st.divider()
+
+# --- 5. SÍNTESE ACADÊMICA ---
+st.header("5. Compilação da Síntese Final")
 
 if "relatorios_por_projeto" not in st.session_state:
     st.session_state.relatorios_por_projeto = {}
@@ -296,8 +333,8 @@ if relatorio_compilado is not None:
 
 st.divider()
 
-# --- 5. PACOTE DE REPRODUTIBILIDADE ---
-st.header("5. Pacote de Reprodutibilidade do Projeto")
+# --- 6. PACOTE DE REPRODUTIBILIDADE ---
+st.header("6. Pacote de Reprodutibilidade do Projeto")
 st.markdown(
     "Gere um ZIP somente leitura com protocolo, buscas, deduplicação, triagem, "
     "evidências, PRISMA, Golden Set, avaliações, interações dos agentes e o último "

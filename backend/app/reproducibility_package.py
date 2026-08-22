@@ -434,6 +434,42 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
                 """,
                 (project_id,),
             )
+            review_limitations = _fetch_all(
+                cursor,
+                """
+                SELECT id, project_id, detected_protocol_version, source_kind,
+                       signal_code, category, scope_type, scope_id, title, description,
+                       evidence_jsonb, status, impact, mitigation, human_notes,
+                       is_current, first_detected_at, last_detected_at, reviewed_at, updated_at
+                FROM review_limitations
+                WHERE project_id = %s
+                ORDER BY first_detected_at, id
+                """,
+                (project_id,),
+            )
+            review_limitation_events = _fetch_all(
+                cursor,
+                """
+                SELECT id, project_id, limitation_id, action, previous_jsonb,
+                       current_jsonb, created_at
+                FROM review_limitation_events
+                WHERE project_id = %s
+                ORDER BY created_at, id
+                """,
+                (project_id,),
+            )
+            synthesis_confidence_snapshots = _fetch_all(
+                cursor,
+                """
+                SELECT id, project_id, snapshot_version, protocol_version,
+                       protocol_fingerprint, overall_level, domain_ratings_jsonb,
+                       limitation_snapshot_jsonb, rationale, reviewer_name, created_at
+                FROM synthesis_confidence_snapshots
+                WHERE project_id = %s
+                ORDER BY snapshot_version
+                """,
+                (project_id,),
+            )
         if hasattr(connection, "rollback"):
             connection.rollback()
     finally:
@@ -482,6 +518,9 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
             "golden_queries": golden_queries,
             "golden_versions": golden_versions,
             "prisma_snapshots": prisma_snapshots,
+            "review_limitations": review_limitations,
+            "review_limitation_events": review_limitation_events,
+            "synthesis_confidence_snapshots": synthesis_confidence_snapshots,
         }
     )
 
@@ -575,6 +614,14 @@ def _counts(dataset: dict) -> dict:
         "evaluation_runs": len(dataset.get("evaluations") or []),
         "golden_set_queries": len(dataset.get("golden_queries") or []),
         "prisma_snapshots": len(dataset.get("prisma_snapshots") or []),
+        "review_limitations": len(dataset.get("review_limitations") or []),
+        "confirmed_or_mitigated_limitations": sum(
+            1 for item in dataset.get("review_limitations") or []
+            if item.get("is_current") and item.get("status") in {"confirmed", "mitigated"}
+        ),
+        "synthesis_confidence_snapshots": len(
+            dataset.get("synthesis_confidence_snapshots") or []
+        ),
     }
 
 
@@ -613,6 +660,9 @@ literais já usados como evidência permanecem presentes para permitir a auditor
 - Extrações de evidências: {counts['evidence_extractions']}
 - Fontes literais: {counts['literal_evidence_sources']}
 - Avaliações metodológicas revisadas: {counts['reviewed_methodological_assessments']}
+- Limitações registradas: {counts['review_limitations']}
+- Limitações atuais confirmadas ou mitigadas: {counts['confirmed_or_mitigated_limitations']}
+- Snapshots de confiança da síntese: {counts['synthesis_confidence_snapshots']}
 - Interações de agentes: {counts['agent_interactions']}
 - Execuções de avaliação: {counts['evaluation_runs']}
 - Snapshots PRISMA: {counts['prisma_snapshots']}
@@ -624,7 +674,7 @@ literais já usados como evidência permanecem presentes para permitir a auditor
 - `03_selecao/`: artigos, deduplicação, triagem e reavaliações.
 - `04_documentos/`: inventário de indexação, sem PDFs, chunks ou vetores.
 - `05_evidencias/`: matriz, extrações e fontes literais rastreáveis.
-- `06_avaliacao/`: instrumentos e avaliações metodológicas, PRISMA, Golden Set e benchmarks.
+- `06_avaliacao/`: instrumentos, avaliações metodológicas, limitações, confiança, PRISMA, Golden Set e benchmarks.
 - `07_agentes/`: interações JSONB e configurações de modelos registradas.
 - `08_relatorio/`: última síntese persistida, quando disponível.
 - `manifest.json`: versão, escopo, contagens, tamanho e SHA-256 de cada arquivo.
@@ -704,6 +754,10 @@ def build_reproducibility_package(dataset: dict, generated_at: str | None = None
         "06_avaliacao/golden_set_atual.json": _json_bytes(dataset.get("golden_queries") or []),
         "06_avaliacao/golden_set_versoes.json": _json_bytes(dataset.get("golden_versions") or []),
         "06_avaliacao/execucoes.json": _json_bytes(dataset.get("evaluations") or []),
+        "06_avaliacao/limitacoes_sintese.json": _json_bytes(dataset.get("review_limitations") or []),
+        "06_avaliacao/limitacoes_sintese.csv": _csv_bytes(dataset.get("review_limitations") or []),
+        "06_avaliacao/eventos_limitacoes.json": _json_bytes(dataset.get("review_limitation_events") or []),
+        "06_avaliacao/confianca_sintese.json": _json_bytes(dataset.get("synthesis_confidence_snapshots") or []),
         "07_agentes/interacoes.json": _json_bytes(dataset.get("interactions") or []),
         "07_agentes/modelos_utilizados.json": _json_bytes(models),
     }

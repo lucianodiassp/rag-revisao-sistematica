@@ -8,7 +8,8 @@
 
 Aplicação local para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
-de evidências, avaliação metodológica revisada por humano, auditoria e síntese final.
+de evidências, avaliação metodológica revisada por humano, painel versionado de
+limitações e confiança, auditoria e síntese final.
 
 O sistema foi projetado para manter o pesquisador no controle das decisões críticas.
 A IA sugere, extrai e sintetiza; inclusão de artigos, aprovação das evidências e uso
@@ -92,6 +93,7 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Inventário da indexação sem copiar PDFs, texto integral dos chunks ou vetores de embedding.
 - Matriz de evidências em CSV, extrações com fontes literais e avaliações metodológicas.
 - Snapshots PRISMA, Golden Set, benchmarks, auditorias e interações dos agentes.
+- Limitações revisadas, histórico de decisões e snapshots humanos de confiança da síntese.
 - Artigos sentinela, buscas piloto, correspondências explicáveis e revisões PRESS.
 - Configurações de modelos efetivamente registradas nas interações, sem credenciais.
 - Inclusão da última síntese persistida pelo Agente Relator, quando disponível.
@@ -227,6 +229,23 @@ autorização e isolamento entre usuários ainda não fazem parte desta versão.
 - Síntese somente com evidências rastreáveis aprovadas ou corrigidas.
 - Citações no formato `[paper_id, p. página]` e download em Markdown.
 
+### Limitações e confiança na síntese
+
+- Detecção determinística de sinais em seis dimensões: cobertura da busca, seleção,
+  acesso documental, qualidade metodológica, rastreabilidade das evidências e
+  confiabilidade computacional.
+- Evidência objetiva e origem explícita para cada sinal, distinguindo limitações do
+  processo, limitações relatadas pelos estudos e registros manuais do pesquisador.
+- Revisão humana com decisões de confirmar, mitigar, descartar ou resolver, impacto,
+  justificativa e trilha de eventos em JSONB.
+- Sugestão determinística e não vinculante de confiança alta, moderada, baixa ou muito
+  baixa por dimensão e para o conjunto da síntese.
+- Snapshot humano imutável ligado ao protocolo e ao retrato das limitações; mudanças
+  posteriores geram alerta de desatualização.
+- Integração no Agente Relator e no pacote de reprodutibilidade, sem exclusão automática
+  de estudos ou alteração automática das conclusões.
+- O painel é um apoio genérico e não reivindica equivalência ao sistema GRADE.
+
 ### Avaliação quantitativa reprodutível do RAG
 
 - Golden Set definido por julgamento humano e isolado por projeto.
@@ -258,10 +277,14 @@ flowchart LR
     F --> H["Extração rastreável"]
     H --> I["Revisão humana da matriz"]
     F --> Q["Qualidade metodológica + revisão humana"]
+    I --> R["Limitações + confiança humana"]
+    Q --> R
+    L --> R
     G --> J["Auditoria LLM-as-a-Judge"]
     G --> L["Golden Set + métricas determinísticas"]
     I --> K["Síntese e relatório final"]
     Q --> K
+    R --> K
     J --> K
 ```
 
@@ -626,11 +649,22 @@ recadastre as credenciais pelas telas de configuração.
   reavaliação de uma recusa inicial.
 - Baixe o resultado em JSON ou CSV.
 
-### 10. Auditar e gerar o relatório
+### 10. Revisar limitações e classificar a confiança
+
+- Abra **Limitações e Confiança** e atualize os sinais depois de concluir as etapas anteriores.
+- Confira a evidência objetiva de cada alerta e registre uma decisão humana: confirmar,
+  mitigar, descartar ou resolver.
+- Acrescente limitações identificadas manualmente quando necessário.
+- Revise a sugestão não vinculante, classifique as seis dimensões e justifique a
+  confiança geral da síntese.
+- Registre o snapshot humano e confira se ele permanece atual após mudanças no projeto.
+
+### 11. Auditar e gerar o relatório
 
 - Abra **3. Relatório Final**.
 - Configure as perguntas de auditoria.
 - Execute o juiz e analise fidelidade e relevância.
+- Confira no painel do relatório se o snapshot de confiança está presente e atual.
 - Gere a síntese após aprovar ou corrigir as evidências.
 - Baixe o relatório em Markdown.
 - Gere o **Pacote de Reprodutibilidade do Projeto** e confira as contagens e o
