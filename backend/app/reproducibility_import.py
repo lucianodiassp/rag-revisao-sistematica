@@ -51,6 +51,9 @@ OPTIONAL_JSON_FILES = {
     "02_buscas/calibracoes.json": "calibration_runs",
     "02_buscas/calibracao_correspondencias.json": "calibration_matches",
     "02_buscas/revisoes_press.json": "press_reviews",
+    "06_avaliacao/limitacoes_sintese.json": "review_limitations",
+    "06_avaliacao/eventos_limitacoes.json": "review_limitation_events",
+    "06_avaliacao/confianca_sintese.json": "synthesis_confidence_snapshots",
 }
 
 LIST_DATASETS = (set(REQUIRED_JSON_FILES.values()) | set(OPTIONAL_JSON_FILES.values())) - {"project"}
@@ -341,6 +344,13 @@ def _prepare_import(dataset: dict, title: str | None = None) -> dict:
         "golden_query": _new_id_map(dataset["golden_queries"], "perguntas Golden Set", False),
         "golden_version": _new_id_map(dataset["golden_versions"], "versões Golden Set", False),
         "prisma": _new_id_map(dataset["prisma_snapshots"], "snapshots PRISMA", False),
+        "limitation": _new_id_map(dataset["review_limitations"], "limitações", False),
+        "limitation_event": _new_id_map(
+            dataset["review_limitation_events"], "eventos de limitação", False
+        ),
+        "confidence_snapshot": _new_id_map(
+            dataset["synthesis_confidence_snapshots"], "snapshots de confiança", False
+        ),
     }
 
     chunk_map = {}
@@ -848,6 +858,81 @@ def _insert_import(cursor, dataset: dict, prepared: dict) -> None:
                 Json(_remap_json(row.get("source_counts_jsonb") or {}, remap)),
                 Json(_remap_json(row.get("exclusion_reasons_jsonb") or {}, remap)),
                 Json(_remap_json(row.get("interpretation_jsonb") or {}, remap)), row.get("created_at"),
+            ),
+        )
+
+    for row in dataset["review_limitations"]:
+        cursor.execute(
+            """
+            INSERT INTO review_limitations
+                (id, project_id, detected_protocol_version, source_kind, signal_code,
+                 category, scope_type, scope_id, title, description, evidence_jsonb,
+                 status, impact, mitigation, human_notes, is_current,
+                 first_detected_at, last_detected_at, reviewed_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP),
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP),
+                    %s::timestamptz,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["limitation"][_source_id(row, "limitation")], project_id,
+                int(row.get("detected_protocol_version") or 1),
+                row.get("source_kind") or "manual",
+                _remap_json(row.get("signal_code") or f"imported:{uuid.uuid4()}", remap),
+                row.get("category") or "other", row.get("scope_type") or "project",
+                _remap_json(row.get("scope_id"), remap),
+                row.get("title") or "Limitação importada",
+                row.get("description") or "Limitação recuperada do pacote de reprodutibilidade.",
+                Json(_remap_json(row.get("evidence_jsonb") or {}, remap)),
+                row.get("status") or "pending", row.get("impact") or "moderate",
+                row.get("mitigation"), row.get("human_notes"),
+                bool(row.get("is_current", True)), row.get("first_detected_at"),
+                row.get("last_detected_at"), row.get("reviewed_at"), row.get("updated_at"),
+            ),
+        )
+
+    for row in dataset["review_limitation_events"]:
+        cursor.execute(
+            """
+            INSERT INTO review_limitation_events
+                (id, project_id, limitation_id, action, previous_jsonb,
+                 current_jsonb, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["limitation_event"][_source_id(row, "limitation_event")], project_id,
+                _mapped(maps["limitation"], row.get("limitation_id"), "limitação do evento"),
+                row.get("action") or "created",
+                Json(_remap_json(row.get("previous_jsonb"), remap))
+                if row.get("previous_jsonb") is not None else None,
+                Json(_remap_json(row.get("current_jsonb") or {}, remap)),
+                row.get("created_at"),
+            ),
+        )
+
+    for row in dataset["synthesis_confidence_snapshots"]:
+        cursor.execute(
+            """
+            INSERT INTO synthesis_confidence_snapshots
+                (id, project_id, snapshot_version, protocol_version,
+                 protocol_fingerprint, overall_level, domain_ratings_jsonb,
+                 limitation_snapshot_jsonb, rationale, reviewer_name, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["confidence_snapshot"][_source_id(row, "confidence_snapshot")],
+                project_id, int(row.get("snapshot_version") or 1),
+                int(row.get("protocol_version") or 1),
+                row.get("protocol_fingerprint") or ("0" * 64),
+                row.get("overall_level") or "moderate",
+                Json(_remap_json(row.get("domain_ratings_jsonb") or [], remap)),
+                Json(_remap_json(row.get("limitation_snapshot_jsonb") or [], remap)),
+                row.get("rationale") or "Classificação humana recuperada do pacote importado.",
+                row.get("reviewer_name"), row.get("created_at"),
             ),
         )
 

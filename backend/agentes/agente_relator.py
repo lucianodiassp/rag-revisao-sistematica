@@ -7,6 +7,7 @@ from backend.app.ai_service import generate_content
 from backend.app.database import log_interacao_agente, resolver_project_id
 from backend.app.methodological_quality import methodological_summary
 from backend.app.prisma import calcular_fluxo_prisma, salvar_snapshot_prisma
+from backend.app.synthesis_confidence import confidence_summary
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
@@ -90,11 +91,13 @@ def gerar_relatorio_final(project_id=None):
     print("📚 A recolher evidências extraídas...")
     evidencias = coletar_evidencias(project_id)
     avaliacoes_metodologicas = methodological_summary(project_id)
+    confianca = confidence_summary(project_id)
     
     if not evidencias:
         return {
             "metricas": metricas,
             "prisma_snapshot": snapshot_prisma,
+            "synthesis_confidence": confianca,
             "relatorio_md": (
                 "Não há evidências **aprovadas pela revisão humana** para gerar o relatório. "
                 "Revise e aprove ao menos uma extração na Matriz de Evidências."
@@ -124,6 +127,17 @@ def gerar_relatorio_final(project_id=None):
 
     Avaliações metodológicas da versão ativa, registradas por revisão humana:
     {json.dumps(avaliacoes_metodologicas, indent=2, ensure_ascii=False, default=str)}
+
+    Limitações do processo e confiança da síntese, revisadas por uma pessoa:
+    {json.dumps({
+        'latest_snapshot': confianca['latest_snapshot'],
+        'snapshot_is_stale': confianca['is_stale'],
+        'warnings': confianca['warnings'],
+        'confirmed_or_mitigated_limitations': [
+            item for item in confianca['current_limitations']
+            if item['status'] in ('confirmed', 'mitigated')
+        ],
+    }, indent=2, ensure_ascii=False, default=str)}
     
     Sua tarefa:
     1. Abra com uma seção 'Fluxo PRISMA' e relate os números e motivos do snapshot exatamente como fornecidos.
@@ -133,9 +147,13 @@ def gerar_relatorio_final(project_id=None):
     5. Identifique as 'Limitações' mais comuns relatadas pelos autores.
     6. Inclua uma seção 'Qualidade metodológica e possíveis vieses' somente quando
        houver avaliações humanas. Diferencie explicitamente a decisão humana da sugestão de IA.
-    7. Mantenha um tom estritamente académico, imparcial e científico. Não invente dados, baseie-se APENAS no JSON fornecido.
-    8. Ao apresentar um achado, cite a fonte no formato [paper_id, p. página].
-    9. Não apresente um achado quando não houver uma fonte literal compatível no campo correspondente.
+    7. Inclua a seção 'Limitações metodológicas e confiança na síntese'. Diferencie
+       limitações relatadas pelos estudos das limitações do processo de revisão. Use somente
+       limitações confirmadas ou mitigadas. Informe a classificação humana geral e por dimensão
+       apenas se houver snapshot atual; se estiver ausente ou desatualizado, declare isso explicitamente.
+    8. Mantenha um tom estritamente académico, imparcial e científico. Não invente dados, baseie-se APENAS no JSON fornecido.
+    9. Ao apresentar um achado, cite a fonte no formato [paper_id, p. página].
+    10. Não apresente um achado quando não houver uma fonte literal compatível no campo correspondente.
     """
     
     try:
@@ -157,6 +175,15 @@ def gerar_relatorio_final(project_id=None):
             "methodological_assessment_ids": [
                 str(item["id"]) for item in avaliacoes_metodologicas
             ],
+            "synthesis_confidence_snapshot_id": (
+                str(confianca["latest_snapshot"]["id"])
+                if confianca["latest_snapshot"] else None
+            ),
+            "synthesis_confidence_stale": confianca["is_stale"],
+            "limitation_ids": [
+                str(item["id"]) for item in confianca["current_limitations"]
+                if item["status"] in ("confirmed", "mitigated")
+            ],
         },
         {
             "report_markdown": texto_relatorio,
@@ -168,6 +195,7 @@ def gerar_relatorio_final(project_id=None):
     return {
         "metricas": metricas,
         "prisma_snapshot": snapshot_prisma,
+        "synthesis_confidence": confianca,
         "relatorio_md": texto_relatorio
     }
 

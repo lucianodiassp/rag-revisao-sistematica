@@ -197,6 +197,31 @@ def _dataset():
         "golden_queries": [],
         "golden_versions": [],
         "prisma_snapshots": [],
+        "review_limitations": [
+            {
+                "id": "limitation-1",
+                "source_kind": "manual",
+                "signal_code": "manual:1",
+                "category": "other",
+                "title": "Limitação confirmada",
+                "description": "Limitação registrada pelo pesquisador.",
+                "status": "confirmed",
+                "impact": "moderate",
+                "is_current": True,
+            }
+        ],
+        "review_limitation_events": [],
+        "synthesis_confidence_snapshots": [
+            {
+                "id": "confidence-1",
+                "snapshot_version": 1,
+                "protocol_version": 2,
+                "overall_level": "moderate",
+                "domain_ratings_jsonb": [],
+                "limitation_snapshot_jsonb": [],
+                "rationale": "Classificação humana registrada para a síntese.",
+            }
+        ],
     }
 
 
@@ -212,6 +237,8 @@ def test_package_contains_readable_artifacts_and_manifest_hashes():
         assert "05_evidencias/matriz_evidencias.csv" in names
         assert "06_avaliacao/avaliacoes_metodologicas.json" in names
         assert "06_avaliacao/fontes_metodologicas.csv" in names
+        assert "06_avaliacao/limitacoes_sintese.json" in names
+        assert "06_avaliacao/confianca_sintese.json" in names
         assert "08_relatorio/relatorio_final.md" in names
         assert not any(name.lower().endswith(".pdf") for name in names)
 
@@ -221,6 +248,8 @@ def test_package_contains_readable_artifacts_and_manifest_hashes():
         assert manifest["counts"]["unique_papers"] == 1
         assert manifest["counts"]["indexed_papers"] == 1
         assert manifest["counts"]["reviewed_methodological_assessments"] == 1
+        assert manifest["counts"]["review_limitations"] == 1
+        assert manifest["counts"]["synthesis_confidence_snapshots"] == 1
         assert manifest["scope"]["secrets_excluded"] is True
         for entry in manifest["integrity"]["files"]:
             content = archive.read(entry["path"])
