@@ -5,6 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-2ea44f.svg)
 
 Aplicação local para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
@@ -23,6 +24,7 @@ do relatório permanecem sob responsabilidade humana.
 - [Instalação local](#instalação-local)
 - [Projeto demonstrativo](#projeto-demonstrativo)
 - [Atualização de um banco existente](#atualização-de-um-banco-existente)
+- [Versionamento e releases](#versionamento-e-releases)
 - [Configuração segura](#configuração-segura)
 - [Fluxo de uso](#fluxo-de-uso)
 - [Testes](#testes)
@@ -41,6 +43,9 @@ agentes, auditorias e relatórios próprios.
 O perfil atual de implantação é **local e de usuário único**. As tabelas de
 configuração já possuem campos de escopo para uma evolução futura, mas autenticação,
 autorização e isolamento entre usuários ainda não fazem parte desta versão.
+
+A versão estável documentada é **1.0.0 — Local, usuário único**. A identidade
+efetiva aparece no menu lateral e acompanha backups e pacotes de reprodutibilidade.
 
 ## Principais funcionalidades
 
@@ -482,6 +487,27 @@ dessa etapa.
 Para auditar essa etapa, use `docker compose logs migrate`. Uma falha interrompe a
 inicialização da aplicação, evitando que uma versão nova rode sobre um schema
 incompatível. As migrações preservam os dados existentes.
+
+## Versionamento e releases
+
+A versão do produto é lida do arquivo [`VERSION`](VERSION) e segue o Versionamento
+Semântico. Ela não substitui a versão das migrações, do formato `.ragbackup`, do
+pacote de reprodutibilidade ou dos protocolos científicos de cada projeto.
+
+O perfil em execução pode ser configurado sem alterar a versão do produto:
+
+```env
+RAG_DEPLOYMENT_PROFILE=local
+RAG_USER_MODE=single_user
+```
+
+A identidade aparece no menu lateral, nos logs de inicialização e nos manifestos
+dos arquivos exportados. Backups e pacotes antigos, sem esse campo, continuam
+compatíveis e são identificados como anteriores ao versionamento da aplicação.
+
+Consulte o [`CHANGELOG.md`](CHANGELOG.md) para as alterações da release e o guia
+[`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md) para o processo de tags, manutenção
+da linha `v1.x` e desenvolvimento da futura `v2-web`.
 
 ## Configuração segura
 

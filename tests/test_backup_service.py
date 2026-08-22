@@ -18,6 +18,7 @@ from backend.app.backup_service import (
     restore_backup,
     validate_backup_password,
 )
+from backend.app.version import APP_VERSION
 
 
 PASSWORD = "senha-forte-de-teste"
@@ -110,6 +111,39 @@ def test_inspect_backup_rejects_tampered_component(tmp_path):
 def test_restore_requires_exact_confirmation(tmp_path):
     with pytest.raises(ValueError, match="RESTAURAR BACKUP"):
         restore_backup(tmp_path / "inexistente.ragbackup", PASSWORD, "restaurar")
+
+
+def test_created_backup_records_application_version_without_changing_format_version(
+    tmp_path, monkeypatch
+):
+    settings = DatabaseSettings("db", "5432", "test", "user", "password")
+    pdf_directory = tmp_path / "pdfs"
+    pdf_directory.mkdir()
+    (pdf_directory / "artigo.pdf").write_bytes(b"pdf de teste")
+
+    monkeypatch.setattr(
+        backup_service,
+        "_dump_database",
+        lambda destination, _settings: destination.write_bytes(b"dump de teste"),
+    )
+    monkeypatch.setattr(
+        backup_service,
+        "_database_counts",
+        lambda _settings: {"projects": 1, "papers": 1},
+    )
+
+    result = backup_service.create_backup(
+        PASSWORD,
+        settings=settings,
+        pdf_directory=pdf_directory,
+        master_key_path=tmp_path / "chave-ausente.key",
+        backup_directory=tmp_path / "backups",
+    )
+    inspected = inspect_backup(result["path"], PASSWORD)
+
+    assert inspected["version"] == BACKUP_VERSION
+    assert inspected["application"]["version"] == APP_VERSION
+    assert inspected["application"]["deployment_profile"] == "local"
 
 
 def test_restore_failure_applies_automatic_recovery(tmp_path, monkeypatch):

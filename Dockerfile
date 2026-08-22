@@ -28,6 +28,9 @@ RUN apt-get update \
     && python -m pip install --upgrade pip \
     && python -m pip install --requirement requirements.txt
 
+# A versão muda a cada release e não deve invalidar a camada pesada de dependências.
+COPY VERSION ./VERSION
+
 # Usa as mesmas ferramentas principais do PostgreSQL do servidor (pg16).
 # Evita dumps criados por um cliente mais novo que o banco e incompatíveis na restauração.
 COPY --from=postgres-client /usr/lib/postgresql/16/bin /usr/lib/postgresql/16/bin

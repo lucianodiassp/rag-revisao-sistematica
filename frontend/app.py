@@ -2,6 +2,8 @@
 
 import streamlit as st
 
+from backend.app.version import application_caption, application_metadata
+
 
 st.set_page_config(
     page_title="RAG - Revisão Sistemática",
@@ -11,6 +13,23 @@ st.set_page_config(
     # centralizada da página inicial até o próximo refresh do navegador.
     layout="wide",
 )
+
+
+@st.cache_resource
+def registrar_identidade_aplicacao():
+    metadata = application_metadata()
+    print(
+        "RAG application started: "
+        f"version={metadata['version']} "
+        f"deployment={metadata['deployment_profile']} "
+        f"user_mode={metadata['user_mode']}",
+        flush=True,
+    )
+    return metadata
+
+
+registrar_identidade_aplicacao()
+st.sidebar.caption(f"**{application_caption()}**")
 
 pages = [
     st.Page(

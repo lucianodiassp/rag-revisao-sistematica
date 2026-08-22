@@ -13,6 +13,8 @@ import zipfile
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
+from backend.app.version import application_metadata
+
 
 PACKAGE_FORMAT = "rag-systematic-review-reproducibility-package"
 PACKAGE_VERSION = 1
@@ -625,7 +627,9 @@ def _counts(dataset: dict) -> dict:
     }
 
 
-def _package_readme(dataset: dict, generated_at: str, counts: dict) -> bytes:
+def _package_readme(
+    dataset: dict, generated_at: str, counts: dict, application: dict
+) -> bytes:
     project = dataset["project"]
     text = f"""# Pacote de reprodutibilidade da revisão sistemática
 
@@ -635,6 +639,8 @@ def _package_readme(dataset: dict, generated_at: str, counts: dict) -> bytes:
 - Identificador: `{project.get('id')}`
 - Pergunta atual: {project.get('question')}
 - Versão atual do protocolo: {project.get('protocol_version')}
+- Versão da aplicação: {application.get('version')}
+- Perfil da implantação: {application.get('deployment_label')} · {application.get('user_mode_label')}
 - Gerado em: {generated_at}
 
 ## Escopo
@@ -708,12 +714,13 @@ def build_reproducibility_package(dataset: dict, generated_at: str | None = None
         raise ReproducibilityPackageError("Snapshot do projeto está incompleto.")
     generated_at = generated_at or datetime.now(timezone.utc).isoformat()
     counts = _counts(dataset)
+    application = application_metadata()
     matrix = _matrix_rows(dataset.get("extractions") or [])
     models = _model_usage(dataset.get("interactions") or [])
     latest_report = _latest_report(dataset.get("interactions") or [])
 
     files = {
-        "README.md": _package_readme(dataset, generated_at, counts),
+        "README.md": _package_readme(dataset, generated_at, counts, application),
         "01_projeto/projeto.json": _json_bytes(project),
         "01_projeto/protocolo_atual.json": _json_bytes(
             {
@@ -775,6 +782,7 @@ def build_reproducibility_package(dataset: dict, generated_at: str | None = None
     manifest = {
         "format": PACKAGE_FORMAT,
         "version": PACKAGE_VERSION,
+        "application": application,
         "generated_at": generated_at,
         "project": {
             "id": project.get("id"),
