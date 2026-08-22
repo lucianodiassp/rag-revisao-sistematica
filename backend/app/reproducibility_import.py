@@ -382,6 +382,7 @@ def _prepare_import(dataset: dict, title: str | None = None) -> dict:
         "source_project_id": source_project_id,
         "source_generated_at": dataset.get("_generated_at"),
         "package_sha256": dataset.get("_package_sha256"),
+        "source_application": dataset.get("_source_application") or {},
         "imported_at": datetime.now(timezone.utc).isoformat(),
     }
     return {
@@ -947,6 +948,7 @@ def import_reproducibility_package(
     dataset = validated["dataset"]
     dataset["_generated_at"] = validated["manifest"].get("generated_at")
     dataset["_package_sha256"] = validated["sha256"]
+    dataset["_source_application"] = validated["manifest"].get("application") or {}
     prepared = _prepare_import(dataset, title=title)
 
     if connection_factory is None:

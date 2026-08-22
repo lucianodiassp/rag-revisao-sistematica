@@ -44,8 +44,17 @@ def _show_manifest(manifest: dict) -> None:
     col2.metric("Artigos únicos", counts.get("papers", 0))
     col3.metric("PDFs", manifest.get("pdf_count", 0))
     col4.metric("Interações de agentes", counts.get("agent_interactions", 0))
+    application = manifest.get("application") or {}
+    application_description = (
+        f"aplicação v{application.get('version')} · "
+        f"{application.get('deployment_label') or application.get('deployment_profile')} · "
+        f"{application.get('user_mode_label') or application.get('user_mode')} · "
+        if application.get("version")
+        else "aplicação anterior ao versionamento · "
+    )
     st.caption(
         f"Criado em {manifest.get('created_at', 'indisponível')} · "
+        f"{application_description}"
         f"formato v{manifest.get('version', '?')} · "
         + (
             "inclui a chave-mestra cifrada pelo arquivo"

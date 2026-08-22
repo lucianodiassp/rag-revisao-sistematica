@@ -11,6 +11,7 @@ from backend.app.reproducibility_package import (
     ReproducibilityPackageError,
     build_reproducibility_package,
 )
+from backend.app.version import APP_VERSION
 
 
 PROJECT_ID = "11111111-1111-1111-1111-111111111111"
@@ -245,6 +246,8 @@ def test_package_contains_readable_artifacts_and_manifest_hashes():
         manifest = json.loads(archive.read("manifest.json"))
         assert manifest["format"] == PACKAGE_FORMAT
         assert manifest["version"] == PACKAGE_VERSION
+        assert manifest["application"]["version"] == APP_VERSION
+        assert manifest["application"]["deployment_profile"] == "local"
         assert manifest["counts"]["unique_papers"] == 1
         assert manifest["counts"]["indexed_papers"] == 1
         assert manifest["counts"]["reviewed_methodological_assessments"] == 1

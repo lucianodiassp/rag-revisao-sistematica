@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from backend.app.secret_store import get_master_key_path
+from backend.app.version import application_metadata
 
 
 BACKUP_FORMAT = "rag-systematic-review-full-backup"
@@ -417,6 +418,7 @@ def create_backup(
             manifest = {
                 "format": BACKUP_FORMAT,
                 "version": BACKUP_VERSION,
+                "application": application_metadata(),
                 "created_at": timestamp.isoformat(),
                 "database": {
                     "name": settings.database,
