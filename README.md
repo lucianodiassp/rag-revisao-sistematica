@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-2ea44f.svg)
+![Version](https://img.shields.io/badge/version-2.0.0--dev-orange.svg)
 
 Aplicação local para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
@@ -44,8 +44,13 @@ O perfil atual de implantação é **local e de usuário único**. As tabelas de
 configuração já possuem campos de escopo para uma evolução futura, mas autenticação,
 autorização e isolamento entre usuários ainda não fazem parte desta versão.
 
-A versão estável documentada é **1.0.0 — Local, usuário único**. A identidade
-efetiva aparece no menu lateral e acompanha backups e pacotes de reprodutibilidade.
+A versão estável publicada é **1.0.0 — Local, usuário único**. Esta branch de
+integração inicia a **2.0.0-dev — Web privada**, ainda em desenvolvimento. A
+identidade efetiva aparece no menu lateral e acompanha backups e pacotes de
+reprodutibilidade.
+
+O plano incremental da nova linha está em
+[Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
 
 ## Principais funcionalidades
 
