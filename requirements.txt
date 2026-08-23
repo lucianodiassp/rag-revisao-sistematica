@@ -14,3 +14,4 @@ pymupdf==1.24.1
 python-dotenv==1.0.1
 requests==2.34.2
 streamlit==1.58.0
+tomli==2.4.1; python_version < "3.11"

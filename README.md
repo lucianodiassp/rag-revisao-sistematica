@@ -65,6 +65,18 @@ Git nem incluído no build. Consulte o guia
 [Autenticação da Web privada](docs/AUTENTICACAO_WEB.md) para configurar Google,
 Microsoft ou outro provedor OIDC e validar o fluxo completo.
 
+### Perfil Web de produção (v2 em desenvolvimento)
+
+O arquivo `docker-compose.web.yml` mantém PostgreSQL e Streamlit em redes Docker
+sem portas públicas e expõe somente o Caddy nas portas `80/443`. Antes de iniciar
+qualquer serviço de dados, um preflight exige domínio público, HTTPS/OIDC coerente,
+um único e-mail autorizado e senha forte de banco, sem imprimir esses valores.
+
+O procedimento completo está em
+[Implantação Web privada](docs/IMPLANTACAO_WEB.md). Esta configuração ainda precisa
+ser validada em um servidor com domínio e DNS públicos antes de ser considerada
+pronta para produção.
+
 ## Principais funcionalidades
 
 ### Projetos isolados e protocolo versionado
