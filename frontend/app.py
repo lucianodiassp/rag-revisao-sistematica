@@ -3,6 +3,7 @@
 import streamlit as st
 
 from backend.app.version import application_caption, application_metadata
+from frontend.auth_gate import enforce_access
 
 
 st.set_page_config(
@@ -28,7 +29,8 @@ def registrar_identidade_aplicacao():
     return metadata
 
 
-registrar_identidade_aplicacao()
+metadata = registrar_identidade_aplicacao()
+enforce_access(metadata)
 st.sidebar.caption(f"**{application_caption()}**")
 
 pages = [

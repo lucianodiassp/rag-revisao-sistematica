@@ -7,7 +7,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Version](https://img.shields.io/badge/version-2.0.0--dev-orange.svg)
 
-Aplicação local para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
+Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
 de evidências, avaliação metodológica revisada por humano, painel versionado de
 limitações e confiança, auditoria e síntese final.
@@ -40,9 +40,10 @@ fluxo de uma revisão dentro de projetos isolados. Cada projeto possui pergunta,
 protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, interações de
 agentes, auditorias e relatórios próprios.
 
-O perfil atual de implantação é **local e de usuário único**. As tabelas de
-configuração já possuem campos de escopo para uma evolução futura, mas autenticação,
-autorização e isolamento entre usuários ainda não fazem parte desta versão.
+O perfil padrão de implantação continua sendo **local e de usuário único**. A linha
+`2.0.0-dev` acrescenta o perfil **Web privado**, também de usuário único, protegido
+por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
+continua reservado para uma evolução posterior.
 
 A versão estável publicada é **1.0.0 — Local, usuário único**. Esta branch de
 integração inicia a **2.0.0-dev — Web privada**, ainda em desenvolvimento. A
@@ -51,6 +52,18 @@ reprodutibilidade.
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
+
+### Autenticação da Web privada (v2 em desenvolvimento)
+
+Quando `RAG_DEPLOYMENT_PROFILE=web_private`, a aplicação exige login OIDC antes de
+criar a navegação ou exibir dados. A autorização é limitada aos e-mails definidos
+em `RAG_AUTH_ALLOWED_EMAILS`; no modo `single_user`, informe exatamente um e-mail.
+O perfil `local` permanece acessível sem login.
+
+As credenciais do provedor ficam em `.streamlit/secrets.toml`, que não é enviado ao
+Git nem incluído no build. Consulte o guia
+[Autenticação da Web privada](docs/AUTENTICACAO_WEB.md) para configurar Google,
+Microsoft ou outro provedor OIDC e validar o fluxo completo.
 
 ## Principais funcionalidades
 
