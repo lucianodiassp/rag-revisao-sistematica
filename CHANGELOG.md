@@ -11,6 +11,9 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Criada a linha de integração `v2-web` a partir da versão estável `v1.0.0`.
 - Identificada a aplicação como `2.0.0-dev` durante o desenvolvimento.
 - Documentado o roadmap incremental da Web privada e seus critérios de aceite.
+- Adicionada autenticação OIDC obrigatória no perfil Web privado.
+- Adicionada autorização explícita por e-mail, com bloqueio seguro de configurações
+  incompletas e preservação do acesso local sem login.
 - Preparação da implantação Web privada, inicialmente de usuário único.
 
 ## [1.0.0] — 2026-08-22

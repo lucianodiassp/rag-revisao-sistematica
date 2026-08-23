@@ -26,6 +26,8 @@ devem usar **`v2-web` como branch de destino**, e não `main`.
 
 Branch: `feature/v2-autenticacao`
 
+Estado: **implementada e validada**.
+
 - Usar a autenticação OIDC nativa do Streamlit.
 - Exigir login quando `RAG_DEPLOYMENT_PROFILE=web_private`.
 - Restringir o acesso a uma lista explícita de e-mails autorizados.
@@ -95,4 +97,3 @@ banco, armazenamento, provedor de IA e fonte bibliográfica.
 
 Esses itens continuam possíveis, mas serão tratados somente depois da validação da
 Web privada de usuário único.
-

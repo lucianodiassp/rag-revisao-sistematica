@@ -62,11 +62,10 @@ services:
       AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
       BACKUP_DIRECTORY: /app/data/backups
       STREAMLIT_SERVER_MAX_UPLOAD_SIZE: ${RAG_MAX_UPLOAD_MB:-2048}
-      RAG_DEPLOYMENT_PROFILE: ${RAG_DEPLOYMENT_PROFILE:-local}
-      RAG_USER_MODE: ${RAG_USER_MODE:-single_user}
     ports:
       - "127.0.0.1:${RAG_APP_PORT:-8501}:8501"
     volumes:
+      - ./.streamlit:/app/.streamlit:ro
       - ./data/pdfs:/app/data/pdfs
       - ./data/backups:/app/data/backups
       - app_private_data:/app/data/private
