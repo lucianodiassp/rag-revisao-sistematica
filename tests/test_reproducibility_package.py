@@ -226,7 +226,9 @@ def _dataset():
     }
 
 
-def test_package_contains_readable_artifacts_and_manifest_hashes():
+def test_package_contains_readable_artifacts_and_manifest_hashes(monkeypatch):
+    monkeypatch.setenv("RAG_DEPLOYMENT_PROFILE", "local")
+    monkeypatch.setenv("RAG_USER_MODE", "single_user")
     result = build_reproducibility_package(
         _dataset(), generated_at="2026-08-16T15:30:00+00:00"
     )

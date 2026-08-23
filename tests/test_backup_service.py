@@ -116,6 +116,8 @@ def test_restore_requires_exact_confirmation(tmp_path):
 def test_created_backup_records_application_version_without_changing_format_version(
     tmp_path, monkeypatch
 ):
+    monkeypatch.setenv("RAG_DEPLOYMENT_PROFILE", "local")
+    monkeypatch.setenv("RAG_USER_MODE", "single_user")
     settings = DatabaseSettings("db", "5432", "test", "user", "password")
     pdf_directory = tmp_path / "pdfs"
     pdf_directory.mkdir()

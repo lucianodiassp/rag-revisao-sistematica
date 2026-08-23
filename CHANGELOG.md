@@ -14,6 +14,10 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Adicionada autenticação OIDC obrigatória no perfil Web privado.
 - Adicionada autorização explícita por e-mail, com bloqueio seguro de configurações
   incompletas e preservação do acesso local sem login.
+- Adicionado Compose exclusivo para Web privada com Caddy, HTTPS automático,
+  PostgreSQL e Streamlit sem portas públicas.
+- Adicionado preflight que bloqueia configurações Web incompletas ou inseguras sem
+  exibir os valores recebidos.
 - Preparação da implantação Web privada, inicialmente de usuário único.
 
 ## [1.0.0] — 2026-08-22

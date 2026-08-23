@@ -43,6 +43,8 @@ Web privado antes da autenticação e da verificação da lista de acesso.
 
 Branch: `feature/v2-configuracao-producao`
 
+Estado: **implementada, aguardando validação em servidor com domínio público**.
+
 - Separar o Compose local da sobreposição Web.
 - Retirar credenciais padrão do perfil Web e exigir segredos externos.
 - Publicar somente a porta necessária da aplicação.
