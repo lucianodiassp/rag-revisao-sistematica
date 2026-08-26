@@ -36,6 +36,10 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Criada a página Diagnóstico Operacional, com classificação de falhas e exportação
   de um relatório seguro para suporte.
 - Documentados diagnóstico, atualização segura e retorno para uma revisão anterior.
+- Corrigidos os health checks independentes da aplicação e do worker no Compose
+  Web e adicionado um teste de contrato para impedir regressões.
+- Adicionado o gate documentado de candidata, piloto em domínio real e promoção
+  segura para `v2.0.0`.
 
 ## [1.0.0] — 2026-08-22
 

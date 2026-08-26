@@ -106,18 +106,6 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -m
-        - backend.app.operational_health
-        - --component
-        - worker
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
     networks:
       - backend
       - frontend
@@ -148,6 +136,18 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - backend.app.operational_health
+        - --component
+        - worker
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - backend
 

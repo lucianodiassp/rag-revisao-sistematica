@@ -65,8 +65,16 @@ branch de integração `v2-web`, por exemplo:
 A `main` permanece como linha estável até a validação integral da v2. Quando a
 versão Web estiver pronta, `v2-web` é incorporada à `main` e recebe a tag `v2.0.0`.
 
+Antes da versão estável, a linha passa por uma candidata `2.0.0-rc.1`. A candidata
+só é identificada e etiquetada depois dos testes locais, da restauração de um
+backup v1 em ambiente limpo e da validação funcional. O piloto com domínio, HTTPS
+e OIDC reais usa exatamente essa tag. Correções posteriores geram uma nova
+candidata (`rc.2`, `rc.3`), sem mover ou reutilizar tags já publicadas.
+
 O planejamento incremental, os critérios de aceite e os itens fora do primeiro
 ciclo estão detalhados em [ROADMAP_V2_WEB.md](ROADMAP_V2_WEB.md).
+O gate de promoção está detalhado em
+[CHECKLIST_RELEASE_V2.md](CHECKLIST_RELEASE_V2.md).
 
 ## Compatibilidade e retorno
 

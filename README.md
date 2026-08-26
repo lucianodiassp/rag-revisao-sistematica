@@ -53,6 +53,8 @@ reprodutibilidade.
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
+As condições para publicar a candidata e promover a versão estável estão no
+[Checklist da candidata v2](docs/CHECKLIST_RELEASE_V2.md).
 
 ### Autenticação da Web privada (v2 em desenvolvimento)
 
