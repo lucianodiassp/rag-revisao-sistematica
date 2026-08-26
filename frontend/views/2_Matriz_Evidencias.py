@@ -9,15 +9,16 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 
 from backend.agentes.agente_extrator import (  # noqa: E402
     carregar_extracoes_projeto,
-    executar_pipeline_extracao,
     salvar_revisao_humana,
 )
+from backend.app.background_jobs import JOB_EVIDENCE_EXTRACTION  # noqa: E402
 from backend.app.evidence_utils import FIELD_TYPES, achatar_extracao  # noqa: E402
 from backend.processamento.leitor_pdf import (  # noqa: E402
     carregar_status_pdfs,
     resumir_status_fluxo,
 )
 from frontend.project_selector import selecionar_projeto_ativo  # noqa: E402
+from frontend.background_jobs_ui import job_is_active, render_job_status, start_job  # noqa: E402
 
 
 ROTULOS = {
@@ -90,6 +91,12 @@ if (((projeto.get("criteria_jsonb") or {}).get("_demo") or {}).get("seed_id")):
     )
 
 col_texto, col_acao = st.columns([3, 1])
+extraction_job = render_job_status(
+    project_id,
+    JOB_EVIDENCE_EXTRACTION,
+    key="evidence_extraction",
+    title="Extração rastreável",
+)
 with col_texto:
     if (((projeto.get("criteria_jsonb") or {}).get("_demo") or {}).get("seed_id")):
         st.markdown(
@@ -104,20 +111,25 @@ with col_texto:
             "Somente itens aprovados nesta tela serão usados no relatório final."
         )
 with col_acao:
-    if st.button("🔄 Extrair dos PDFs", type="primary", use_container_width=True):
-        with st.spinner("Lendo os artigos e validando as citações literais..."):
-            try:
-                resumo = executar_pipeline_extracao(project_id)
-                st.success(f"{resumo['extraidos']} artigo(s) extraído(s) com rastreabilidade.")
-                if resumo["sem_pdf_rastreavel"]:
-                    st.warning(
-                        f"{resumo['sem_pdf_rastreavel']} artigo(s) aprovado(s) ainda não "
-                        "possuem indexação rastreável. Confira a página Gestão de PDFs."
-                    )
-                if resumo["falhas"]:
-                    st.warning(f"{resumo['falhas']} extração(ões) não puderam ser concluídas.")
-            except Exception as erro:
-                st.error(f"Não foi possível executar a extração: {erro}")
+    if st.button(
+        "🔄 Extrair dos PDFs",
+        type="primary",
+        use_container_width=True,
+        disabled=job_is_active(extraction_job),
+    ):
+        try:
+            start_job(project_id, JOB_EVIDENCE_EXTRACTION)
+            st.rerun()
+        except Exception as erro:
+            st.error(f"Não foi possível iniciar a extração: {erro}")
+
+if extraction_job and extraction_job.get("status") == "succeeded":
+    resumo_extracao = extraction_job.get("result_jsonb") or {}
+    st.info(
+        f"Última execução: {resumo_extracao.get('extraidos', 0)} extraído(s), "
+        f"{resumo_extracao.get('falhas', 0)} falha(s) e "
+        f"{resumo_extracao.get('sem_pdf_rastreavel', 0)} sem PDF rastreável."
+    )
 
 st.divider()
 st.subheader("Andamento do fluxo de evidências")

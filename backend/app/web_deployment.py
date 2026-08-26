@@ -106,6 +106,36 @@ def validate_web_configuration(
         errors.append("RAG_DEPLOYMENT_PROFILE deve ser web_private.")
     if _text(environ.get("RAG_USER_MODE")) != "single_user":
         errors.append("A primeira versão Web exige RAG_USER_MODE=single_user.")
+    try:
+        job_workers = int(_text(environ.get("RAG_JOB_WORKERS")))
+    except ValueError:
+        job_workers = 0
+    if job_workers != 1:
+        errors.append("A versão Web privada exige RAG_JOB_WORKERS=1.")
+
+    job_limits = (
+        ("RAG_JOB_POLL_SECONDS", 1, 60),
+        ("RAG_JOB_HEARTBEAT_SECONDS", 5, 300),
+        ("RAG_JOB_STALE_SECONDS", 60, 3600),
+        ("RAG_JOB_MAX_ATTEMPTS", 1, 10),
+        ("RAG_JOB_RETRY_BASE_SECONDS", 1, 300),
+    )
+    parsed_job_limits = {}
+    for name, minimum, maximum in job_limits:
+        try:
+            value = int(_text(environ.get(name)))
+        except ValueError:
+            value = 0
+        parsed_job_limits[name] = value
+        if value < minimum or value > maximum:
+            errors.append(f"{name} deve estar entre {minimum} e {maximum}.")
+    if (
+        parsed_job_limits["RAG_JOB_STALE_SECONDS"]
+        < parsed_job_limits["RAG_JOB_HEARTBEAT_SECONDS"] * 3
+    ):
+        errors.append(
+            "RAG_JOB_STALE_SECONDS deve ser ao menos três vezes o intervalo de heartbeat."
+        )
 
     try:
         emails = parse_allowed_emails(environ.get("RAG_AUTH_ALLOWED_EMAILS"))

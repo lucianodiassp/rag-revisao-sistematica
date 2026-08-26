@@ -284,7 +284,7 @@ def salvar_revisao_humana(project_id, extracao_id, dados_revisados, status, nota
             raise ValueError("Extração não encontrada no projeto ativo.")
 
 
-def executar_pipeline_extracao(project_id=None):
+def executar_pipeline_extracao(project_id=None, progress_callback=None):
     project_id = resolver_project_id(project_id)
     artigos = buscar_artigos_aprovados(project_id)
     sem_pdf = contar_aprovados_sem_pdf_rastreavel(project_id)
@@ -297,11 +297,23 @@ def executar_pipeline_extracao(project_id=None):
     print(f"📊 Encontrados {len(artigos)} artigos para extração rastreável.\n")
     with get_conexao() as conexao, conexao.cursor() as cursor:
         for indice, (paper_id, titulo) in enumerate(artigos):
+            if progress_callback:
+                progress_callback(
+                    indice,
+                    len(artigos),
+                    f"Extraindo evidências: {titulo[:80]}",
+                )
             print(f"🧠 IA a extrair evidências do PDF: '{titulo[:50]}...'")
             chunks, truncado = buscar_chunks_pdf(paper_id)
             dados_extraidos = extrair_evidencias_com_ia(titulo, chunks, truncado)
             if not dados_extraidos:
                 resumo["falhas"] += 1
+                if progress_callback:
+                    progress_callback(
+                        indice + 1,
+                        len(artigos),
+                        f"Extração não concluída: {titulo[:80]}",
+                    )
                 continue
 
             extracao_id = _salvar_extracao(cursor, project_id, paper_id, dados_extraidos)
@@ -327,6 +339,12 @@ def executar_pipeline_extracao(project_id=None):
             conexao.commit()
             resumo["extraidos"] += 1
             print("   ✅ Evidências e fontes literais validadas e salvas.")
+            if progress_callback:
+                progress_callback(
+                    indice + 1,
+                    len(artigos),
+                    f"Evidências extraídas: {titulo[:80]}",
+                )
             if indice < len(artigos) - 1:
                 time.sleep(15)
 

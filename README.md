@@ -82,6 +82,12 @@ A aplicação valida escrita, reserva mínima de disco e limites distintos para 
 `.ragbackup` antes de gravar. O mesmo guia documenta cópia externa e recuperação em
 uma instalação Web limpa sem alterar o formato de backup da v1.
 
+As operações demoradas de coleta, indexação, extração, relatório e benchmark são
+enviadas a uma fila persistente no PostgreSQL e executadas por um processo separado.
+Atualizar ou fechar a página não cancela a operação: andamento, falhas e tentativas
+continuam disponíveis na tela correspondente. O perfil de usuário único executa
+uma tarefa por vez para evitar picos de consumo nas APIs.
+
 ## Principais funcionalidades
 
 ### Projetos isolados e protocolo versionado

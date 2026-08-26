@@ -25,6 +25,10 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   recuperação da implantação Web em ambiente limpo.
 - Centralizados os caminhos persistentes usados por upload, indexação, backup e
   restauração, preservando o formato `.ragbackup` v1.
+- Adicionada fila persistente no PostgreSQL e processo separado para coleta,
+  indexação de PDFs, extração, relatório final e benchmark quantitativo.
+- Preservados progresso, falhas e tentativas após atualização ou desconexão do
+  navegador, com concorrência unitária para proteger as cotas das APIs.
 
 ## [1.0.0] — 2026-08-22
 

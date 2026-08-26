@@ -87,6 +87,41 @@ services:
     networks:
       - rag_network
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_UID: ${RAG_UID:-1000}
+        APP_GID: ${RAG_GID:-1000}
+    container_name: rag_background_worker
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: rag_systematic_review
+      DB_USER: rag_user
+      DB_PASSWORD: rag_password
+      AI_CONFIG_DATABASE_ENABLED: "true"
+      AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+      PDF_DIRECTORY: /app/data/pdfs
+      BACKUP_DIRECTORY: /app/data/backups
+      PRIVATE_DIRECTORY: /app/data/private
+      RAG_JOB_WORKERS: "1"
+    command: ["python", "-m", "backend.app.job_worker"]
+    volumes:
+      - ./data/pdfs:/app/data/pdfs
+      - ./data/backups:/app/data/backups
+      - app_private_data:/app/data/private
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - rag_network
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: rag_pgadmin

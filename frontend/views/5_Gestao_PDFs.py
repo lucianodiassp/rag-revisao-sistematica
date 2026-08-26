@@ -7,9 +7,9 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.processamento.leitor_pdf import (
     carregar_status_pdfs,
-    processar_pdfs,
     resumir_status_fluxo,
 )
+from backend.app.background_jobs import JOB_PDF_INDEXING
 from backend.processamento.ocr_pdf import get_pdf_ocr_config
 from backend.app.screening_reassessment import (
     ACTION_EXCLUDE,
@@ -24,6 +24,7 @@ from backend.app.storage_service import (
     storage_limits,
 )
 from frontend.project_selector import selecionar_projeto_ativo
+from frontend.background_jobs_ui import job_is_active, render_job_status, start_job
 
 # ==========================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -263,27 +264,28 @@ else:
             "produzir texto para indexação."
         )
 
-    # Botão de ignição do backend
+    index_job = render_job_status(
+        project_id,
+        JOB_PDF_INDEXING,
+        key="pdf_indexing",
+        title="Indexação vetorial",
+    )
+
+    # Botão de ignição do processo separado
     if st.button(
         "⚡ Executar Processamento e Vetorização de PDFs",
         type="secondary",
         width="stretch",
+        disabled=job_is_active(index_job),
     ):
-        with st.spinner("O sistema está a ler, fatiar e vetorizar os documentos na íntegra... Isto pode demorar alguns minutos consoante o tamanho dos artigos."):
-            try:
-                # Invoca a função do leitor_pdf.py diretamente
-                resumo = processar_pdfs(project_id)
-                st.session_state["ultimo_relatorio_indexacao"] = {
-                    "project_id": project_id,
-                    "resumo": resumo,
-                }
-                st.rerun()
-            except Exception as e:
-                st.error(f"⚠️ Ocorreu um erro durante a vetorização: {e}")
+        try:
+            start_job(project_id, JOB_PDF_INDEXING)
+            st.rerun()
+        except Exception as e:
+            st.error(f"⚠️ Não foi possível iniciar a vetorização: {e}")
 
-    relatorio_salvo = st.session_state.get("ultimo_relatorio_indexacao")
-    if relatorio_salvo and relatorio_salvo.get("project_id") == project_id:
-        resumo = relatorio_salvo["resumo"]
+    if index_job and index_job.get("status") == "succeeded":
+        resumo = index_job.get("result_jsonb") or {}
         if resumo["falhas"]:
             st.warning(
                 "Processamento concluído parcialmente: "

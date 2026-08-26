@@ -31,7 +31,13 @@ def gerar_id_deterministico(artigo, project_id):
     return gerar_id_artigo(artigo, project_id)
 
 
-def iniciar_recolha(query, project_id=None, max_por_fonte=5, source_queries=None):
+def iniciar_recolha(
+    query,
+    project_id=None,
+    max_por_fonte=5,
+    source_queries=None,
+    progress_callback=None,
+):
     project_id = resolver_project_id(project_id)
     source_queries = source_queries or {}
     print("=======================================================")
@@ -58,6 +64,12 @@ def iniciar_recolha(query, project_id=None, max_por_fonte=5, source_queries=None
     resultados_por_fonte = []
 
     for indice, (source_code, nome_fonte, coletor, config) in enumerate(fontes, 1):
+        if progress_callback:
+            progress_callback(
+                indice - 1,
+                len(fontes),
+                f"Consultando {nome_fonte}",
+            )
         print(f"[Fonte {indice}/{len(fontes)}] A contactar {nome_fonte}...")
         source_query = str(source_queries.get(source_code) or query).strip()
         artigos = coletor(source_query, max_resultados=max_por_fonte)
@@ -75,6 +87,12 @@ def iniciar_recolha(query, project_id=None, max_por_fonte=5, source_queries=None
             },
         )
         resultados_por_fonte.append((nome_fonte, busca_id, artigos))
+        if progress_callback:
+            progress_callback(
+                indice,
+                len(fontes),
+                f"{nome_fonte}: {len(artigos)} registro(s) recuperado(s)",
+            )
 
     total_encontrados = sum(len(artigos) for _, _, artigos in resultados_por_fonte)
     print("-------------------------------------------------------")
@@ -83,6 +101,7 @@ def iniciar_recolha(query, project_id=None, max_por_fonte=5, source_queries=None
     sucessos = 0
     mesclados = 0
     pendentes_revisao = 0
+    processados = 0
     for nome_fonte, busca_id, artigos in resultados_por_fonte:
         for artigo in artigos:
             try:
@@ -109,6 +128,14 @@ def iniciar_recolha(query, project_id=None, max_por_fonte=5, source_queries=None
                     pendentes_revisao += 1
             except Exception as erro:
                 print(f"⚠️ Artigo '{artigo['titulo'][:20]}...' gerou erro: {erro}")
+            finally:
+                processados += 1
+                if progress_callback:
+                    progress_callback(
+                        processados,
+                        total_encontrados,
+                        f"Consolidando registros ({processados}/{total_encontrados})",
+                    )
 
     print(
         f"\n✅ Processo concluído no projeto {project_id}: "

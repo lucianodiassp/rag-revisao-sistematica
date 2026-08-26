@@ -7,8 +7,11 @@ from dotenv import load_dotenv, find_dotenv
 
 # Adiciona o caminho raiz para podermos importar o agente relator e avaliador
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-from backend.agentes.agente_relator import gerar_relatorio_final
 from backend.agentes.agente_avaliador import PERGUNTAS_PADRAO, executar_auditoria
+from backend.app.background_jobs import (
+    JOB_FINAL_REPORT,
+    get_latest_successful_job,
+)
 from backend.app.database import carregar_ultima_execucao_avaliacao, salvar_protocolo_projeto
 from backend.app.prisma import (
     calcular_fluxo_prisma,
@@ -23,6 +26,7 @@ from backend.app.reproducibility_package import generate_reproducibility_package
 from backend.app.screening_service import EXCLUSION_REASON_LABELS
 from backend.app.synthesis_confidence import confidence_summary
 from frontend.project_selector import selecionar_projeto_ativo
+from frontend.background_jobs_ui import job_is_active, render_job_status, start_job
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
@@ -295,22 +299,34 @@ st.divider()
 # --- 5. SÍNTESE ACADÊMICA ---
 st.header("5. Compilação da Síntese Final")
 
-if "relatorios_por_projeto" not in st.session_state:
-    st.session_state.relatorios_por_projeto = {}
+report_job = render_job_status(
+    project_id,
+    JOB_FINAL_REPORT,
+    key="final_report",
+    title="Compilação do relatório",
+)
 
 col_tit, col_btn = st.columns([2, 1])
 with col_tit:
     st.write("Acione o Agente Relator para ler as evidências extraídas e gerar o texto final no padrão académico.")
 with col_btn:
-    if st.button("🚀 Gerar / Atualizar Relatório Final", type="primary", use_container_width=True):
-        with st.spinner("A invocar o Agente Relator (Pode demorar alguns segundos)..."):
-            try:
-                st.session_state.relatorios_por_projeto[project_id] = gerar_relatorio_final(project_id)
-                st.success("Relatório compilado com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao executar o Agente Relator: {e}")
+    if st.button(
+        "🚀 Gerar / Atualizar Relatório Final",
+        type="primary",
+        use_container_width=True,
+        disabled=job_is_active(report_job),
+    ):
+        try:
+            start_job(project_id, JOB_FINAL_REPORT)
+            st.rerun()
+        except Exception as e:
+            st.error(f"Não foi possível iniciar o Agente Relator: {e}")
 
-relatorio_compilado = st.session_state.relatorios_por_projeto.get(project_id)
+successful_report_job = get_latest_successful_job(project_id, JOB_FINAL_REPORT)
+relatorio_compilado = (
+    (successful_report_job or {}).get("result_jsonb")
+    if successful_report_job else None
+)
 if relatorio_compilado is not None:
     texto_relatorio = relatorio_compilado["relatorio_md"]
     snapshot_relatorio = relatorio_compilado.get("prisma_snapshot")
