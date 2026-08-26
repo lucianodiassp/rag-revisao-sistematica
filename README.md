@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.0.0--dev-orange.svg)
+![Version](https://img.shields.io/badge/version-2.0.0--rc.1-orange.svg)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
@@ -41,13 +41,14 @@ fluxo de uma revisão dentro de projetos isolados. Cada projeto possui pergunta,
 protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, interações de
 agentes, auditorias e relatórios próprios.
 
-O perfil padrão de implantação continua sendo **local e de usuário único**. A linha
-`2.0.0-dev` acrescenta o perfil **Web privado**, também de usuário único, protegido
+O perfil padrão de implantação continua sendo **local e de usuário único**. A candidata
+`2.0.0-rc.1` acrescenta o perfil **Web privado**, também de usuário único, protegido
 por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
 continua reservado para uma evolução posterior.
 
 A versão estável publicada é **1.0.0 — Local, usuário único**. Esta branch de
-integração inicia a **2.0.0-dev — Web privada**, ainda em desenvolvimento. A
+integração contém a candidata **2.0.0-rc.1 — Web privada**, pronta para o piloto em
+servidor com domínio e HTTPS reais. A
 identidade efetiva aparece no menu lateral e acompanha backups e pacotes de
 reprodutibilidade.
 
@@ -56,7 +57,7 @@ O plano incremental da nova linha está em
 As condições para publicar a candidata e promover a versão estável estão no
 [Checklist da candidata v2](docs/CHECKLIST_RELEASE_V2.md).
 
-### Autenticação da Web privada (v2 em desenvolvimento)
+### Autenticação da Web privada (v2 candidata)
 
 Quando `RAG_DEPLOYMENT_PROFILE=web_private`, a aplicação exige login OIDC antes de
 criar a navegação ou exibir dados. A autorização é limitada aos e-mails definidos
@@ -68,7 +69,7 @@ Git nem incluído no build. Consulte o guia
 [Autenticação da Web privada](docs/AUTENTICACAO_WEB.md) para configurar Google,
 Microsoft ou outro provedor OIDC e validar o fluxo completo.
 
-### Perfil Web de produção (v2 em desenvolvimento)
+### Perfil Web de produção (v2 candidata)
 
 O arquivo `docker-compose.web.yml` mantém PostgreSQL e Streamlit em redes Docker
 sem portas públicas e expõe somente o Caddy nas portas `80/443`. Antes de iniciar
