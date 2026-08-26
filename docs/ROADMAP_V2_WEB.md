@@ -108,6 +108,18 @@ dos projetos.
 Critério de aceite: o operador deve conseguir distinguir falha de configuração,
 banco, armazenamento, provedor de IA e fonte bibliográfica.
 
+## Próxima fase: candidata e piloto
+
+As cinco etapas técnicas do primeiro ciclo foram implementadas. A promoção para
+`2.0.0-rc.1` depende agora do gate de integridade, compatibilidade e validação
+funcional. A publicação estável `v2.0.0` depende adicionalmente de um piloto em
+servidor com domínio, HTTPS e callback OIDC reais.
+
+O procedimento e as evidências esperadas estão no
+[Checklist da candidata v2](CHECKLIST_RELEASE_V2.md). Enquanto o piloto não for
+concluído, `v2-web` permanece a linha de integração e `main` continua sendo a
+versão local estável.
+
 ## Fora do primeiro ciclo da v2
 
 - Cadastro público e autoatendimento.
