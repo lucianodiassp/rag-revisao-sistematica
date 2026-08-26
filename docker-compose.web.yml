@@ -108,6 +108,35 @@ services:
       - backend
       - frontend
 
+  worker:
+    image: rag-revisao-sistematica-app:2.0.0-dev
+    container_name: rag_web_background_worker
+    restart: unless-stopped
+    env_file:
+      - ./deploy/web.env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      RAG_DEPLOYMENT_PROFILE: web_private
+      RAG_USER_MODE: single_user
+      RAG_MANAGED_STORAGE: "true"
+      AI_CONFIG_DATABASE_ENABLED: "true"
+      AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+      PDF_DIRECTORY: /app/data/pdfs
+      BACKUP_DIRECTORY: /app/data/backups
+      PRIVATE_DIRECTORY: /app/data/private
+      RAG_JOB_WORKERS: "1"
+    command: ["python", "-m", "backend.app.job_worker"]
+    volumes:
+      - web_pdfs:/app/data/pdfs
+      - web_backups:/app/data/backups
+      - web_private_data:/app/data/private
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - backend
+
   proxy:
     image: caddy:2.11.4-alpine
     container_name: rag_web_proxy

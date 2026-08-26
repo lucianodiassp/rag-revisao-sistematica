@@ -51,6 +51,11 @@ Edite `deploy/web.env` e substitua todos os valores de exemplo. São obrigatóri
 - `RAG_MAX_PDF_UPLOAD_MB`: limite de cada artigo em PDF;
 - `RAG_MAX_BACKUP_UPLOAD_MB`: limite de importação do `.ragbackup`;
 - `RAG_MIN_FREE_STORAGE_MB`: reserva que não pode ser consumida por uma operação.
+- `RAG_JOB_WORKERS=1`: concorrência fixa da fila no perfil de usuário único;
+- `RAG_JOB_HEARTBEAT_SECONDS` e `RAG_JOB_STALE_SECONDS`: detecção segura de
+  processamento interrompido;
+- `RAG_JOB_MAX_ATTEMPTS` e `RAG_JOB_RETRY_BASE_SECONDS`: limite e intervalo inicial
+  das novas tentativas para indisponibilidades temporárias.
 
 O arquivo real é ignorado pelo Git e pelo contexto de build do Docker.
 
@@ -105,6 +110,13 @@ Consulte o estado sem exibir a configuração:
 ```bash
 docker compose --env-file deploy/web.env -f docker-compose.web.yml ps
 docker compose --env-file deploy/web.env -f docker-compose.web.yml logs --tail 100 proxy app
+```
+
+O serviço `worker` executa uma operação longa por vez. Para acompanhar a fila sem
+exibir configurações sensíveis:
+
+```bash
+docker compose --env-file deploy/web.env -f docker-compose.web.yml logs --tail 100 worker
 ```
 
 Acesse `https://SEU_DOMINIO`. A aplicação deve mostrar somente o botão **Entrar**

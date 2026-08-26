@@ -72,10 +72,18 @@ validado deve restaurar a instalação em ambiente limpo.
 
 Branch: `feature/v2-processamento-assincrono`
 
+Estado: **implementada e validada**.
+
 - Mapear operações demoradas de busca, indexação, extração, relatório e benchmark.
 - Evitar que uma desconexão do navegador perca o estado de uma operação.
 - Registrar progresso, falhas e possibilidade de nova tentativa.
 - Definir limites de concorrência e consumo das APIs de IA.
+
+A implementação utiliza uma fila no PostgreSQL e um processo separado, limitado a
+uma operação por vez no perfil de usuário único. Coleta, indexação, extração,
+relatório e benchmark preservam estado, progresso, falhas e tentativas mesmo quando
+a página é atualizada ou fechada. Erros transitórios de provedor podem ser repetidos
+automaticamente; falhas definitivas oferecem nova tentativa manual.
 
 Critério de aceite: tarefas longas devem continuar rastreáveis após atualização ou
 reconexão da interface.

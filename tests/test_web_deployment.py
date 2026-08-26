@@ -20,6 +20,12 @@ def _valid_environment():
         "RAG_MAX_PDF_UPLOAD_MB": "100",
         "RAG_MAX_BACKUP_UPLOAD_MB": "2048",
         "RAG_MIN_FREE_STORAGE_MB": "2048",
+        "RAG_JOB_WORKERS": "1",
+        "RAG_JOB_POLL_SECONDS": "2",
+        "RAG_JOB_HEARTBEAT_SECONDS": "15",
+        "RAG_JOB_STALE_SECONDS": "300",
+        "RAG_JOB_MAX_ATTEMPTS": "3",
+        "RAG_JOB_RETRY_BASE_SECONDS": "15",
     }
 
 
@@ -48,6 +54,18 @@ def test_rejects_local_or_multi_user_profile():
 
     assert any("web_private" in error for error in errors)
     assert any("single_user" in error for error in errors)
+
+
+def test_rejects_unsafe_background_worker_limits():
+    environment = _valid_environment()
+    environment["RAG_JOB_WORKERS"] = "2"
+    environment["RAG_JOB_HEARTBEAT_SECONDS"] = "30"
+    environment["RAG_JOB_STALE_SECONDS"] = "60"
+
+    errors = validate_web_configuration(environment, _valid_auth())
+
+    assert any("RAG_JOB_WORKERS=1" in error for error in errors)
+    assert any("três vezes" in error for error in errors)
 
 
 def test_rejects_non_public_domain_and_redirect_without_https():
