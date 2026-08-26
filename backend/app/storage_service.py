@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from platformdirs import user_data_path
+from backend.app.observability import log_event
 
 
 PDF_DIRECTORY_ENV = "PDF_DIRECTORY"
@@ -266,12 +267,22 @@ def main() -> int:
     try:
         statuses = validate_startup_storage()
     except (StorageConfigurationError, StorageCapacityError, OSError) as error:
-        print(f"Armazenamento persistente inválido: {error}")
+        log_event(
+            "storage_startup_failed",
+            component="entrypoint",
+            level="error",
+            category="storage",
+            message="Armazenamento persistente inválido.",
+            issue_type=type(error).__name__,
+        )
         return 1
     minimum = storage_limits().minimum_free_mb
-    print(
-        "Armazenamento persistente validado: "
-        f"{len(statuses)} áreas graváveis e reserva mínima de {minimum} MB."
+    log_event(
+        "storage_startup_succeeded",
+        component="entrypoint",
+        category="storage",
+        area_count=len(statuses),
+        minimum_free_mb=minimum,
     )
     return 0
 

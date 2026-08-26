@@ -56,6 +56,8 @@ Edite `deploy/web.env` e substitua todos os valores de exemplo. São obrigatóri
   processamento interrompido;
 - `RAG_JOB_MAX_ATTEMPTS` e `RAG_JOB_RETRY_BASE_SECONDS`: limite e intervalo inicial
   das novas tentativas para indisponibilidades temporárias.
+- `RAG_SERVICE_HEARTBEAT_SECONDS` e `RAG_SERVICE_STALE_SECONDS`: frequência e prazo
+  usados para detectar serviços sem sinal de vida.
 
 O arquivo real é ignorado pelo Git e pelo contexto de build do Docker.
 
@@ -118,6 +120,16 @@ exibir configurações sensíveis:
 ```bash
 docker compose --env-file deploy/web.env -f docker-compose.web.yml logs --tail 100 worker
 ```
+
+Depois da inicialização, abra **Diagnóstico Operacional** ou execute:
+
+```bash
+docker compose --env-file deploy/web.env -f docker-compose.web.yml \
+  exec -T app python -m backend.app.operational_health --component full
+```
+
+O procedimento de atualização, interpretação das categorias e retorno de versão
+está em [OPERACAO_E_DIAGNOSTICO.md](OPERACAO_E_DIAGNOSTICO.md).
 
 Acesse `https://SEU_DOMINIO`. A aplicação deve mostrar somente o botão **Entrar**
 antes da autenticação. Depois do login com o e-mail autorizado, deve liberar a

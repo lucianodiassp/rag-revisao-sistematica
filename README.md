@@ -25,6 +25,7 @@ do relatório permanecem sob responsabilidade humana.
 - [Projeto demonstrativo](#projeto-demonstrativo)
 - [Atualização de um banco existente](#atualização-de-um-banco-existente)
 - [Versionamento e releases](#versionamento-e-releases)
+- [Diagnóstico operacional](#diagnóstico-operacional)
 - [Configuração segura](#configuração-segura)
 - [Fluxo de uso](#fluxo-de-uso)
 - [Testes](#testes)
@@ -87,6 +88,12 @@ enviadas a uma fila persistente no PostgreSQL e executadas por um processo separ
 Atualizar ou fechar a página não cancela a operação: andamento, falhas e tentativas
 continuam disponíveis na tela correspondente. O perfil de usuário único executa
 uma tarefa por vez para evitar picos de consumo nas APIs.
+
+Eventos operacionais usam linhas JSON com versão, perfil e categoria. A página
+**Diagnóstico Operacional** verifica banco, migrações, armazenamento, interface,
+worker, fila e configurações externas sem chamar APIs pagas nem mostrar segredos.
+Consulte o [guia de operação e diagnóstico](docs/OPERACAO_E_DIAGNOSTICO.md) para
+atualização, investigação de falhas e retorno seguro de versão.
 
 ## Principais funcionalidades
 

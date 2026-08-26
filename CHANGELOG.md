@@ -29,6 +29,13 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   indexação de PDFs, extração, relatório final e benchmark quantitativo.
 - Preservados progresso, falhas e tentativas após atualização ou desconexão do
   navegador, com concorrência unitária para proteger as cotas das APIs.
+- Adicionados eventos operacionais estruturados em JSON, com versão, perfil,
+  categoria e ocultação preventiva de campos sensíveis.
+- Adicionados registro verificável de migrações, sinais de vida da aplicação e do
+  worker e health checks compostos para banco, interface e armazenamento.
+- Criada a página Diagnóstico Operacional, com classificação de falhas e exportação
+  de um relatório seguro para suporte.
+- Documentados diagnóstico, atualização segura e retorno para uma revisão anterior.
 
 ## [1.0.0] — 2026-08-22
 

@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from dotenv import dotenv_values
 
 from backend.app.auth import AuthConfigurationError, parse_allowed_emails
+from backend.app.observability import log_event
 
 try:
     import tomllib
@@ -119,6 +120,8 @@ def validate_web_configuration(
         ("RAG_JOB_STALE_SECONDS", 60, 3600),
         ("RAG_JOB_MAX_ATTEMPTS", 1, 10),
         ("RAG_JOB_RETRY_BASE_SECONDS", 1, 300),
+        ("RAG_SERVICE_HEARTBEAT_SECONDS", 5, 300),
+        ("RAG_SERVICE_STALE_SECONDS", 15, 3600),
     )
     parsed_job_limits = {}
     for name, minimum, maximum in job_limits:
@@ -135,6 +138,13 @@ def validate_web_configuration(
     ):
         errors.append(
             "RAG_JOB_STALE_SECONDS deve ser ao menos três vezes o intervalo de heartbeat."
+        )
+    if (
+        parsed_job_limits["RAG_SERVICE_STALE_SECONDS"]
+        < parsed_job_limits["RAG_SERVICE_HEARTBEAT_SECONDS"] * 3
+    ):
+        errors.append(
+            "RAG_SERVICE_STALE_SECONDS deve ser ao menos três vezes o heartbeat dos serviços."
         )
 
     try:
@@ -252,11 +262,22 @@ def main(argv=None) -> int:
     arguments = parser.parse_args(argv)
     errors = validate_web_files(arguments.env_file, arguments.secrets_file)
     if errors:
-        print("Configuração Web inválida:")
-        for error in errors:
-            print(f"- {error}")
+        log_event(
+            "web_preflight_failed",
+            component="preflight",
+            level="error",
+            category="configuration",
+            message="Configuração Web inválida.",
+            error_count=len(errors),
+            errors=errors,
+        )
         return 1
-    print("Configuração Web validada com segurança.")
+    log_event(
+        "web_preflight_succeeded",
+        component="preflight",
+        category="configuration",
+        message="Configuração Web validada com segurança.",
+    )
     return 0
 
 

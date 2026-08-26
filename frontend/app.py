@@ -3,6 +3,8 @@
 import streamlit as st
 
 from backend.app.version import application_caption, application_metadata
+from backend.app.observability import log_event
+from backend.app.operational_health import ServiceHeartbeatThread
 from frontend.auth_gate import enforce_access
 
 
@@ -19,17 +21,26 @@ st.set_page_config(
 @st.cache_resource
 def registrar_identidade_aplicacao():
     metadata = application_metadata()
-    print(
-        "RAG application started: "
-        f"version={metadata['version']} "
-        f"deployment={metadata['deployment_profile']} "
-        f"user_mode={metadata['user_mode']}",
-        flush=True,
+    log_event(
+        "service_started",
+        component="app",
+        category="application",
+        version=metadata["version"],
+        deployment=metadata["deployment_profile"],
+        configured_user_mode=metadata["user_mode"],
     )
     return metadata
 
 
+@st.cache_resource
+def iniciar_sinal_de_vida_aplicacao():
+    heartbeat = ServiceHeartbeatThread("app", metadata={"role": "streamlit"})
+    heartbeat.start()
+    return heartbeat
+
+
 metadata = registrar_identidade_aplicacao()
+iniciar_sinal_de_vida_aplicacao()
 enforce_access(metadata)
 st.sidebar.caption(f"**{application_caption()}**")
 
@@ -92,6 +103,11 @@ pages = [
         "views/9_Backup_Restauracao.py",
         title="Backup e Restauração",
         icon="🛡️",
+    ),
+    st.Page(
+        "views/13_Diagnostico_Operacional.py",
+        title="Diagnóstico Operacional",
+        icon="🩺",
     ),
 ]
 

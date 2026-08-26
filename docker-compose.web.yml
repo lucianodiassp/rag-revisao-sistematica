@@ -95,15 +95,29 @@ services:
       test:
         - CMD
         - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=2)"
-      interval: 10s
-      timeout: 5s
+        - -m
+        - backend.app.operational_health
+        - --component
+        - app
+      interval: 15s
+      timeout: 10s
       retries: 12
       start_period: 20s
     depends_on:
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - backend.app.operational_health
+        - --component
+        - worker
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - backend
       - frontend
