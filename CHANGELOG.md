@@ -19,6 +19,12 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Adicionado preflight que bloqueia configurações Web incompletas ou inseguras sem
   exibir os valores recebidos.
 - Preparação da implantação Web privada, inicialmente de usuário único.
+- Adicionados limites separados para PDFs e backups, reserva mínima de armazenamento
+  e gravação atômica de uploads.
+- Exibida a capacidade dos volumes persistentes e documentadas a cópia externa e a
+  recuperação da implantação Web em ambiente limpo.
+- Centralizados os caminhos persistentes usados por upload, indexação, backup e
+  restauração, preservando o formato `.ragbackup` v1.
 
 ## [1.0.0] — 2026-08-22
 

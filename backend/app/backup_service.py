@@ -22,6 +22,11 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from backend.app.secret_store import get_master_key_path
+from backend.app.storage_service import (
+    backup_directory,
+    ensure_free_space,
+    pdf_directory,
+)
 from backend.app.version import application_metadata
 
 
@@ -75,12 +80,11 @@ def project_root() -> Path:
 
 
 def default_pdf_directory() -> Path:
-    return project_root() / "data" / "pdfs"
+    return pdf_directory()
 
 
 def default_backup_directory() -> Path:
-    configured = os.getenv("BACKUP_DIRECTORY")
-    return Path(configured).expanduser().resolve() if configured else project_root() / "data" / "backups"
+    return backup_directory()
 
 
 def validate_backup_password(password: str) -> str:
@@ -392,6 +396,7 @@ def create_backup(
     master_key_path = Path(master_key_path or get_master_key_path()).resolve()
     backup_directory = Path(backup_directory or default_backup_directory()).resolve()
     backup_directory.mkdir(parents=True, exist_ok=True)
+    ensure_free_space(backup_directory, operation="criar o backup")
 
     timestamp = datetime.now(timezone.utc)
     suffix = uuid.uuid4().hex[:8]
@@ -413,6 +418,15 @@ def create_backup(
                 for pdf in sorted(pdf_directory.glob("*.pdf")):
                     if pdf.is_file():
                         components.append((pdf, f"pdfs/{pdf.name}"))
+
+            # O ZIP e o arquivo cifrado coexistem temporariamente. Esta estimativa
+            # evita iniciar um backup que deixaria o volume sem reserva operacional.
+            component_size = sum(path.stat().st_size for path, _ in components)
+            ensure_free_space(
+                backup_directory,
+                component_size * 2,
+                operation="montar e cifrar o backup",
+            )
 
             entries = [_entry_metadata(path, archive_name) for path, archive_name in components]
             manifest = {
@@ -454,6 +468,11 @@ def inspect_backup(source: Path, password: str) -> dict:
     source = Path(source).expanduser().resolve()
     if not source.is_file():
         raise BackupError("Arquivo de backup não encontrado.")
+    ensure_free_space(
+        Path(tempfile.gettempdir()),
+        source.stat().st_size,
+        operation="validar o backup",
+    )
     with tempfile.TemporaryDirectory(prefix="rag-backup-inspect-") as temp:
         zip_path = Path(temp) / "payload.zip"
         decrypt_file(source, zip_path, password)
@@ -539,6 +558,11 @@ def _decrypt_and_apply(
     master_key_path: Path,
     scripts_directory: Path | None = None,
 ) -> dict:
+    ensure_free_space(
+        Path(tempfile.gettempdir()),
+        source.stat().st_size * 2,
+        operation="preparar a restauração",
+    )
     with tempfile.TemporaryDirectory(prefix="rag-backup-restore-") as temp:
         zip_path = Path(temp) / "payload.zip"
         decrypt_file(source, zip_path, password)
@@ -572,6 +596,21 @@ def restore_backup(
     backup_directory = Path(backup_directory or default_backup_directory()).resolve()
 
     manifest = inspect_backup(source, password)
+    declared_pdf_size = sum(
+        int(entry.get("size", 0))
+        for entry in manifest.get("entries", [])
+        if str(entry.get("path", "")).startswith("pdfs/")
+    )
+    ensure_free_space(
+        pdf_directory,
+        declared_pdf_size,
+        operation="restaurar os PDFs",
+    )
+    ensure_free_space(
+        backup_directory,
+        source.stat().st_size,
+        operation="criar o backup de recuperação",
+    )
     recovery = create_backup(
         password,
         settings=settings,

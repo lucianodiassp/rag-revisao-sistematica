@@ -150,6 +150,7 @@ def test_created_backup_records_application_version_without_changing_format_vers
 
 def test_restore_failure_applies_automatic_recovery(tmp_path, monkeypatch):
     incoming = tmp_path / "incoming.ragbackup"
+    incoming.write_bytes(b"backup de teste")
     recovery = tmp_path / "pre-restore.ragbackup"
     calls = []
     settings = DatabaseSettings("db", "5432", "test", "user", "password")

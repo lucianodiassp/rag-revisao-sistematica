@@ -77,6 +77,11 @@ O procedimento completo está em
 ser validada em um servidor com domínio e DNS públicos antes de ser considerada
 pronta para produção.
 
+Banco, PDFs, backups, chave-mestra e certificados usam volumes nomeados separados.
+A aplicação valida escrita, reserva mínima de disco e limites distintos para PDFs e
+`.ragbackup` antes de gravar. O mesmo guia documenta cópia externa e recuperação em
+uma instalação Web limpa sem alterar o formato de backup da v1.
+
 ## Principais funcionalidades
 
 ### Projetos isolados e protocolo versionado
@@ -117,6 +122,8 @@ pronta para produção.
 - Backup automático do estado atual antes de restaurar outro arquivo.
 - Restauração transacional do banco, seguida pelas migrações idempotentes.
 - Retorno automático ao estado anterior quando uma etapa da restauração falha.
+- Limites de upload e reserva livre conferidos antes de validar, criar ou restaurar.
+- Compatibilidade do formato `.ragbackup` v1 entre os perfis local e Web privado.
 
 ### Pacote de reprodutibilidade por projeto
 

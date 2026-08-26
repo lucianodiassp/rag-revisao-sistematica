@@ -80,7 +80,9 @@ services:
       RAG_MANAGED_STORAGE: "true"
       AI_CONFIG_DATABASE_ENABLED: "true"
       AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+      PDF_DIRECTORY: /app/data/pdfs
       BACKUP_DIRECTORY: /app/data/backups
+      PRIVATE_DIRECTORY: /app/data/private
       STREAMLIT_SERVER_MAX_UPLOAD_SIZE: ${RAG_MAX_UPLOAD_MB:-2048}
     expose:
       - "8501"
