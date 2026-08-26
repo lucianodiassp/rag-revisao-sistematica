@@ -200,6 +200,13 @@ pode atingir simultaneamente a aplicação e todos os volumes.
 7. Após a restauração, confira projetos, Gestão de PDFs, configurações de IA e uma
    consulta RAG. As migrações atuais são reaplicadas ao banco restaurado.
 
+Durante a restauração, o schema de destino é substituído integralmente pelo schema
+do dump. Isso remove tabelas exclusivas de uma versão mais nova que poderiam manter
+dependências incompatíveis com um backup antigo. Em seguida, todas as migrações da
+versão instalada são reaplicadas e seus checksums são registrados. A cópia automática
+pré-restauração permite recuperar o estado anterior caso qualquer uma dessas etapas
+falhe.
+
 O formato lógico permanece na versão `1`, portanto backups `.ragbackup` válidos da
 v1 local continuam aceitos pela v2 Web. O perfil, o domínio e a autenticação do novo
 servidor não são sobrescritos pelo arquivo restaurado.
