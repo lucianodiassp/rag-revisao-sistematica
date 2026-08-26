@@ -40,6 +40,12 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   Web e adicionado um teste de contrato para impedir regressões.
 - Adicionado o gate documentado de candidata, piloto em domínio real e promoção
   segura para `v2.0.0`.
+- Corrigida a restauração de backups v1 em bancos v2 que já possuam tabelas com
+  novas dependências, substituindo o schema de destino antes do `pg_restore`.
+- A restauração passa a registrar novamente os checksums das migrações reaplicadas,
+  preservando o diagnóstico operacional depois da recuperação.
+- Adicionados um Compose isolado e um registro de evidências para repetir com
+  segurança a validação de backups entre as versões v1 e v2.
 
 ## [1.0.0] — 2026-08-22
 

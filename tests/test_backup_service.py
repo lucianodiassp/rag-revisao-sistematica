@@ -113,6 +113,59 @@ def test_restore_requires_exact_confirmation(tmp_path):
         restore_backup(tmp_path / "inexistente.ragbackup", PASSWORD, "restaurar")
 
 
+def test_database_restore_resets_newer_destination_schema_before_pg_restore(
+    tmp_path, monkeypatch
+):
+    dump = tmp_path / "database.dump"
+    dump.write_bytes(b"dump")
+    settings = DatabaseSettings("db", "5432", "test", "user", "password")
+    commands = []
+
+    monkeypatch.setattr(
+        backup_service,
+        "_run",
+        lambda command, _settings: commands.append(command),
+    )
+
+    backup_service._restore_database(dump, settings)
+
+    assert len(commands) == 2
+    assert commands[0][0] == "psql"
+    assert "--single-transaction" in commands[0]
+    assert "DROP SCHEMA IF EXISTS public CASCADE" in commands[0][-1]
+    assert commands[1][0] == "pg_restore"
+    assert "--clean" in commands[1]
+    assert "--single-transaction" in commands[1]
+
+
+def test_migrations_are_applied_in_order_and_registered_with_checksums(
+    tmp_path, monkeypatch
+):
+    first = tmp_path / "002_second.sql"
+    last = tmp_path / "015_last.sql"
+    first.write_text("SELECT 2;", encoding="utf-8")
+    last.write_text("SELECT 15;", encoding="utf-8")
+    settings = DatabaseSettings("db", "5432", "test", "user", "password")
+    commands = []
+    registered = []
+
+    monkeypatch.setattr(
+        backup_service,
+        "_run",
+        lambda command, _settings: commands.append(command),
+    )
+    monkeypatch.setattr(
+        backup_service,
+        "_record_migrations",
+        lambda _settings, migrations: registered.extend(migrations),
+    )
+
+    backup_service._run_migrations(settings, tmp_path)
+
+    assert [command[-1] for command in commands] == [str(first), str(last)]
+    assert registered == [first, last]
+
+
 def test_created_backup_records_application_version_without_changing_format_version(
     tmp_path, monkeypatch
 ):

@@ -255,6 +255,35 @@ def _dump_database(destination: Path, settings: DatabaseSettings) -> None:
 
 
 def _restore_database(source: Path, settings: DatabaseSettings) -> None:
+    # O --clean do pg_restore remove somente objetos conhecidos pelo arquivo.
+    # Ao importar um backup antigo, tabelas criadas por versões mais novas podem
+    # continuar referenciando chaves do dump e impedir a limpeza. O reset do schema
+    # elimina também esses objetos exclusivos do destino. A transação garante que
+    # uma falha no reset preserve o schema anterior; o backup de recuperação criado
+    # por restore_backup protege as etapas seguintes.
+    _run(
+        [
+            "psql",
+            "--host",
+            settings.host,
+            "--port",
+            settings.port,
+            "--username",
+            settings.user,
+            "--dbname",
+            settings.database,
+            "--set",
+            "ON_ERROR_STOP=1",
+            "--single-transaction",
+            "--command",
+            (
+                "DROP SCHEMA IF EXISTS public CASCADE; "
+                "CREATE SCHEMA public; "
+                "GRANT USAGE ON SCHEMA public TO PUBLIC;"
+            ),
+        ],
+        settings,
+    )
     _run(
         [
             "pg_restore",
@@ -278,9 +307,43 @@ def _restore_database(source: Path, settings: DatabaseSettings) -> None:
     )
 
 
+def _record_migrations(settings: DatabaseSettings, migrations: list[Path]) -> None:
+    with psycopg2.connect(
+        host=settings.host,
+        port=settings.port,
+        database=settings.database,
+        user=settings.user,
+        password=settings.password,
+    ) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                migration_name VARCHAR(255) PRIMARY KEY,
+                checksum_sha256 CHAR(64) NOT NULL,
+                applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_verified_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (length(checksum_sha256) = 64)
+            )
+            """
+        )
+        for migration in migrations:
+            cursor.execute(
+                """
+                INSERT INTO schema_migrations
+                    (migration_name, checksum_sha256, applied_at, last_verified_at)
+                VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (migration_name) DO UPDATE
+                SET checksum_sha256 = EXCLUDED.checksum_sha256,
+                    last_verified_at = CURRENT_TIMESTAMP
+                """,
+                (migration.name, _sha256(migration)),
+            )
+
+
 def _run_migrations(settings: DatabaseSettings, scripts_directory: Path | None = None) -> None:
     scripts = Path(scripts_directory or project_root() / "database" / "scripts")
-    for migration in sorted(scripts.glob("0*.sql")):
+    migrations = sorted(scripts.glob("0*.sql"))
+    for migration in migrations:
         _run(
             [
                 "psql",
@@ -299,6 +362,7 @@ def _run_migrations(settings: DatabaseSettings, scripts_directory: Path | None =
             ],
             settings,
         )
+    _record_migrations(settings, migrations)
 
 
 def _database_counts(settings: DatabaseSettings) -> dict[str, int]:

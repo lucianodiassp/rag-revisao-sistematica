@@ -18,6 +18,19 @@ os blocos 1 a 3 estiverem concluídos. A tag estável `v2.0.0` exige também o b
 
 ## 2. Compatibilidade e recuperação
 
+Para executar esta etapa sem tocar na instalação principal:
+
+```bash
+docker compose -p rag-v2-restore-validation \
+  -f docker-compose.yml \
+  -f deploy/restore-validation.compose.yml \
+  up -d --build db migrate app worker
+```
+
+Acesse `http://localhost:18501`. Ao concluir, encerre os contêineres sem apagar os
+volumes com o mesmo conjunto de arquivos e o comando `down`. Não acrescente `-v`
+até que todas as evidências tenham sido conferidas.
+
 - [ ] Um backup `.ragbackup` gerado pela v1 foi validado antes da migração.
 - [ ] Uma cópia desse backup foi guardada fora do servidor da aplicação.
 - [ ] O backup foi restaurado em uma instalação v2 limpa.
@@ -26,6 +39,9 @@ os blocos 1 a 3 estiverem concluídos. A tag estável `v2.0.0` exige também o b
 - [ ] Uma atualização preservou banco, PDFs, backups e chave-mestra.
 - [ ] O procedimento de retorno documentado foi ensaiado sem usar
   `docker compose down -v`.
+
+O primeiro ensaio da candidata está registrado em
+[VALIDACAO_V2_RC1.md](VALIDACAO_V2_RC1.md).
 
 ## 3. Validação funcional da candidata
 
