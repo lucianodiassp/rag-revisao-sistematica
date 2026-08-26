@@ -5,6 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from backend.app.auth import AuthConfigurationError, evaluate_access
+from backend.app.observability import log_event
 
 
 def _oidc_is_configured() -> bool:
@@ -22,6 +23,13 @@ def _current_identity() -> dict:
 
 
 def _render_configuration_error(message: str) -> None:
+    log_event(
+        "authentication_configuration_failed",
+        component="app",
+        level="error",
+        category="configuration",
+        message="A autenticação Web não está configurada.",
+    )
     st.title("🔐 Acesso à versão Web privada")
     st.error("A autenticação ainda não está configurada com segurança.")
     st.code(message, language=None)
@@ -52,6 +60,11 @@ def enforce_access(metadata: dict):
         _render_configuration_error(str(error))
 
     if decision.code == "login_required":
+        log_event(
+            "authentication_required",
+            component="app",
+            category="authentication",
+        )
         st.title("🔐 Acesso à versão Web privada")
         st.write(
             "Entre com a conta autorizada para acessar seus projetos de revisão "
@@ -62,6 +75,13 @@ def enforce_access(metadata: dict):
         st.stop()
 
     if not decision.authorized:
+        log_event(
+            "authentication_denied",
+            component="app",
+            level="warning",
+            category="authentication",
+            decision_code=decision.code,
+        )
         st.title("⛔ Acesso não autorizado")
         if decision.code == "email_unverified":
             st.error("O provedor não confirmou a verificação do e-mail desta conta.")
@@ -75,6 +95,13 @@ def enforce_access(metadata: dict):
             st.logout()
         st.stop()
 
+    if not st.session_state.get("authentication_success_logged"):
+        log_event(
+            "authentication_succeeded",
+            component="app",
+            category="authentication",
+        )
+        st.session_state["authentication_success_logged"] = True
     st.sidebar.caption(f"Conectado como **{decision.display_name}**")
     st.sidebar.caption(decision.email)
     if st.sidebar.button("Sair", use_container_width=True):

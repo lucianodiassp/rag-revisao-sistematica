@@ -92,10 +92,18 @@ reconexão da interface.
 
 Branch: `feature/v2-observabilidade`
 
+Estado: **implementada e validada**.
+
 - Logs estruturados sem chaves, tokens ou conteúdo sensível.
 - Identificação da versão e do perfil em eventos operacionais.
 - Health checks de aplicação, banco e migrações.
 - Guia de diagnóstico, atualização e retorno à versão anterior.
+
+A implementação registra eventos operacionais em JSON com versão, perfil e categoria,
+mantém sinais de vida da aplicação e do worker no PostgreSQL, verifica migrações e
+volumes e disponibiliza um diagnóstico seguro na interface e na linha de comando.
+Falhas recentes são traduzidas em ações específicas sem expor credenciais ou conteúdo
+dos projetos.
 
 Critério de aceite: o operador deve conseguir distinguir falha de configuração,
 banco, armazenamento, provedor de IA e fonte bibliográfica.

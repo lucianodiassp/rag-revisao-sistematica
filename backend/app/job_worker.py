@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import re
 import signal
 import socket
 import threading
@@ -23,6 +22,12 @@ from backend.app.background_jobs import (
     recover_stale_jobs,
     update_job_progress,
 )
+from backend.app.observability import (
+    classify_error,
+    log_event,
+    sanitize_text,
+)
+from backend.app.operational_health import ServiceHeartbeatThread
 
 
 TRANSIENT_MARKERS = (
@@ -50,13 +55,7 @@ def is_transient_error(error):
 
 
 def safe_error_message(error):
-    message = str(error or "Falha não identificada").replace("\x00", "")
-    message = re.sub(
-        r"(?i)(api[_-]?key|token|secret|password)(\s*[:=]\s*)[^\s,;]+",
-        r"\1\2[oculto]",
-        message,
-    )
-    return message[:2000]
+    return sanitize_text(error or "Falha não identificada", maximum=2000)
 
 
 def _progress(job_id):
@@ -128,8 +127,14 @@ class HeartbeatThread(threading.Thread):
         while not self.stop_event.wait(self.interval_seconds):
             try:
                 heartbeat_job(self.job_id)
-            except Exception as error:  # o trabalho continua; a falha fica no log do contêiner
-                print(f"Não foi possível atualizar o sinal de vida: {safe_error_message(error)}")
+            except Exception:
+                log_event(
+                    "job_heartbeat_failed",
+                    component="worker",
+                    level="warning",
+                    category="database",
+                    job_id=self.job_id,
+                )
 
     def stop(self):
         self.stop_event.set()
@@ -145,31 +150,68 @@ class JobWorker:
             5.0, float(os.getenv("RAG_JOB_HEARTBEAT_SECONDS", "15"))
         )
         self.stop_event = threading.Event()
+        self.service_heartbeat = ServiceHeartbeatThread(
+            "worker",
+            instance_id=self.worker_id,
+            metadata={"role": "background_jobs"},
+        )
 
     def request_stop(self, *_args):
         self.stop_event.set()
+        self.service_heartbeat.stop()
 
     def run_once(self):
         job = claim_next_job(self.worker_id)
         if not job:
             return False
 
+        log_event(
+            "job_started",
+            component="worker",
+            category="worker",
+            job_id=job["id"],
+            project_id=job["project_id"],
+            job_type=job["job_type"],
+            attempt=job.get("attempt_count"),
+        )
         heartbeat = HeartbeatThread(job["id"], self.heartbeat_seconds)
         heartbeat.start()
         try:
             result = execute_job(job)
             complete_job(job["id"], result)
+            log_event(
+                "job_succeeded",
+                component="worker",
+                category="worker",
+                job_id=job["id"],
+                project_id=job["project_id"],
+                job_type=job["job_type"],
+            )
         except Exception as error:
             transient = is_transient_error(error)
+            hint = (
+                "bibliographic_source"
+                if job["job_type"] == JOB_BIBLIOGRAPHIC_SEARCH
+                else "ai_provider" if transient else None
+            )
+            issue = classify_error(error, component_hint=hint)
             fail_job(
                 job["id"],
                 safe_error_message(error),
                 retryable=transient,
                 error_code="transient_provider_error" if transient else "processing_error",
             )
-            print(
-                f"Trabalho {job['id']} falhou"
-                f"{' e será repetido' if transient else ''}: {safe_error_message(error)}"
+            log_event(
+                "job_failed",
+                component="worker",
+                level="warning" if transient else "error",
+                category=issue.category,
+                message=issue.user_message,
+                job_id=job["id"],
+                project_id=job["project_id"],
+                job_type=job["job_type"],
+                issue_code=issue.code,
+                retryable=transient,
             )
         finally:
             heartbeat.stop()
@@ -177,18 +219,48 @@ class JobWorker:
         return True
 
     def run_forever(self):
+        self.service_heartbeat.start()
         recovered = recover_stale_jobs()
         if recovered:
-            print(f"{recovered} processamento(s) interrompido(s) foram sinalizados.")
-        print(f"Processo de trabalho iniciado: {self.worker_id}")
-        while not self.stop_event.is_set():
-            try:
-                worked = self.run_once()
-            except Exception as error:
-                worked = False
-                print(f"Falha ao consultar a fila: {safe_error_message(error)}")
-            if not worked:
-                self.stop_event.wait(self.poll_seconds)
+            log_event(
+                "stale_jobs_recovered",
+                component="worker",
+                level="warning",
+                category="worker",
+                recovered_count=recovered,
+            )
+        log_event(
+            "service_started",
+            component="worker",
+            category="worker",
+            worker_id=self.worker_id,
+        )
+        try:
+            while not self.stop_event.is_set():
+                try:
+                    worked = self.run_once()
+                except Exception as error:
+                    worked = False
+                    issue = classify_error(error, component_hint="database")
+                    log_event(
+                        "job_queue_poll_failed",
+                        component="worker",
+                        level="error",
+                        category=issue.category,
+                        message=issue.user_message,
+                        issue_code=issue.code,
+                    )
+                if not worked:
+                    self.stop_event.wait(self.poll_seconds)
+        finally:
+            self.service_heartbeat.stop()
+            self.service_heartbeat.join(timeout=2)
+            log_event(
+                "service_stopped",
+                component="worker",
+                category="worker",
+                worker_id=self.worker_id,
+            )
 
 
 def main():
