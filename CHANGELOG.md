@@ -6,7 +6,9 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
-### Em desenvolvimento
+## [2.0.0-rc.1] — 2026-08-26
+
+### Candidata Web privada
 
 - Criada a linha de integração `v2-web` a partir da versão estável `v1.0.0`.
 - Identificada a aplicação como `2.0.0-dev` durante o desenvolvimento.
@@ -46,6 +48,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   preservando o diagnóstico operacional depois da recuperação.
 - Adicionados um Compose isolado e um registro de evidências para repetir com
   segurança a validação de backups entre as versões v1 e v2.
+- Promovida a identidade da aplicação para `2.0.0-rc.1` após a conclusão do gate
+  local de integridade, recuperação e validação funcional.
 
 ## [1.0.0] — 2026-08-22
 
@@ -69,5 +73,6 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v1.0.0...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.1...HEAD
+[2.0.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v1.0.0...v2.0.0-rc.1
 [1.0.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/releases/tag/v1.0.0

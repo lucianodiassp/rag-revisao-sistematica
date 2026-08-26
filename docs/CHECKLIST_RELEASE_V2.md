@@ -1,20 +1,20 @@
 # Checklist da candidata v2 Web privada
 
 Este checklist transforma os critérios do roadmap em uma decisão objetiva de
-publicação. A versão só deve avançar de `2.0.0-dev` para `2.0.0-rc.1` depois que
-os blocos 1 a 3 estiverem concluídos. A tag estável `v2.0.0` exige também o bloco
-4 em uma instalação Web real.
+publicação. Os blocos 1 a 3 foram concluídos em 26 de agosto de 2026 e sustentam a
+candidata `2.0.0-rc.1`. A tag estável `v2.0.0` exige também o bloco 4 em uma
+instalação Web real.
 
 ## 1. Integridade do código
 
-- [ ] A branch `v2-web` está sincronizada e sem alterações locais não registradas.
-- [ ] A suíte completa de testes termina sem falhas.
-- [ ] `docker compose config --quiet` valida o perfil local.
-- [ ] O perfil Web mantém health checks independentes para `app` e `worker`.
-- [ ] Somente o proxy publica portas no perfil Web.
-- [ ] `.env`, `deploy/web.env` e `.streamlit/secrets.toml` não estão rastreados
+- [x] A branch `v2-web` está sincronizada e sem alterações locais não registradas.
+- [x] A suíte completa de testes termina sem falhas.
+- [x] `docker compose config --quiet` valida o perfil local.
+- [x] O perfil Web mantém health checks independentes para `app` e `worker`.
+- [x] Somente o proxy publica portas no perfil Web.
+- [x] `.env`, `deploy/web.env` e `.streamlit/secrets.toml` não estão rastreados
   pelo Git.
-- [ ] O `CHANGELOG.md`, o README e os guias operacionais refletem a candidata.
+- [x] O `CHANGELOG.md`, o README e os guias operacionais refletem a candidata.
 
 ## 2. Compatibilidade e recuperação
 
@@ -31,13 +31,13 @@ Acesse `http://localhost:18501`. Ao concluir, encerre os contêineres sem apagar
 volumes com o mesmo conjunto de arquivos e o comando `down`. Não acrescente `-v`
 até que todas as evidências tenham sido conferidas.
 
-- [ ] Um backup `.ragbackup` gerado pela v1 foi validado antes da migração.
-- [ ] Uma cópia desse backup foi guardada fora do servidor da aplicação.
-- [ ] O backup foi restaurado em uma instalação v2 limpa.
-- [ ] Projetos, artigos, PDFs, configurações cifradas e consultas RAG foram
+- [x] Um backup `.ragbackup` gerado pela v1 foi validado antes da migração.
+- [x] Uma cópia desse backup foi guardada fora do servidor da aplicação.
+- [x] O backup foi restaurado em uma instalação v2 limpa.
+- [x] Projetos, artigos, PDFs, configurações cifradas e consultas RAG foram
   conferidos após a restauração.
-- [ ] Uma atualização preservou banco, PDFs, backups e chave-mestra.
-- [ ] O procedimento de retorno documentado foi ensaiado sem usar
+- [x] Uma atualização preservou banco, PDFs, backups e chave-mestra.
+- [x] O procedimento de retorno documentado foi ensaiado sem usar
   `docker compose down -v`.
 
 O primeiro ensaio da candidata está registrado em
@@ -45,16 +45,16 @@ O primeiro ensaio da candidata está registrado em
 
 ## 3. Validação funcional da candidata
 
-- [ ] O perfil local continua acessível sem login.
-- [ ] O perfil Web não mostra páginas nem dados antes da autenticação.
-- [ ] O e-mail autorizado entra e um e-mail não autorizado é bloqueado.
-- [ ] Coleta, indexação, extração, relatório e benchmark continuam após atualizar
+- [x] O perfil local continua acessível sem login.
+- [x] O perfil Web não mostra páginas nem dados antes da autenticação.
+- [x] O e-mail autorizado entra e um e-mail não autorizado é bloqueado.
+- [x] Coleta, indexação, extração, relatório e benchmark continuam após atualizar
   ou fechar a página.
-- [ ] Falhas transitórias podem ser repetidas e falhas definitivas apresentam
+- [x] Falhas transitórias podem ser repetidas e falhas definitivas apresentam
   diagnóstico compreensível.
-- [ ] O Diagnóstico Operacional identifica aplicação, banco, migrações, volumes,
+- [x] O Diagnóstico Operacional identifica aplicação, banco, migrações, volumes,
   worker e fila sem expor segredos.
-- [ ] Foi gerado e validado um novo backup ao final do teste.
+- [x] Foi gerado e validado um novo backup ao final do teste.
 
 ## 4. Piloto em servidor com domínio público
 
