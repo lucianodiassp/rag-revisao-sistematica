@@ -22,4 +22,8 @@ if ! gosu ragapp test -w /app/data/backups; then
     exit 1
 fi
 
+# Confere limites configurados e reserva mínima em todos os volumes antes de
+# iniciar o servidor. A mensagem não inclui caminhos privados nem credenciais.
+gosu ragapp python -m backend.app.storage_service
+
 exec gosu ragapp "$@"

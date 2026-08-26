@@ -10,12 +10,13 @@ from backend.processamento.ocr_pdf import (
     get_pdf_ocr_config,
     sanitize_pdf_text,
 )
+from backend.app.storage_service import pdf_directory
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 load_dotenv(find_dotenv())
-DIRETORIO_PDFS = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data/pdfs'))
+DIRETORIO_PDFS = str(pdf_directory())
 
 def get_conexao():
     return psycopg2.connect(

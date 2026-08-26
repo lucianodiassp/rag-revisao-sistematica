@@ -72,6 +72,25 @@ def _valid_https_url(value: str) -> bool:
     return parsed.scheme == "https" and bool(parsed.netloc) and not parsed.username
 
 
+def _configured_integer(
+    environ: Mapping[str, object],
+    name: str,
+    *,
+    minimum: int,
+    maximum: int,
+    errors: list[str],
+) -> int | None:
+    raw = _text(environ.get(name))
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 0
+    if value < minimum or value > maximum:
+        errors.append(f"{name} deve estar entre {minimum} e {maximum} MB.")
+        return None
+    return value
+
+
 def validate_web_configuration(
     environ: Mapping[str, object], auth_config: Mapping[str, object]
 ) -> list[str]:
@@ -109,6 +128,43 @@ def validate_web_configuration(
         or db_password in {db_name, db_user}
     ):
         errors.append("DB_PASSWORD deve ser uma senha forte com pelo menos 16 caracteres.")
+
+    server_upload = _configured_integer(
+        environ,
+        "RAG_MAX_UPLOAD_MB",
+        minimum=1,
+        maximum=10240,
+        errors=errors,
+    )
+    pdf_upload = _configured_integer(
+        environ,
+        "RAG_MAX_PDF_UPLOAD_MB",
+        minimum=1,
+        maximum=10240,
+        errors=errors,
+    )
+    backup_upload = _configured_integer(
+        environ,
+        "RAG_MAX_BACKUP_UPLOAD_MB",
+        minimum=1,
+        maximum=10240,
+        errors=errors,
+    )
+    _configured_integer(
+        environ,
+        "RAG_MIN_FREE_STORAGE_MB",
+        minimum=256,
+        maximum=1024 * 1024,
+        errors=errors,
+    )
+    if server_upload is not None and pdf_upload is not None and pdf_upload > server_upload:
+        errors.append("RAG_MAX_PDF_UPLOAD_MB não pode exceder RAG_MAX_UPLOAD_MB.")
+    if (
+        server_upload is not None
+        and backup_upload is not None
+        and backup_upload > server_upload
+    ):
+        errors.append("RAG_MAX_BACKUP_UPLOAD_MB não pode exceder RAG_MAX_UPLOAD_MB.")
 
     redirect_uri = _text(auth_config.get("redirect_uri"))
     expected_redirect = f"https://{domain}/oauth2callback" if domain else ""

@@ -47,6 +47,10 @@ Edite `deploy/web.env` e substitua todos os valores de exemplo. São obrigatóri
 - `RAG_AUTH_ALLOWED_EMAILS`: exatamente um e-mail;
 - `DB_NAME` e `DB_USER` com identificadores simples;
 - `DB_PASSWORD` aleatória, com pelo menos 16 caracteres.
+- `RAG_MAX_UPLOAD_MB`: teto global aceito pelo servidor;
+- `RAG_MAX_PDF_UPLOAD_MB`: limite de cada artigo em PDF;
+- `RAG_MAX_BACKUP_UPLOAD_MB`: limite de importação do `.ragbackup`;
+- `RAG_MIN_FREE_STORAGE_MB`: reserva que não pode ser consumida por uma operação.
 
 O arquivo real é ignorado pelo Git e pelo contexto de build do Docker.
 
@@ -86,6 +90,7 @@ ou valores recebidos. A implantação é interrompida quando identifica:
 - arquivo OIDC ausente ou inválido;
 - callback diferente de `https://DOMINIO/oauth2callback`;
 - chave de cookie ou credenciais OIDC não configuradas.
+- limites de upload ausentes, inválidos ou maiores que o teto do servidor.
 
 O mesmo preflight é uma dependência obrigatória do banco no Compose Web.
 
@@ -117,6 +122,63 @@ docker compose --env-file deploy/web.env -f docker-compose.web.yml down
 Não use `down --volumes`: essa opção remove os volumes persistentes. Antes de uma
 atualização, gere e valide um `.ragbackup`. Em seguida, atualize o código e execute
 novamente o comando `up -d --build`.
+
+## Armazenamento persistente
+
+A implantação Web mantém cada classe de dado em um volume nomeado:
+
+| Volume | Conteúdo | Incluído no `.ragbackup` |
+|---|---|---|
+| `rag_web_postgres_data` | banco PostgreSQL e vetores | sim, como dump lógico |
+| `rag_web_pdfs` | artigos integrais associados | sim |
+| `rag_web_backups` | backups gerados e cópias pré-restauração | não, para evitar cópias recursivas |
+| `rag_web_private_data` | chave-mestra das credenciais cifradas | sim, quando existente |
+| `rag_web_caddy_data` | certificados TLS do Caddy | não |
+
+Ao iniciar, a aplicação confirma escrita e reserva livre nas áreas de PDFs, backups
+e dados privados. A tela **Gestão de PDFs** mostra o limite por arquivo e a
+capacidade disponível. A tela **Backup e Restauração** mostra o consumo das três
+áreas e bloqueia operações que excederiam os limites configurados.
+
+Os limites da aplicação não substituem o monitoramento do servidor. O administrador
+deve acompanhar também o espaço usado pelo volume do PostgreSQL e pelos logs do
+Docker.
+
+## Cópia externa do backup
+
+O botão **Baixar último backup** é a forma mais simples de retirar o `.ragbackup` do
+servidor. Guarde o arquivo e sua senha em locais separados. Para copiar uma cópia já
+preservada no volume sem usar o navegador:
+
+```bash
+mkdir -p ~/rag-backups-externos
+docker compose --env-file deploy/web.env -f docker-compose.web.yml \
+  cp app:/app/data/backups/NOME_DO_ARQUIVO.ragbackup \
+  ~/rag-backups-externos/NOME_DO_ARQUIVO.ragbackup
+```
+
+Valide o arquivo pela própria tela antes de considerá-lo uma cópia recuperável. Não
+trate apenas o volume Docker como backup externo: uma falha do disco do servidor
+pode atingir simultaneamente a aplicação e todos os volumes.
+
+## Recuperação em uma instalação limpa
+
+1. Instale a aplicação em um novo servidor e prepare `deploy/web.env` e
+   `.streamlit/secrets.toml` com o novo domínio e as credenciais OIDC. Esses dois
+   arquivos não fazem parte do `.ragbackup`.
+2. Execute o preflight e suba os contêineres normalmente. O banco vazio será criado
+   e migrado.
+3. Entre com o único e-mail autorizado e abra **Backup e Restauração**.
+4. Envie o `.ragbackup`, informe a senha e use **Validar backup**.
+5. Confira projetos, artigos, PDFs, versão do formato e presença da chave-mestra.
+6. Confirme **RESTAURAR BACKUP**. Antes de substituir o estado, a aplicação cria uma
+   cópia automática da instalação vazia ou atual.
+7. Após a restauração, confira projetos, Gestão de PDFs, configurações de IA e uma
+   consulta RAG. As migrações atuais são reaplicadas ao banco restaurado.
+
+O formato lógico permanece na versão `1`, portanto backups `.ragbackup` válidos da
+v1 local continuam aceitos pela v2 Web. O perfil, o domínio e a autenticação do novo
+servidor não são sobrescritos pelo arquivo restaurado.
 
 ## Separação do perfil local
 

@@ -16,6 +16,10 @@ def _valid_environment():
         "DB_NAME": "rag_systematic_review",
         "DB_USER": "rag_web_user",
         "DB_PASSWORD": "V4lida-Longa-Aleatoria-2026!",
+        "RAG_MAX_UPLOAD_MB": "2048",
+        "RAG_MAX_PDF_UPLOAD_MB": "100",
+        "RAG_MAX_BACKUP_UPLOAD_MB": "2048",
+        "RAG_MIN_FREE_STORAGE_MB": "2048",
     }
 
 
@@ -68,6 +72,20 @@ def test_rejects_weak_database_and_cookie_secrets():
 
     assert any("DB_PASSWORD" in error for error in errors)
     assert any("cookie_secret" in error for error in errors)
+
+
+def test_rejects_invalid_or_inconsistent_storage_limits():
+    environment = _valid_environment()
+    environment["RAG_MAX_UPLOAD_MB"] = "500"
+    environment["RAG_MAX_PDF_UPLOAD_MB"] = "501"
+    environment["RAG_MAX_BACKUP_UPLOAD_MB"] = "não-numérico"
+    environment["RAG_MIN_FREE_STORAGE_MB"] = "128"
+
+    errors = validate_web_configuration(environment, _valid_auth())
+
+    assert any("RAG_MAX_PDF_UPLOAD_MB não pode exceder" in error for error in errors)
+    assert any("RAG_MAX_BACKUP_UPLOAD_MB deve estar" in error for error in errors)
+    assert any("RAG_MIN_FREE_STORAGE_MB deve estar" in error for error in errors)
 
 
 def test_rejects_missing_oidc_credentials_and_invalid_email():

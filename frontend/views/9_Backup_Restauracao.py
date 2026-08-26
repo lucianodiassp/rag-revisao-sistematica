@@ -17,6 +17,12 @@ from backend.app.backup_service import (
     inspect_backup,
     restore_backup,
 )
+from backend.app.storage_service import (
+    StorageCapacityError,
+    ensure_upload_allowed,
+    storage_limits,
+    storage_overview,
+)
 
 
 def _format_size(size: int) -> str:
@@ -73,6 +79,22 @@ st.warning(
     "Guarde a senha fora da aplicação. Sem ela, o backup não poderá ser aberto. "
     "O arquivo pode restaurar credenciais de API e deve ser tratado como dado sensível."
 )
+
+limits = storage_limits()
+with st.expander("Capacidade do armazenamento persistente", expanded=False):
+    statuses = storage_overview()
+    columns = st.columns(len(statuses))
+    for column, status in zip(columns, statuses):
+        column.metric(status.label, _format_size(status.stored_bytes))
+        column.caption(
+            f"{_format_size(status.free_bytes)} livres · "
+            + ("operacional" if status.healthy else "requer atenção")
+        )
+    st.caption(
+        f"Reserva mínima: **{limits.minimum_free_mb} MB** · "
+        f"limite para importar backup: **{limits.backup_upload_mb} MB**. "
+        "Em produção Web, estas áreas correspondem a volumes Docker persistentes."
+    )
 
 if mensagem := st.session_state.pop("backup_restore_success", None):
     st.success(mensagem)
@@ -134,9 +156,16 @@ if st.button(
     disabled=uploaded is None or not restore_password,
     use_container_width=True,
 ):
-    uploaded_bytes = uploaded.getvalue()
-    temporary_path = _temporary_upload(uploaded_bytes)
+    temporary_path = None
     try:
+        uploaded_bytes = uploaded.getvalue()
+        ensure_upload_allowed(
+            len(uploaded_bytes),
+            "backup",
+            Path(tempfile.gettempdir()),
+            overhead_factor=2,
+        )
+        temporary_path = _temporary_upload(uploaded_bytes)
         with st.spinner("Decifrando e verificando a integridade do manifesto..."):
             manifest = inspect_backup(temporary_path, restore_password)
         st.session_state["validated_backup"] = {
@@ -148,7 +177,8 @@ if st.button(
         st.session_state.pop("validated_backup", None)
         st.error(f"Backup inválido: {error}")
     finally:
-        temporary_path.unlink(missing_ok=True)
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 validated = st.session_state.get("validated_backup")
 current_digest = hashlib.sha256(uploaded.getvalue()).hexdigest() if uploaded else None
@@ -171,8 +201,16 @@ if validated and validated.get("sha256") == current_digest:
         disabled=not restore_enabled,
         use_container_width=True,
     ):
-        temporary_path = _temporary_upload(uploaded.getvalue())
+        temporary_path = None
         try:
+            uploaded_bytes = uploaded.getvalue()
+            ensure_upload_allowed(
+                len(uploaded_bytes),
+                "backup",
+                Path(tempfile.gettempdir()),
+                overhead_factor=3,
+            )
+            temporary_path = _temporary_upload(uploaded_bytes)
             with st.spinner(
                 "Criando cópia de recuperação e restaurando banco, PDFs e credenciais..."
             ):
@@ -197,12 +235,13 @@ if validated and validated.get("sha256") == current_digest:
                 f"em data/backups/{recovery_name}."
             )
             st.rerun()
-        except (BackupError, RestoreError, ValueError) as error:
+        except (BackupError, RestoreError, StorageCapacityError, ValueError) as error:
             st.error(f"Não foi possível restaurar o backup: {error}")
         except Exception as error:
             st.error(f"Falha inesperada durante a restauração: {error}")
         finally:
-            temporary_path.unlink(missing_ok=True)
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
 
 with st.expander("Arquivos locais de recuperação"):
     backup_directory = default_backup_directory()

@@ -60,7 +60,9 @@ services:
       DB_PASSWORD: rag_password
       AI_CONFIG_DATABASE_ENABLED: "true"
       AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+      PDF_DIRECTORY: /app/data/pdfs
       BACKUP_DIRECTORY: /app/data/backups
+      PRIVATE_DIRECTORY: /app/data/private
       STREAMLIT_SERVER_MAX_UPLOAD_SIZE: ${RAG_MAX_UPLOAD_MB:-2048}
     ports:
       - "127.0.0.1:${RAG_APP_PORT:-8501}:8501"

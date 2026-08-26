@@ -58,6 +58,8 @@ parâmetro obrigatório estiver ausente, sem usar valores padrão inseguros.
 
 Branch: `feature/v2-armazenamento-pdfs`
 
+Estado: **implementada e validada**.
+
 - Definir volumes persistentes para banco, PDFs, backups e chave-mestra.
 - Validar limites de upload e espaço disponível.
 - Preservar compatibilidade com o backup `.ragbackup` da v1.
