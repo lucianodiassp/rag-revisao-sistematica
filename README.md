@@ -6,6 +6,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+[![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
@@ -560,7 +561,7 @@ compatíveis e são identificados como anteriores ao versionamento da aplicaçã
 
 Consulte o [`CHANGELOG.md`](CHANGELOG.md) para as alterações da release e o guia
 [`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md) para o processo de tags, manutenção
-da linha `v1.x` e desenvolvimento da futura `v2-web`.
+das versões estáveis e criação das próximas branches a partir da `main`.
 
 ## Configuração segura
 
@@ -787,6 +788,11 @@ Golden Set, isolamento por projeto, indexação de PDFs, evidências rastreávei
 validação da chave-mestra usada na migração para Docker. Também verifica criptografia,
 integridade e recuperação automática dos backups, além da estrutura, privacidade,
 acentuação e manifesto do pacote de reprodutibilidade.
+
+O workflow **Integridade contínua** executa a suíte em pull requests e alterações
+na `main`. Ele também valida os perfis local e Web do Docker Compose, adapta o
+Caddyfile com a mesma imagem usada em produção e impede o rastreamento dos arquivos
+reais de credenciais.
 
 A revisão PRESS implementada é uma adaptação operacional dos seis domínios do
 [PRESS 2015 Guideline Statement](https://pubmed.ncbi.nlm.nih.gov/27005575/); ela

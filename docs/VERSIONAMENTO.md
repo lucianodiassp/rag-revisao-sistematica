@@ -36,8 +36,8 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 - `2.0.0-rc.3`: candidata com o gate de privacidade dos logs aprovado.
 - `2.0.0`: versão estável local e Web privada, inicialmente de usuário único.
 
-O sufixo `-rc.N` identifica uma candidata e impede que ela seja confundida com a
-futura Release estável `v2.0.0`.
+O sufixo `-rc.N` identificou as candidatas e impediu que fossem confundidas com a
+Release estável `v2.0.0`.
 
 ## Fluxo concluído da v1.0.0
 
@@ -54,9 +54,9 @@ futura Release estável `v2.0.0`.
 5. Criar a GitHub Release usando a seção `1.0.0` do `CHANGELOG.md`.
 6. Criar `v2-web` a partir da `main` já etiquetada.
 
-## Desenvolvimento da v2
+## Fluxo de desenvolvimento concluído da v2
 
-As funcionalidades da v2 são desenvolvidas em branches pequenas, direcionadas à
+As funcionalidades da v2 foram desenvolvidas em branches pequenas, direcionadas à
 branch de integração `v2-web`, por exemplo:
 
 - `feature/v2-autenticacao`;
@@ -65,14 +65,15 @@ branch de integração `v2-web`, por exemplo:
 - `feature/v2-processamento-assincrono`;
 - `feature/v2-observabilidade`.
 
-A `main` permanece como linha estável até a validação integral da v2. Quando a
-versão Web estiver pronta, `v2-web` é incorporada à `main` e recebe a tag `v2.0.0`.
+A `v2-web` foi incorporada à `main` depois da validação integral, e a tag `v2.0.0`
+foi criada no commit integrado. Novas correções e funcionalidades devem partir da
+`main`; a antiga branch de integração pode permanecer apenas como histórico.
 
-Antes da versão estável, a linha passa por uma candidata `2.0.0-rc.1`. A candidata
-só é identificada e etiquetada depois dos testes locais, da restauração de um
+Antes da versão estável, a linha passou por uma candidata `2.0.0-rc.1`. A candidata
+foi identificada e etiquetada depois dos testes locais, da restauração de um
 backup v1 em ambiente limpo e da validação funcional. O piloto com domínio, HTTPS
-e OIDC reais usa exatamente essa tag. Correções posteriores geram uma nova
-candidata (`rc.2`, `rc.3`), sem mover ou reutilizar tags já publicadas.
+e OIDC reais usou exatamente essa tag. As correções posteriores geraram novas
+candidatas (`rc.2`, `rc.3`), sem mover ou reutilizar tags já publicadas.
 
 O planejamento incremental, os critérios de aceite e os itens fora do primeiro
 ciclo estão detalhados em [ROADMAP_V2_WEB.md](ROADMAP_V2_WEB.md).
