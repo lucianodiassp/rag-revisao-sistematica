@@ -10,12 +10,13 @@ from backend.processamento.ocr_pdf import (
     get_pdf_ocr_config,
     sanitize_pdf_text,
 )
+from backend.app.storage_service import pdf_directory
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 load_dotenv(find_dotenv())
-DIRETORIO_PDFS = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data/pdfs'))
+DIRETORIO_PDFS = str(pdf_directory())
 
 def get_conexao():
     return psycopg2.connect(
@@ -260,7 +261,7 @@ def criar_chunks_por_pagina(paginas, max_palavras=250, overlap=50):
             )
     return resultado
 
-def processar_pdfs(project_id=None):
+def processar_pdfs(project_id=None, progress_callback=None):
     project_id = resolver_project_id(project_id)
     embedding_config = get_embedding_config()
     resumo = {
@@ -308,10 +309,16 @@ def processar_pdfs(project_id=None):
         print("✅ Nenhum PDF aprovado deste projeto está pendente de processamento.")
         return resumo
 
-    for arquivo in arquivos_pdf:
+    for arquivo_indice, arquivo in enumerate(arquivos_pdf, 1):
         # O nome do arquivo deve ser o UUID exato da tabela deduplicated_papers
         paper_id = arquivo.replace(".pdf", "")
         titulo = artigos_aprovados[paper_id]
+        if progress_callback:
+            progress_callback(
+                arquivo_indice - 1,
+                len(arquivos_pdf),
+                f"Preparando PDF: {titulo[:80]}",
+            )
         caminho_completo = os.path.join(DIRETORIO_PDFS, arquivo)
 
         # Um índice antigo sem página precisa ser reconstruído uma única vez.
@@ -364,6 +371,12 @@ def processar_pdfs(project_id=None):
                     "error": None,
                 }
             )
+            if progress_callback:
+                progress_callback(
+                    arquivo_indice,
+                    len(arquivos_pdf),
+                    f"PDF já indexado: {titulo[:80]}",
+                )
             continue
 
 
@@ -423,6 +436,12 @@ def processar_pdfs(project_id=None):
                     ),
                 }
             )
+            if progress_callback:
+                progress_callback(
+                    arquivo_indice,
+                    len(arquivos_pdf),
+                    f"Falha ao extrair PDF: {titulo[:80]}",
+                )
             continue
 
         print(f"🔪 A fatiar {len(paginas)} páginas de {paper_id[:8]} sem perder a origem...")
@@ -511,6 +530,12 @@ def processar_pdfs(project_id=None):
                     "error": erro_indexacao or "A indexação não processou todos os trechos.",
                 }
             )
+            if progress_callback:
+                progress_callback(
+                    arquivo_indice,
+                    len(arquivos_pdf),
+                    f"Falha ao indexar PDF: {titulo[:80]}",
+                )
             continue
 
         conexao.commit()
@@ -528,6 +553,12 @@ def processar_pdfs(project_id=None):
             }
         )
         print(f"   💾 Sucesso! {chunks_inseridos} trechos indexados para o artigo {paper_id[:8]}.\n")
+        if progress_callback:
+            progress_callback(
+                arquivo_indice,
+                len(arquivos_pdf),
+                f"PDF indexado: {titulo[:80]}",
+            )
 
     cursor.close()
     conexao.close()

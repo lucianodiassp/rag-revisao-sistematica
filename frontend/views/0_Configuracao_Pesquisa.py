@@ -10,6 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 
 from backend.agentes.agente_formulador import estruturar_pergunta_pesquisa  # noqa: E402
 from backend.app.bibliographic_config import get_bibliographic_settings  # noqa: E402
+from backend.app.background_jobs import JOB_BIBLIOGRAPHIC_SEARCH  # noqa: E402
 from backend.app.database import (  # noqa: E402
     criar_projeto,
     salvar_protocolo_projeto,
@@ -28,7 +29,6 @@ from backend.app.reproducibility_import import (  # noqa: E402
     import_reproducibility_package,
     validate_reproducibility_package,
 )
-from backend.coleta.orquestrador_coleta import iniciar_recolha  # noqa: E402
 from backend.coleta.importador_bibtex import (  # noqa: E402
     ErroBibTeX,
     analisar_bibtex,
@@ -37,6 +37,11 @@ from backend.coleta.importador_bibtex import (  # noqa: E402
 from frontend.project_selector import (  # noqa: E402
     CHAVE_PROJETO_ATIVO,
     selecionar_projeto_ativo,
+)
+from frontend.background_jobs_ui import (  # noqa: E402
+    job_is_active,
+    render_job_status,
+    start_job,
 )
 
 
@@ -577,36 +582,44 @@ with aba_apis:
             "Configure as fontes antes de iniciar a coleta por API."
         )
 
+    coleta_job = render_job_status(
+        project_id,
+        JOB_BIBLIOGRAPHIC_SEARCH,
+        key="bibliographic_search",
+        title="Coleta bibliográfica",
+    )
     if st.button(
         "🚀 Iniciar coleta nas fontes habilitadas",
         type="primary",
         use_container_width=True,
-        disabled=not fontes_ativas,
+        disabled=not fontes_ativas or job_is_active(coleta_job),
     ):
-        with st.spinner("A consultar as bases e registrar protocolo e proveniência..."):
-            try:
-                qtd_salvos, qtd_encontrados, qtd_mesclados, qtd_pendentes = iniciar_recolha(
-                    termo_busca,
-                    project_id=project_id,
-                    max_por_fonte=qtd_artigos,
-                    source_queries=protocolo_normalizado.get("source_search_strings"),
-                )
-                if qtd_encontrados == 0:
-                    st.warning("Nenhum artigo foi encontrado. Ajuste o rascunho do protocolo.")
-                elif qtd_salvos == 0 and qtd_pendentes == 0:
-                    st.info(
-                        f"Os {qtd_encontrados} registros já existiam neste projeto; "
-                        "a proveniência das fontes foi atualizada."
-                    )
-                else:
-                    st.success(
-                        f"Coleta concluída: {qtd_salvos} novo(s), "
-                        f"{qtd_mesclados} mesclado(s) por DOI e "
-                        f"{qtd_pendentes} candidato(s) aguardando revisão, em "
-                        f"{qtd_encontrados} registro(s) recuperado(s)."
-                    )
-            except Exception as erro:
-                st.error(f"Erro durante a coleta: {erro}")
+        try:
+            start_job(
+                project_id,
+                JOB_BIBLIOGRAPHIC_SEARCH,
+                {
+                    "query": termo_busca,
+                    "max_per_source": qtd_artigos,
+                    "source_queries": protocolo_normalizado.get("source_search_strings") or {},
+                },
+            )
+            st.rerun()
+        except Exception as erro:
+            st.error(f"Não foi possível iniciar a coleta: {erro}")
+
+    if coleta_job and coleta_job.get("status") == "succeeded":
+        resultado = coleta_job.get("result_jsonb") or {}
+        encontrados = int(resultado.get("found") or 0)
+        if encontrados == 0:
+            st.warning("Nenhum artigo foi encontrado. Ajuste o rascunho do protocolo.")
+        else:
+            st.info(
+                f"Última coleta: {resultado.get('saved', 0)} novo(s), "
+                f"{resultado.get('merged', 0)} mesclado(s), "
+                f"{resultado.get('pending_review', 0)} aguardando revisão, em "
+                f"{encontrados} registro(s) recuperado(s)."
+            )
 
 with aba_bibtex:
     st.markdown(

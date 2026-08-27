@@ -1,0 +1,39 @@
+{$RAG_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+	}
+
+	reverse_proxy app:8501 {
+		health_uri /_stcore/health
+		health_interval 30s
+		health_timeout 5s
+	}
+
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>headers delete
+			request>remote_ip ip_mask 16 32
+			request>client_ip ip_mask 16 32
+			request>uri query {
+				delete code
+				delete state
+				delete scope
+				delete authuser
+				delete prompt
+				delete iss
+				delete error
+				delete error_description
+				delete login_hint
+				delete email
+			}
+		}
+	}
+}

@@ -1,0 +1,202 @@
+name: rag-revisao-web
+
+services:
+  preflight:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_UID: ${RAG_UID:-1000}
+        APP_GID: ${RAG_GID:-1000}
+    image: rag-revisao-sistematica-app:2.0.0
+    restart: "no"
+    environment:
+      RAG_DEPLOYMENT_PROFILE: ${RAG_DEPLOYMENT_PROFILE:-web_private}
+      RAG_USER_MODE: ${RAG_USER_MODE:-single_user}
+      RAG_MIN_FREE_STORAGE_MB: ${RAG_MIN_FREE_STORAGE_MB:-2048}
+    volumes:
+      - ./deploy/web.env:/run/config/web.env:ro
+      - ./.streamlit/secrets.toml:/run/secrets/streamlit.toml:ro
+    command:
+      - python
+      - -m
+      - backend.app.web_deployment
+      - --env-file
+      - /run/config/web.env
+      - --secrets-file
+      - /run/secrets/streamlit.toml
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: rag_web_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:?Defina DB_USER em deploy/web.env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD em deploy/web.env}
+      POSTGRES_DB: ${DB_NAME:?Defina DB_NAME em deploy/web.env}
+    volumes:
+      - web_postgres_data:/var/lib/postgresql/data
+      - ./database/scripts/init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      preflight:
+        condition: service_completed_successfully
+    networks:
+      - backend
+
+  migrate:
+    image: pgvector/pgvector:pg16
+    container_name: rag_web_migrations
+    restart: "no"
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${DB_NAME:?Defina DB_NAME em deploy/web.env}
+      PGUSER: ${DB_USER:?Defina DB_USER em deploy/web.env}
+      PGPASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD em deploy/web.env}
+    volumes:
+      - ./database/scripts:/migrations:ro
+    entrypoint: ["/bin/sh", "/migrations/migrate.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  app:
+    image: rag-revisao-sistematica-app:2.0.0
+    container_name: rag_web_app
+    restart: unless-stopped
+    env_file:
+      - ./deploy/web.env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      RAG_DEPLOYMENT_PROFILE: web_private
+      RAG_USER_MODE: single_user
+      RAG_MANAGED_STORAGE: "true"
+      AI_CONFIG_DATABASE_ENABLED: "true"
+      AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+      PDF_DIRECTORY: /app/data/pdfs
+      BACKUP_DIRECTORY: /app/data/backups
+      PRIVATE_DIRECTORY: /app/data/private
+      STREAMLIT_SERVER_MAX_UPLOAD_SIZE: ${RAG_MAX_UPLOAD_MB:-2048}
+    expose:
+      - "8501"
+    volumes:
+      - ./.streamlit/secrets.toml:/app/.streamlit/secrets.toml:ro
+      - web_pdfs:/app/data/pdfs
+      - web_backups:/app/data/backups
+      - web_private_data:/app/data/private
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - backend.app.operational_health
+        - --component
+        - app
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - backend
+      - frontend
+
+  worker:
+    image: rag-revisao-sistematica-app:2.0.0
+    container_name: rag_web_background_worker
+    restart: unless-stopped
+    env_file:
+      - ./deploy/web.env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      RAG_DEPLOYMENT_PROFILE: web_private
+      RAG_USER_MODE: single_user
+      RAG_MANAGED_STORAGE: "true"
+      AI_CONFIG_DATABASE_ENABLED: "true"
+      AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+      PDF_DIRECTORY: /app/data/pdfs
+      BACKUP_DIRECTORY: /app/data/backups
+      PRIVATE_DIRECTORY: /app/data/private
+      RAG_JOB_WORKERS: "1"
+    command: ["python", "-m", "backend.app.job_worker"]
+    volumes:
+      - web_pdfs:/app/data/pdfs
+      - web_backups:/app/data/backups
+      - web_private_data:/app/data/private
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - backend.app.operational_health
+        - --component
+        - worker
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - backend
+      - frontend
+
+  proxy:
+    image: caddy:2.11.4-alpine
+    container_name: rag_web_proxy
+    restart: unless-stopped
+    environment:
+      RAG_DOMAIN: ${RAG_DOMAIN:?Defina RAG_DOMAIN em deploy/web.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - frontend
+
+networks:
+  backend:
+    internal: true
+  frontend:
+
+volumes:
+  web_postgres_data:
+    name: rag_web_postgres_data
+  web_pdfs:
+    name: rag_web_pdfs
+  web_backups:
+    name: rag_web_backups
+  web_private_data:
+    name: rag_web_private_data
+  caddy_data:
+    name: rag_web_caddy_data
+  caddy_config:
+    name: rag_web_caddy_config

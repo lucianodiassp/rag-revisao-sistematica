@@ -2,6 +2,7 @@
 # O pip resolve automaticamente as dependências transitivas.
 # Compatível com Python 3.10 ou superior.
 
+Authlib==1.7.2
 cryptography==48.0.0
 google-genai==2.8.0
 matplotlib==3.11.1
@@ -13,3 +14,4 @@ pymupdf==1.24.1
 python-dotenv==1.0.1
 requests==2.34.2
 streamlit==1.58.0
+tomli==2.4.1; python_version < "3.11"

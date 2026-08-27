@@ -30,6 +30,7 @@ from backend.app.ai_config_repository import (  # noqa: E402
     list_configuration_audit,
 )
 from backend.app.secret_store import get_master_key_path  # noqa: E402
+from backend.app.version import application_metadata  # noqa: E402
 
 
 TASK_LABELS = {
@@ -51,10 +52,13 @@ STATUS_LABELS = {
 
 st.set_page_config(page_title="Configuração de IA", page_icon="🔐", layout="wide")
 st.title("🔐 Configuração de IA e Credenciais")
-st.caption("Escopo atual: instalação local · usuário único")
+metadata = application_metadata()
+st.caption(
+    f"Escopo atual: {metadata['deployment_label']} · {metadata['user_mode_label']}"
+)
 st.info(
     "A chave é cifrada antes de chegar ao PostgreSQL. A chave-mestra permanece "
-    "no perfil local do sistema operacional e nenhuma credencial é exibida ou registrada nos logs."
+    "no armazenamento privado da instalação e nenhuma credencial é exibida ou registrada nos logs."
 )
 
 if not configuration_tables_available():

@@ -22,6 +22,11 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from backend.app.secret_store import get_master_key_path
+from backend.app.storage_service import (
+    backup_directory,
+    ensure_free_space,
+    pdf_directory,
+)
 from backend.app.version import application_metadata
 
 
@@ -75,12 +80,11 @@ def project_root() -> Path:
 
 
 def default_pdf_directory() -> Path:
-    return project_root() / "data" / "pdfs"
+    return pdf_directory()
 
 
 def default_backup_directory() -> Path:
-    configured = os.getenv("BACKUP_DIRECTORY")
-    return Path(configured).expanduser().resolve() if configured else project_root() / "data" / "backups"
+    return backup_directory()
 
 
 def validate_backup_password(password: str) -> str:
@@ -251,6 +255,35 @@ def _dump_database(destination: Path, settings: DatabaseSettings) -> None:
 
 
 def _restore_database(source: Path, settings: DatabaseSettings) -> None:
+    # O --clean do pg_restore remove somente objetos conhecidos pelo arquivo.
+    # Ao importar um backup antigo, tabelas criadas por versões mais novas podem
+    # continuar referenciando chaves do dump e impedir a limpeza. O reset do schema
+    # elimina também esses objetos exclusivos do destino. A transação garante que
+    # uma falha no reset preserve o schema anterior; o backup de recuperação criado
+    # por restore_backup protege as etapas seguintes.
+    _run(
+        [
+            "psql",
+            "--host",
+            settings.host,
+            "--port",
+            settings.port,
+            "--username",
+            settings.user,
+            "--dbname",
+            settings.database,
+            "--set",
+            "ON_ERROR_STOP=1",
+            "--single-transaction",
+            "--command",
+            (
+                "DROP SCHEMA IF EXISTS public CASCADE; "
+                "CREATE SCHEMA public; "
+                "GRANT USAGE ON SCHEMA public TO PUBLIC;"
+            ),
+        ],
+        settings,
+    )
     _run(
         [
             "pg_restore",
@@ -274,9 +307,43 @@ def _restore_database(source: Path, settings: DatabaseSettings) -> None:
     )
 
 
+def _record_migrations(settings: DatabaseSettings, migrations: list[Path]) -> None:
+    with psycopg2.connect(
+        host=settings.host,
+        port=settings.port,
+        database=settings.database,
+        user=settings.user,
+        password=settings.password,
+    ) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                migration_name VARCHAR(255) PRIMARY KEY,
+                checksum_sha256 CHAR(64) NOT NULL,
+                applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_verified_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (length(checksum_sha256) = 64)
+            )
+            """
+        )
+        for migration in migrations:
+            cursor.execute(
+                """
+                INSERT INTO schema_migrations
+                    (migration_name, checksum_sha256, applied_at, last_verified_at)
+                VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (migration_name) DO UPDATE
+                SET checksum_sha256 = EXCLUDED.checksum_sha256,
+                    last_verified_at = CURRENT_TIMESTAMP
+                """,
+                (migration.name, _sha256(migration)),
+            )
+
+
 def _run_migrations(settings: DatabaseSettings, scripts_directory: Path | None = None) -> None:
     scripts = Path(scripts_directory or project_root() / "database" / "scripts")
-    for migration in sorted(scripts.glob("0*.sql")):
+    migrations = sorted(scripts.glob("0*.sql"))
+    for migration in migrations:
         _run(
             [
                 "psql",
@@ -295,6 +362,7 @@ def _run_migrations(settings: DatabaseSettings, scripts_directory: Path | None =
             ],
             settings,
         )
+    _record_migrations(settings, migrations)
 
 
 def _database_counts(settings: DatabaseSettings) -> dict[str, int]:
@@ -392,6 +460,7 @@ def create_backup(
     master_key_path = Path(master_key_path or get_master_key_path()).resolve()
     backup_directory = Path(backup_directory or default_backup_directory()).resolve()
     backup_directory.mkdir(parents=True, exist_ok=True)
+    ensure_free_space(backup_directory, operation="criar o backup")
 
     timestamp = datetime.now(timezone.utc)
     suffix = uuid.uuid4().hex[:8]
@@ -413,6 +482,15 @@ def create_backup(
                 for pdf in sorted(pdf_directory.glob("*.pdf")):
                     if pdf.is_file():
                         components.append((pdf, f"pdfs/{pdf.name}"))
+
+            # O ZIP e o arquivo cifrado coexistem temporariamente. Esta estimativa
+            # evita iniciar um backup que deixaria o volume sem reserva operacional.
+            component_size = sum(path.stat().st_size for path, _ in components)
+            ensure_free_space(
+                backup_directory,
+                component_size * 2,
+                operation="montar e cifrar o backup",
+            )
 
             entries = [_entry_metadata(path, archive_name) for path, archive_name in components]
             manifest = {
@@ -454,6 +532,11 @@ def inspect_backup(source: Path, password: str) -> dict:
     source = Path(source).expanduser().resolve()
     if not source.is_file():
         raise BackupError("Arquivo de backup não encontrado.")
+    ensure_free_space(
+        Path(tempfile.gettempdir()),
+        source.stat().st_size,
+        operation="validar o backup",
+    )
     with tempfile.TemporaryDirectory(prefix="rag-backup-inspect-") as temp:
         zip_path = Path(temp) / "payload.zip"
         decrypt_file(source, zip_path, password)
@@ -539,6 +622,11 @@ def _decrypt_and_apply(
     master_key_path: Path,
     scripts_directory: Path | None = None,
 ) -> dict:
+    ensure_free_space(
+        Path(tempfile.gettempdir()),
+        source.stat().st_size * 2,
+        operation="preparar a restauração",
+    )
     with tempfile.TemporaryDirectory(prefix="rag-backup-restore-") as temp:
         zip_path = Path(temp) / "payload.zip"
         decrypt_file(source, zip_path, password)
@@ -549,6 +637,15 @@ def _decrypt_and_apply(
             master_key_path=master_key_path,
             scripts_directory=scripts_directory,
         )
+
+
+def _reload_runtime_configuration() -> None:
+    """Descarta configurações em memória após substituir banco e chave-mestra."""
+    from backend.app.ai_service import reload_ai_runtime
+    from backend.app.bibliographic_config import clear_bibliographic_settings_cache
+
+    reload_ai_runtime()
+    clear_bibliographic_settings_cache()
 
 
 def restore_backup(
@@ -572,6 +669,21 @@ def restore_backup(
     backup_directory = Path(backup_directory or default_backup_directory()).resolve()
 
     manifest = inspect_backup(source, password)
+    declared_pdf_size = sum(
+        int(entry.get("size", 0))
+        for entry in manifest.get("entries", [])
+        if str(entry.get("path", "")).startswith("pdfs/")
+    )
+    ensure_free_space(
+        pdf_directory,
+        declared_pdf_size,
+        operation="restaurar os PDFs",
+    )
+    ensure_free_space(
+        backup_directory,
+        source.stat().st_size,
+        operation="criar o backup de recuperação",
+    )
     recovery = create_backup(
         password,
         settings=settings,
@@ -599,6 +711,7 @@ def restore_backup(
                 master_key_path=master_key_path,
                 scripts_directory=scripts_directory,
             )
+            _reload_runtime_configuration()
         except Exception as rollback_error:
             raise RestoreError(
                 "A restauração falhou e o retorno automático também falhou. "
@@ -610,6 +723,7 @@ def restore_backup(
             f"Detalhe: {restore_error}"
         ) from restore_error
 
+    _reload_runtime_configuration()
     return {
         "manifest": applied_manifest or manifest,
         "recovery_path": recovery["path"],

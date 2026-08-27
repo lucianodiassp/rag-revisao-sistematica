@@ -7,23 +7,31 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.processamento.leitor_pdf import (
     carregar_status_pdfs,
-    processar_pdfs,
     resumir_status_fluxo,
 )
+from backend.app.background_jobs import JOB_PDF_INDEXING
 from backend.processamento.ocr_pdf import get_pdf_ocr_config
 from backend.app.screening_reassessment import (
     ACTION_EXCLUDE,
     ACTION_RETURN_TO_SCREENING,
     reassess_included_paper,
 )
+from backend.app.storage_service import (
+    StorageCapacityError,
+    inspect_storage,
+    pdf_directory,
+    save_upload_atomic,
+    storage_limits,
+)
 from frontend.project_selector import selecionar_projeto_ativo
+from frontend.background_jobs_ui import job_is_active, render_job_status, start_job
 
 # ==========================================
 # CONFIGURAÇÃO DA PÁGINA
 # ==========================================
 st.set_page_config(page_title="Gestão de PDFs", page_icon="📂", layout="wide")
 
-DIRETORIO_PDFS = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data/pdfs'))
+DIRETORIO_PDFS = str(pdf_directory())
 
 # Garante que a pasta física existe no ambiente
 if not os.path.exists(DIRETORIO_PDFS):
@@ -67,6 +75,18 @@ st.markdown("""
 Faça o upload dos documentos na íntegra para os artigos aprovados e acione a indexação 
 vetorial para alimentar o cérebro do motor RAG.
 """)
+limites_armazenamento = storage_limits()
+status_armazenamento = inspect_storage("PDFs", DIRETORIO_PDFS)
+st.caption(
+    f"Limite por PDF: **{limites_armazenamento.pdf_upload_mb} MB** · "
+    f"Espaço livre no armazenamento persistente: "
+    f"**{status_armazenamento.free_bytes / (1024 ** 3):.1f} GB**."
+)
+if not status_armazenamento.healthy:
+    st.error(
+        "O armazenamento de PDFs não possui escrita ou reserva livre suficiente. "
+        "Novos uploads devem aguardar a liberação de espaço."
+    )
 st.divider()
 
 ultima_reavaliacao = st.session_state.pop("ultima_reavaliacao_pdf", None)
@@ -126,12 +146,19 @@ else:
             if arquivo_upload is not None:
                 if st.button("💾 Salvar e Relacionar PDF", type="primary", width="stretch"):
                     caminho_salvo = os.path.join(DIRETORIO_PDFS, f"{uuid_alvo}.pdf")
-                    
-                    with open(caminho_salvo, "wb") as f:
-                        f.write(arquivo_upload.getbuffer())
-                    
-                    st.success(f"Ficheiro guardado e vinculado com sucesso!")
-                    st.rerun()
+                    try:
+                        save_upload_atomic(
+                            arquivo_upload.getbuffer(),
+                            caminho_salvo,
+                            kind="pdf",
+                        )
+                    except StorageCapacityError as erro:
+                        st.error(f"Não foi possível armazenar o PDF: {erro}")
+                    except OSError as erro:
+                        st.error(f"Falha ao gravar o PDF no armazenamento persistente: {erro}")
+                    else:
+                        st.success("Ficheiro guardado e vinculado com sucesso!")
+                        st.rerun()
 
             with st.expander("Não consegui obter este PDF", expanded=False):
                 st.write(
@@ -237,27 +264,28 @@ else:
             "produzir texto para indexação."
         )
 
-    # Botão de ignição do backend
+    index_job = render_job_status(
+        project_id,
+        JOB_PDF_INDEXING,
+        key="pdf_indexing",
+        title="Indexação vetorial",
+    )
+
+    # Botão de ignição do processo separado
     if st.button(
         "⚡ Executar Processamento e Vetorização de PDFs",
         type="secondary",
         width="stretch",
+        disabled=job_is_active(index_job),
     ):
-        with st.spinner("O sistema está a ler, fatiar e vetorizar os documentos na íntegra... Isto pode demorar alguns minutos consoante o tamanho dos artigos."):
-            try:
-                # Invoca a função do leitor_pdf.py diretamente
-                resumo = processar_pdfs(project_id)
-                st.session_state["ultimo_relatorio_indexacao"] = {
-                    "project_id": project_id,
-                    "resumo": resumo,
-                }
-                st.rerun()
-            except Exception as e:
-                st.error(f"⚠️ Ocorreu um erro durante a vetorização: {e}")
+        try:
+            start_job(project_id, JOB_PDF_INDEXING)
+            st.rerun()
+        except Exception as e:
+            st.error(f"⚠️ Não foi possível iniciar a vetorização: {e}")
 
-    relatorio_salvo = st.session_state.get("ultimo_relatorio_indexacao")
-    if relatorio_salvo and relatorio_salvo.get("project_id") == project_id:
-        resumo = relatorio_salvo["resumo"]
+    if index_job and index_job.get("status") == "succeeded":
+        resumo = index_job.get("result_jsonb") or {}
         if resumo["falhas"]:
             st.warning(
                 "Processamento concluído parcialmente: "

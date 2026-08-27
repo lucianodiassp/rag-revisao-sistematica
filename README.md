@@ -5,9 +5,9 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-2ea44f.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 
-Aplicação local para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
+Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
 de evidências, avaliação metodológica revisada por humano, painel versionado de
 limitações e confiança, auditoria e síntese final.
@@ -25,6 +25,7 @@ do relatório permanecem sob responsabilidade humana.
 - [Projeto demonstrativo](#projeto-demonstrativo)
 - [Atualização de um banco existente](#atualização-de-um-banco-existente)
 - [Versionamento e releases](#versionamento-e-releases)
+- [Diagnóstico operacional](#diagnóstico-operacional)
 - [Configuração segura](#configuração-segura)
 - [Fluxo de uso](#fluxo-de-uso)
 - [Testes](#testes)
@@ -40,12 +41,62 @@ fluxo de uma revisão dentro de projetos isolados. Cada projeto possui pergunta,
 protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, interações de
 agentes, auditorias e relatórios próprios.
 
-O perfil atual de implantação é **local e de usuário único**. As tabelas de
-configuração já possuem campos de escopo para uma evolução futura, mas autenticação,
-autorização e isolamento entre usuários ainda não fazem parte desta versão.
+O perfil padrão de implantação continua sendo **local e de usuário único**. A versão
+`2.0.0` acrescenta o perfil **Web privado**, também de usuário único, protegido
+por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
+continua reservado para uma evolução posterior.
 
-A versão estável documentada é **1.0.0 — Local, usuário único**. A identidade
-efetiva aparece no menu lateral e acompanha backups e pacotes de reprodutibilidade.
+A versão estável é **2.0.0 — Local e Web privada, usuário único**. Ela preserva o
+uso local da `1.0.0` e incorpora autenticação, operação resiliente, recuperação,
+observabilidade e proteção de privacidade validadas em um servidor real. A
+identidade efetiva aparece no menu lateral e acompanha backups e pacotes de
+reprodutibilidade.
+
+O plano incremental da nova linha está em
+[Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
+As condições para publicar a candidata e promover a versão estável estão no
+[Checklist da candidata v2](docs/CHECKLIST_RELEASE_V2.md).
+
+### Autenticação da Web privada (v2 candidata)
+
+Quando `RAG_DEPLOYMENT_PROFILE=web_private`, a aplicação exige login OIDC antes de
+criar a navegação ou exibir dados. A autorização é limitada aos e-mails definidos
+em `RAG_AUTH_ALLOWED_EMAILS`; no modo `single_user`, informe exatamente um e-mail.
+O perfil `local` permanece acessível sem login.
+
+As credenciais do provedor ficam em `.streamlit/secrets.toml`, que não é enviado ao
+Git nem incluído no build. Consulte o guia
+[Autenticação da Web privada](docs/AUTENTICACAO_WEB.md) para configurar Google,
+Microsoft ou outro provedor OIDC e validar o fluxo completo.
+
+### Perfil Web de produção (v2 candidata)
+
+O arquivo `docker-compose.web.yml` mantém PostgreSQL e Streamlit em redes Docker
+sem portas públicas e expõe somente o Caddy nas portas `80/443`. Antes de iniciar
+qualquer serviço de dados, um preflight exige domínio público, HTTPS/OIDC coerente,
+um único e-mail autorizado e senha forte de banco, sem imprimir esses valores.
+
+O procedimento completo está em
+[Implantação Web privada](docs/IMPLANTACAO_WEB.md). A configuração foi exercitada
+em servidor com domínio, DNS, HTTPS e OIDC reais; a promoção estável ainda depende
+dos itens abertos no checklist da candidata.
+
+Banco, PDFs, backups, chave-mestra e certificados usam volumes nomeados separados.
+A aplicação valida escrita, reserva mínima de disco e limites distintos para PDFs e
+`.ragbackup` antes de gravar. O mesmo guia documenta cópia externa e recuperação em
+uma instalação Web limpa sem alterar o formato de backup da v1.
+
+As operações demoradas de coleta, indexação, extração, relatório e benchmark são
+enviadas a uma fila persistente no PostgreSQL e executadas por um processo separado.
+Atualizar ou fechar a página não cancela a operação: andamento, falhas e tentativas
+continuam disponíveis na tela correspondente. O perfil de usuário único executa
+uma tarefa por vez para evitar picos de consumo nas APIs.
+
+Eventos operacionais usam linhas JSON com versão, perfil e categoria. A página
+**Diagnóstico Operacional** verifica banco, migrações, armazenamento, interface,
+worker, fila e configurações externas sem chamar APIs pagas nem mostrar segredos.
+Consulte o [guia de operação e diagnóstico](docs/OPERACAO_E_DIAGNOSTICO.md) para
+atualização, investigação de falhas e retorno seguro de versão.
 
 ## Principais funcionalidades
 
@@ -87,6 +138,8 @@ efetiva aparece no menu lateral e acompanha backups e pacotes de reprodutibilida
 - Backup automático do estado atual antes de restaurar outro arquivo.
 - Restauração transacional do banco, seguida pelas migrações idempotentes.
 - Retorno automático ao estado anterior quando uma etapa da restauração falha.
+- Limites de upload e reserva livre conferidos antes de validar, criar ou restaurar.
+- Compatibilidade do formato `.ragbackup` v1 entre os perfis local e Web privado.
 
 ### Pacote de reprodutibilidade por projeto
 

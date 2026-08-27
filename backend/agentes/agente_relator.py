@@ -81,19 +81,27 @@ def coletar_evidencias(project_id):
         })
     return evidencias
 
-def gerar_relatorio_final(project_id=None):
+def gerar_relatorio_final(project_id=None, progress_callback=None):
     """Orquestra a coleta de dados e a geração do texto pelo Gemini."""
     project_id = resolver_project_id(project_id)
+    if progress_callback:
+        progress_callback(0, 4, "Calculando e registrando o fluxo PRISMA")
     print("📊 A recolher métricas PRISMA...")
     snapshot_prisma = salvar_snapshot_prisma(project_id)
     metricas = snapshot_prisma["metrics"]
     
     print("📚 A recolher evidências extraídas...")
+    if progress_callback:
+        progress_callback(1, 4, "Reunindo evidências revisadas")
     evidencias = coletar_evidencias(project_id)
     avaliacoes_metodologicas = methodological_summary(project_id)
     confianca = confidence_summary(project_id)
+    if progress_callback:
+        progress_callback(2, 4, "Preparando a síntese acadêmica")
     
     if not evidencias:
+        if progress_callback:
+            progress_callback(4, 4, "Relatório concluído sem evidências aprovadas")
         return {
             "metricas": metricas,
             "prisma_snapshot": snapshot_prisma,
@@ -157,13 +165,15 @@ def gerar_relatorio_final(project_id=None):
     """
     
     try:
+        if progress_callback:
+            progress_callback(3, 4, "Gerando a síntese com o modelo de IA")
         resposta = generate_content(
             TASK_REPORT,
             contents=prompt,
         )
         texto_relatorio = resposta.text
     except Exception as e:
-        texto_relatorio = f"Erro ao contactar a API do Gemini: {e}"
+        raise RuntimeError(f"Não foi possível gerar a síntese com o provedor de IA: {e}") from e
 
     log_interacao_agente(
         project_id,
@@ -191,6 +201,8 @@ def gerar_relatorio_final(project_id=None):
         },
         get_generation_config(TASK_REPORT).metadata(),
     )
+    if progress_callback:
+        progress_callback(4, 4, "Relatório final registrado")
         
     return {
         "metricas": metricas,

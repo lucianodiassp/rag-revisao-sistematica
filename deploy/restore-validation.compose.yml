@@ -1,0 +1,52 @@
+# Sobreposição para validar restaurações sem tocar na instalação principal.
+# Use sempre com um nome de projeto explícito conforme docs/CHECKLIST_RELEASE_V2.md.
+services:
+  db:
+    container_name: rag_v2_restore_validation_db
+    ports: !override []
+    volumes:
+      - rag_v2_restore_validation_postgres:/var/lib/postgresql/data
+      - ./database/scripts/init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+
+  migrate:
+    container_name: rag_v2_restore_validation_migrations
+    volumes:
+      - ./database/scripts:/migrations:ro
+
+  app:
+    container_name: rag_v2_restore_validation_app
+    environment:
+      RAG_DEPLOYMENT_PROFILE: local
+      RAG_USER_MODE: single_user
+    ports: !override
+      - "127.0.0.1:18501:8501"
+    volumes:
+      - ./.streamlit:/app/.streamlit:ro
+      - rag_v2_restore_validation_pdfs:/app/data/pdfs
+      - rag_v2_restore_validation_backups:/app/data/backups
+      - rag_v2_restore_validation_private:/app/data/private
+
+  worker:
+    container_name: rag_v2_restore_validation_worker
+    environment:
+      RAG_DEPLOYMENT_PROFILE: local
+      RAG_USER_MODE: single_user
+    volumes:
+      - rag_v2_restore_validation_pdfs:/app/data/pdfs
+      - rag_v2_restore_validation_backups:/app/data/backups
+      - rag_v2_restore_validation_private:/app/data/private
+
+  pgadmin:
+    container_name: rag_v2_restore_validation_pgadmin
+    ports: !override
+      - "127.0.0.1:15050:80"
+
+volumes:
+  rag_v2_restore_validation_postgres:
+    name: rag_v2_restore_validation_postgres
+  rag_v2_restore_validation_pdfs:
+    name: rag_v2_restore_validation_pdfs
+  rag_v2_restore_validation_backups:
+    name: rag_v2_restore_validation_backups
+  rag_v2_restore_validation_private:
+    name: rag_v2_restore_validation_private

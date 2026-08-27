@@ -18,10 +18,11 @@ from backend.app.rag_benchmark import (
     benchmark_to_csv,
     benchmark_to_json,
     get_latest_rag_benchmark,
-    run_rag_benchmark,
     validate_golden_set,
 )
+from backend.app.background_jobs import JOB_RAG_BENCHMARK
 from frontend.project_selector import selecionar_projeto_ativo
+from frontend.background_jobs_ui import job_is_active, render_job_status, start_job
 
 
 st.set_page_config(page_title="Avaliação Quantitativa do RAG", page_icon="🧪", layout="wide")
@@ -209,6 +210,12 @@ with benchmark_tab:
         for error in errors:
             st.write(f"- {error}")
 
+    benchmark_job = render_job_status(
+        project_id,
+        JOB_RAG_BENCHMARK,
+        key="rag_benchmark",
+        title="Benchmark quantitativo",
+    )
     info_col, button_col = st.columns([2, 1])
     with info_col:
         st.write(
@@ -220,36 +227,14 @@ with benchmark_tab:
             "▶️ Executar benchmark",
             type="primary",
             use_container_width=True,
-            disabled=bool(errors),
+            disabled=bool(errors) or job_is_active(benchmark_job),
         )
     if execute:
-        progress = st.progress(0)
-        status = st.empty()
-
-        def update_progress(current, total, question):
-            progress.progress(min(current / total, 1.0) if total else 0.0)
-            status.write(f"{current}/{total} · {question}")
-
         try:
-            with st.spinner("Executando recuperação, respostas e métricas..."):
-                completed_run = run_rag_benchmark(
-                    project_id, progress_callback=update_progress
-                )
-            completed_summary = completed_run["metrics"]["summary"]
-            if completed_summary.get("failed_query_count"):
-                st.warning(
-                    "Benchmark registrado com falhas parciais. As perguntas concluídas "
-                    "foram preservadas; consulte os detalhes abaixo."
-                )
-            elif completed_summary.get("retried_query_count"):
-                st.success(
-                    "Benchmark concluído após recuperar automaticamente uma "
-                    "indisponibilidade temporária."
-                )
-            else:
-                st.success("Benchmark concluído e registrado no projeto.")
+            start_job(project_id, JOB_RAG_BENCHMARK)
+            st.rerun()
         except Exception as exc:
-            st.error(f"Não foi possível executar o benchmark: {exc}")
+            st.error(f"Não foi possível iniciar o benchmark: {exc}")
 
     latest = get_latest_rag_benchmark(project_id)
     if not latest:

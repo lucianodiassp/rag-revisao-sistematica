@@ -113,9 +113,64 @@ def test_restore_requires_exact_confirmation(tmp_path):
         restore_backup(tmp_path / "inexistente.ragbackup", PASSWORD, "restaurar")
 
 
+def test_database_restore_resets_newer_destination_schema_before_pg_restore(
+    tmp_path, monkeypatch
+):
+    dump = tmp_path / "database.dump"
+    dump.write_bytes(b"dump")
+    settings = DatabaseSettings("db", "5432", "test", "user", "password")
+    commands = []
+
+    monkeypatch.setattr(
+        backup_service,
+        "_run",
+        lambda command, _settings: commands.append(command),
+    )
+
+    backup_service._restore_database(dump, settings)
+
+    assert len(commands) == 2
+    assert commands[0][0] == "psql"
+    assert "--single-transaction" in commands[0]
+    assert "DROP SCHEMA IF EXISTS public CASCADE" in commands[0][-1]
+    assert commands[1][0] == "pg_restore"
+    assert "--clean" in commands[1]
+    assert "--single-transaction" in commands[1]
+
+
+def test_migrations_are_applied_in_order_and_registered_with_checksums(
+    tmp_path, monkeypatch
+):
+    first = tmp_path / "002_second.sql"
+    last = tmp_path / "015_last.sql"
+    first.write_text("SELECT 2;", encoding="utf-8")
+    last.write_text("SELECT 15;", encoding="utf-8")
+    settings = DatabaseSettings("db", "5432", "test", "user", "password")
+    commands = []
+    registered = []
+
+    monkeypatch.setattr(
+        backup_service,
+        "_run",
+        lambda command, _settings: commands.append(command),
+    )
+    monkeypatch.setattr(
+        backup_service,
+        "_record_migrations",
+        lambda _settings, migrations: registered.extend(migrations),
+    )
+
+    backup_service._run_migrations(settings, tmp_path)
+
+    assert [command[-1] for command in commands] == [str(first), str(last)]
+    assert registered == [first, last]
+
+
 def test_created_backup_records_application_version_without_changing_format_version(
     tmp_path, monkeypatch
 ):
+    monkeypatch.setenv("RAG_DEPLOYMENT_PROFILE", "local")
+    monkeypatch.setenv("RAG_USER_MODE", "single_user")
     settings = DatabaseSettings("db", "5432", "test", "user", "password")
     pdf_directory = tmp_path / "pdfs"
     pdf_directory.mkdir()
@@ -148,8 +203,10 @@ def test_created_backup_records_application_version_without_changing_format_vers
 
 def test_restore_failure_applies_automatic_recovery(tmp_path, monkeypatch):
     incoming = tmp_path / "incoming.ragbackup"
+    incoming.write_bytes(b"backup de teste")
     recovery = tmp_path / "pre-restore.ragbackup"
     calls = []
+    reloads = []
     settings = DatabaseSettings("db", "5432", "test", "user", "password")
     manifest = {"format": BACKUP_FORMAT, "version": BACKUP_VERSION}
 
@@ -167,6 +224,11 @@ def test_restore_failure_applies_automatic_recovery(tmp_path, monkeypatch):
         return manifest
 
     monkeypatch.setattr(backup_service, "_decrypt_and_apply", fake_apply)
+    monkeypatch.setattr(
+        backup_service,
+        "_reload_runtime_configuration",
+        lambda: reloads.append(True),
+    )
 
     with pytest.raises(RestoreError, match="recuperado automaticamente"):
         restore_backup(
@@ -180,6 +242,42 @@ def test_restore_failure_applies_automatic_recovery(tmp_path, monkeypatch):
         )
 
     assert calls == [incoming.resolve(), recovery]
+    assert reloads == [True]
+
+
+def test_restore_success_reloads_runtime_configuration(tmp_path, monkeypatch):
+    incoming = tmp_path / "incoming.ragbackup"
+    incoming.write_bytes(b"backup de teste")
+    recovery = tmp_path / "pre-restore.ragbackup"
+    settings = DatabaseSettings("db", "5432", "test", "user", "password")
+    manifest = {"format": BACKUP_FORMAT, "version": BACKUP_VERSION, "entries": []}
+    reloads = []
+
+    monkeypatch.setattr(backup_service, "inspect_backup", lambda *_: manifest)
+    monkeypatch.setattr(
+        backup_service,
+        "create_backup",
+        lambda *_, **__: {"path": recovery},
+    )
+    monkeypatch.setattr(backup_service, "_decrypt_and_apply", lambda *_, **__: manifest)
+    monkeypatch.setattr(
+        backup_service,
+        "_reload_runtime_configuration",
+        lambda: reloads.append(True),
+    )
+
+    result = restore_backup(
+        incoming,
+        PASSWORD,
+        "RESTAURAR BACKUP",
+        settings=settings,
+        pdf_directory=tmp_path / "pdfs",
+        master_key_path=tmp_path / "master.key",
+        backup_directory=tmp_path / "backups",
+    )
+
+    assert result["manifest"] == manifest
+    assert reloads == [True]
 
 
 @pytest.mark.parametrize("password", ["", "curta", "            "])

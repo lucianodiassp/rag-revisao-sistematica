@@ -6,7 +6,7 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `1.0.0` | Funcionalidades e compatibilidade do produto |
+| Aplicação | `2.0.0` | Funcionalidades e compatibilidade do produto |
 | Migração do banco | `013` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
@@ -27,7 +27,19 @@ A v2 deve preservar o modo local sempre que possível. O perfil efetivo é infor
 por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 `RAG_USER_MODE=single_user|multi_user`.
 
-## Fluxo para concluir a v1.0.0
+## Estado atual
+
+- `v1.0.0`: primeira versão local estável, etiquetada e publicada no GitHub.
+- `v2-web`: linha de integração usada na construção da versão Web.
+- `2.0.0-rc.1`: primeira candidata, usada no piloto Web real.
+- `2.0.0-rc.2`: candidata corrigida após o primeiro piloto público.
+- `2.0.0-rc.3`: candidata com o gate de privacidade dos logs aprovado.
+- `2.0.0`: versão estável local e Web privada, inicialmente de usuário único.
+
+O sufixo `-rc.N` identifica uma candidata e impede que ela seja confundida com a
+futura Release estável `v2.0.0`.
+
+## Fluxo concluído da v1.0.0
 
 1. Mesclar a branch de versionamento na `main`.
 2. Atualizar a `main` local e executar a suíte completa.
@@ -55,6 +67,17 @@ branch de integração `v2-web`, por exemplo:
 
 A `main` permanece como linha estável até a validação integral da v2. Quando a
 versão Web estiver pronta, `v2-web` é incorporada à `main` e recebe a tag `v2.0.0`.
+
+Antes da versão estável, a linha passa por uma candidata `2.0.0-rc.1`. A candidata
+só é identificada e etiquetada depois dos testes locais, da restauração de um
+backup v1 em ambiente limpo e da validação funcional. O piloto com domínio, HTTPS
+e OIDC reais usa exatamente essa tag. Correções posteriores geram uma nova
+candidata (`rc.2`, `rc.3`), sem mover ou reutilizar tags já publicadas.
+
+O planejamento incremental, os critérios de aceite e os itens fora do primeiro
+ciclo estão detalhados em [ROADMAP_V2_WEB.md](ROADMAP_V2_WEB.md).
+O gate de promoção está detalhado em
+[CHECKLIST_RELEASE_V2.md](CHECKLIST_RELEASE_V2.md).
 
 ## Compatibilidade e retorno
 
