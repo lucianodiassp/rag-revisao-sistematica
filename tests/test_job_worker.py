@@ -53,7 +53,9 @@ def test_worker_completes_claimed_job(
     heartbeat_class.return_value = MagicMock()
     worker = job_worker.JobWorker()
 
-    assert worker.run_once() is True
+    with patch("backend.app.job_worker.reload_job_runtime_configuration") as reload_config:
+        assert worker.run_once() is True
+    reload_config.assert_called_once_with()
     complete.assert_called_once_with(_job()["id"], {"processados": 2})
     heartbeat_class.return_value.stop.assert_called_once()
 

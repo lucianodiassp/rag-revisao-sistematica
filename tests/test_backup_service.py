@@ -206,6 +206,7 @@ def test_restore_failure_applies_automatic_recovery(tmp_path, monkeypatch):
     incoming.write_bytes(b"backup de teste")
     recovery = tmp_path / "pre-restore.ragbackup"
     calls = []
+    reloads = []
     settings = DatabaseSettings("db", "5432", "test", "user", "password")
     manifest = {"format": BACKUP_FORMAT, "version": BACKUP_VERSION}
 
@@ -223,6 +224,11 @@ def test_restore_failure_applies_automatic_recovery(tmp_path, monkeypatch):
         return manifest
 
     monkeypatch.setattr(backup_service, "_decrypt_and_apply", fake_apply)
+    monkeypatch.setattr(
+        backup_service,
+        "_reload_runtime_configuration",
+        lambda: reloads.append(True),
+    )
 
     with pytest.raises(RestoreError, match="recuperado automaticamente"):
         restore_backup(
@@ -236,6 +242,42 @@ def test_restore_failure_applies_automatic_recovery(tmp_path, monkeypatch):
         )
 
     assert calls == [incoming.resolve(), recovery]
+    assert reloads == [True]
+
+
+def test_restore_success_reloads_runtime_configuration(tmp_path, monkeypatch):
+    incoming = tmp_path / "incoming.ragbackup"
+    incoming.write_bytes(b"backup de teste")
+    recovery = tmp_path / "pre-restore.ragbackup"
+    settings = DatabaseSettings("db", "5432", "test", "user", "password")
+    manifest = {"format": BACKUP_FORMAT, "version": BACKUP_VERSION, "entries": []}
+    reloads = []
+
+    monkeypatch.setattr(backup_service, "inspect_backup", lambda *_: manifest)
+    monkeypatch.setattr(
+        backup_service,
+        "create_backup",
+        lambda *_, **__: {"path": recovery},
+    )
+    monkeypatch.setattr(backup_service, "_decrypt_and_apply", lambda *_, **__: manifest)
+    monkeypatch.setattr(
+        backup_service,
+        "_reload_runtime_configuration",
+        lambda: reloads.append(True),
+    )
+
+    result = restore_backup(
+        incoming,
+        PASSWORD,
+        "RESTAURAR BACKUP",
+        settings=settings,
+        pdf_directory=tmp_path / "pdfs",
+        master_key_path=tmp_path / "master.key",
+        backup_directory=tmp_path / "backups",
+    )
+
+    assert result["manifest"] == manifest
+    assert reloads == [True]
 
 
 @pytest.mark.parametrize("password", ["", "curta", "            "])

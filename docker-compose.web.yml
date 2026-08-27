@@ -10,6 +10,10 @@ services:
         APP_GID: ${RAG_GID:-1000}
     image: rag-revisao-sistematica-app:2.0.0-rc.1
     restart: "no"
+    environment:
+      RAG_DEPLOYMENT_PROFILE: ${RAG_DEPLOYMENT_PROFILE:-web_private}
+      RAG_USER_MODE: ${RAG_USER_MODE:-single_user}
+      RAG_MIN_FREE_STORAGE_MB: ${RAG_MIN_FREE_STORAGE_MB:-2048}
     volumes:
       - ./deploy/web.env:/run/config/web.env:ro
       - ./.streamlit/secrets.toml:/run/secrets/streamlit.toml:ro
@@ -150,6 +154,7 @@ services:
       start_period: 30s
     networks:
       - backend
+      - frontend
 
   proxy:
     image: caddy:2.11.4-alpine
@@ -166,7 +171,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:2019/config/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 15s
       timeout: 5s
       retries: 5

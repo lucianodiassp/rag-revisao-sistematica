@@ -6,6 +6,20 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Corrigido após o piloto público
+
+- Corrigido o healthcheck do Caddy para usar uma requisição GET no loopback IPv4,
+  eliminando o falso estado não saudável observado no VPS.
+- Permitida saída de rede ao worker sem publicar portas, preservando o isolamento
+  do PostgreSQL e habilitando Gemini e fontes bibliográficas em tarefas assíncronas.
+- Configurações de IA e fontes são recarregadas após restauração, e o worker descarta
+  configurações antigas antes de iniciar cada trabalho.
+- As páginas de credenciais passam a mostrar dinamicamente o perfil de implantação
+  e o modo de usuário, inclusive na Web privada.
+- O preflight registra o perfil Web e os limites de armazenamento efetivamente
+  solicitados, mantendo os valores sensíveis fora dos logs.
+- Registradas as evidências e pendências do primeiro piloto em domínio público.
+
 ## [2.0.0-rc.1] — 2026-08-26
 
 ### Candidata Web privada

@@ -31,6 +31,24 @@ def test_web_app_and_worker_have_independent_healthchecks():
     assert worker.count("    healthcheck:") == 1
     assert "        - worker" in worker
     assert "        - app" not in worker
+    assert "      - backend" in worker
+    assert "      - frontend" in worker
+
+
+def test_proxy_healthcheck_uses_ipv4_loopback_and_get_request():
+    compose = WEB_COMPOSE.read_text(encoding="utf-8")
+
+    assert '"http://127.0.0.1:2019/config/"' in compose
+    assert '"http://localhost:2019/config/"' not in compose
+    assert '["CMD", "wget", "-q", "-O", "/dev/null"' in compose
+
+
+def test_preflight_observability_uses_requested_web_profile():
+    preflight = _service_block("preflight")
+
+    assert "RAG_DEPLOYMENT_PROFILE: ${RAG_DEPLOYMENT_PROFILE:-web_private}" in preflight
+    assert "RAG_USER_MODE: ${RAG_USER_MODE:-single_user}" in preflight
+    assert "RAG_MIN_FREE_STORAGE_MB: ${RAG_MIN_FREE_STORAGE_MB:-2048}" in preflight
 
 
 def test_only_proxy_publishes_public_ports_in_web_profile():
