@@ -108,18 +108,20 @@ dos projetos.
 Critério de aceite: o operador deve conseguir distinguir falha de configuração,
 banco, armazenamento, provedor de IA e fonte bibliográfica.
 
-## Próxima fase: segunda candidata e gates finais
+## Próxima fase: terceira candidata e promoção final
 
 As cinco etapas técnicas do primeiro ciclo e o gate local de integridade,
 compatibilidade e validação funcional foram concluídos. A `2.0.0-rc.1` foi usada
 no primeiro piloto com domínio, HTTPS e callback OIDC reais. Os ajustes encontrados
-nesse ensaio formam a `2.0.0-rc.2`, que deve repetir os gates ainda abertos antes da
-publicação estável `v2.0.0`.
+nesse ensaio formaram a `2.0.0-rc.2`. A repetição dos gates identificou conteúdo
+sensível nos logs do proxy e do worker. A correção foi aplicada, revalidada com
+todos os contadores em zero e forma a `2.0.0-rc.3`, antes da publicação estável
+`v2.0.0`.
 
 O procedimento e as evidências esperadas estão no
-[Checklist da candidata v2](CHECKLIST_RELEASE_V2.md). Enquanto os gates finais não
-forem concluídos, `v2-web` permanece a linha de integração e `main` continua sendo
-a versão local estável.
+[Checklist da candidata v2](CHECKLIST_RELEASE_V2.md). A `v2-web` permanece a linha
+de integração até a verificação final da terceira candidata; `main` continua sendo
+a versão local estável até a promoção da `v2.0.0`.
 
 ## Fora do primeiro ciclo da v2
 

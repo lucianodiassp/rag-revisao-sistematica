@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.0.0--rc.2-orange.svg)
+![Version](https://img.shields.io/badge/version-2.0.0--rc.3-orange.svg)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
@@ -42,13 +42,13 @@ protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, intera�
 agentes, auditorias e relatórios próprios.
 
 O perfil padrão de implantação continua sendo **local e de usuário único**. A candidata
-`2.0.0-rc.2` acrescenta o perfil **Web privado**, também de usuário único, protegido
+`2.0.0-rc.3` acrescenta o perfil **Web privado**, também de usuário único, protegido
 por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
 continua reservado para uma evolução posterior.
 
 A versão estável publicada é **1.0.0 — Local, usuário único**. Esta branch de
-integração contém a candidata **2.0.0-rc.2 — Web privada**, que incorpora as
-correções encontradas no primeiro piloto público e aguarda os gates finais. A
+integração contém a candidata **2.0.0-rc.3 — Web privada**, que incorpora as
+correções encontradas no piloto público e a proteção de privacidade dos logs. A
 identidade efetiva aparece no menu lateral e acompanha backups e pacotes de
 reprodutibilidade.
 
