@@ -101,7 +101,7 @@ def executar_auditoria(project_id=None):
     resultados_auditoria = []
     
     for i, pergunta in enumerate(perguntas_ativas, 1):
-        print(f"[{i}/{len(perguntas_ativas)}] Testando: '{pergunta}'")
+        print(f"[{i}/{len(perguntas_ativas)}] Testando pergunta de auditoria.")
         
         # 1. Executa uma única recuperação e reutiliza exatamente as evidências
         # selecionadas tanto na resposta quanto na avaliação do Juiz.

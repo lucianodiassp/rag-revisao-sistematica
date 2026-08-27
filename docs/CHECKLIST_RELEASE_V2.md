@@ -61,14 +61,14 @@ O primeiro ensaio da candidata está registrado em
 - [x] DNS aponta para o servidor; a aplicação publica somente `80` e `443`, além
   do acesso administrativo por SSH protegido por chave.
 - [x] O preflight Web termina com sucesso usando os arquivos reais do servidor.
-- [ ] O Caddy obtém um certificado HTTPS válido e redireciona HTTP para HTTPS.
+- [x] O Caddy obtém um certificado HTTPS válido e redireciona HTTP para HTTPS.
 - [x] A URI OIDC cadastrada é exatamente
   `https://DOMINIO/oauth2callback`.
-- [ ] `db`, `app`, `worker` e `proxy` permanecem saudáveis após reinicialização.
-- [ ] O fluxo completo foi executado pelo domínio: login, projeto, busca/importação,
+- [x] `db`, `app`, `worker` e `proxy` permanecem saudáveis após reinicialização.
+- [x] O fluxo completo foi executado pelo domínio: login, projeto, busca/importação,
   triagem, PDF, indexação, evidências, qualidade, síntese e backup.
-- [ ] Uma desconexão do navegador durante uma tarefa longa não interrompe o job.
-- [ ] Uma falha controlada do worker aparece no diagnóstico e a recuperação foi
+- [x] Uma desconexão do navegador durante uma tarefa longa não interrompe o job.
+- [x] Uma falha controlada do worker aparece no diagnóstico e a recuperação foi
   confirmada após reiniciá-lo.
 - [ ] Logs e relatórios de suporte não contêm chaves, tokens, e-mails ou conteúdo
   científico dos projetos.
@@ -76,8 +76,9 @@ O primeiro ensaio da candidata está registrado em
   validado pela aplicação e guardado fora do VPS.
 
 O primeiro piloto público e as correções que ele revelou estão registrados em
-[VALIDACAO_V2_RC1.md](VALIDACAO_V2_RC1.md). Os itens ainda abertos devem ser
-repetidos sobre a próxima candidata antes da promoção para `v2.0.0`.
+[VALIDACAO_V2_RC1.md](VALIDACAO_V2_RC1.md). A repetição sobre a segunda candidata
+está em [VALIDACAO_V2_RC2.md](VALIDACAO_V2_RC2.md). A auditoria de logs manteve
+o último item aberto e exige uma nova candidata antes da promoção para `v2.0.0`.
 
 ## 5. Promoção da versão
 

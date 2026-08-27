@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import MagicMock, patch
 
 from backend.app import job_worker
@@ -58,6 +59,35 @@ def test_worker_completes_claimed_job(
     reload_config.assert_called_once_with()
     complete.assert_called_once_with(_job()["id"], {"processados": 2})
     heartbeat_class.return_value.stop.assert_called_once()
+
+
+@patch("backend.app.job_worker.HeartbeatThread")
+@patch("backend.app.job_worker.complete_job")
+@patch("backend.app.job_worker.claim_next_job", return_value=_job())
+def test_worker_suppresses_legacy_scientific_output(
+    _claim, complete, heartbeat_class, monkeypatch, capsys
+):
+    monkeypatch.setenv("RAG_JOB_POLL_SECONDS", "1")
+    heartbeat_class.return_value = MagicMock()
+    worker = job_worker.JobWorker()
+
+    def execute_with_legacy_output(_claimed_job):
+        print("PERGUNTA CIENTIFICA CONFIDENCIAL")
+        print("TITULO DE ARTIGO CONFIDENCIAL", file=sys.stderr)
+        return {"processados": 1}
+
+    with patch(
+        "backend.app.job_worker.reload_job_runtime_configuration"
+    ), patch(
+        "backend.app.job_worker.execute_job",
+        side_effect=execute_with_legacy_output,
+    ):
+        assert worker.run_once() is True
+
+    captured = capsys.readouterr()
+    assert "PERGUNTA CIENTIFICA CONFIDENCIAL" not in captured.out
+    assert "TITULO DE ARTIGO CONFIDENCIAL" not in captured.err
+    complete.assert_called_once_with(_job()["id"], {"processados": 1})
 
 
 @patch("backend.app.job_worker.HeartbeatThread")

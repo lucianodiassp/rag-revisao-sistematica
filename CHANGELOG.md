@@ -6,6 +6,16 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Privacidade operacional
+
+- Os logs de acesso do Caddy deixam de registrar cabeçalhos e valores temporários
+  do fluxo OAuth, além de mascararem os endereços IP de origem.
+- O worker preserva eventos operacionais estruturados, mas suprime saídas legadas
+  dos processamentos que poderiam conter perguntas, títulos ou trechos científicos.
+- O progresso da auditoria quantitativa não imprime mais a pergunta avaliada.
+- Adicionados contratos automatizados para impedir regressões na filtragem do
+  proxy e na proteção do conteúdo processado pelo worker.
+
 ## [2.0.0-rc.2] — 2026-08-27
 
 ### Corrigido após o piloto público
