@@ -8,6 +8,7 @@ import socket
 import threading
 import time
 import uuid
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 
 from backend.app.background_jobs import (
     JOB_BIBLIOGRAPHIC_SEARCH,
@@ -72,6 +73,14 @@ def reload_job_runtime_configuration():
 
     reload_ai_runtime()
     clear_bibliographic_settings_cache()
+
+
+@contextmanager
+def suppress_raw_job_output():
+    """Evita que saídas legadas exponham conteúdo científico nos logs do worker."""
+    with open(os.devnull, "w", encoding="utf-8") as sink:
+        with redirect_stdout(sink), redirect_stderr(sink):
+            yield
 
 
 def execute_job(job):
@@ -187,7 +196,8 @@ class JobWorker:
         heartbeat.start()
         try:
             reload_job_runtime_configuration()
-            result = execute_job(job)
+            with suppress_raw_job_output():
+                result = execute_job(job)
             complete_job(job["id"], result)
             log_event(
                 "job_succeeded",

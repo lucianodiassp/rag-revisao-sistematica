@@ -17,6 +17,23 @@
 
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			request>headers delete
+			request>remote_ip ip_mask 16 32
+			request>client_ip ip_mask 16 32
+			request>uri query {
+				delete code
+				delete state
+				delete scope
+				delete authuser
+				delete prompt
+				delete iss
+				delete error
+				delete error_description
+				delete login_hint
+				delete email
+			}
+		}
 	}
 }
