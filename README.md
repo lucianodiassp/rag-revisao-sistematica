@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -43,11 +43,11 @@ protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, intera�
 agentes, auditorias e relatórios próprios.
 
 O perfil padrão de implantação continua sendo **local e de usuário único**. A versão
-`2.0.0` acrescenta o perfil **Web privado**, também de usuário único, protegido
+`2.0.1` oferece o perfil **Web privado**, também de usuário único, protegido
 por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
 continua reservado para uma evolução posterior.
 
-A versão estável é **2.0.0 — Local e Web privada, usuário único**. Ela preserva o
+A versão estável é **2.0.1 — Local e Web privada, usuário único**. Ela preserva o
 uso local da `1.0.0` e incorpora autenticação, operação resiliente, recuperação,
 observabilidade e proteção de privacidade validadas em um servidor real. A
 identidade efetiva aparece no menu lateral e acompanha backups e pacotes de

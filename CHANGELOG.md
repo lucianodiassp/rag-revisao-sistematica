@@ -6,6 +6,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.0.1] — 2026-08-27
+
 ### Manutenção pós-release
 
 - Adicionada integração contínua para executar testes e validar Compose e Caddy em
@@ -129,7 +131,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v1.0.0...v2.0.0
 [2.0.0-rc.3]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.2...v2.0.0-rc.3
 [2.0.0-rc.2]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.1...v2.0.0-rc.2
