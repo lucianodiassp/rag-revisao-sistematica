@@ -639,6 +639,15 @@ def _decrypt_and_apply(
         )
 
 
+def _reload_runtime_configuration() -> None:
+    """Descarta configurações em memória após substituir banco e chave-mestra."""
+    from backend.app.ai_service import reload_ai_runtime
+    from backend.app.bibliographic_config import clear_bibliographic_settings_cache
+
+    reload_ai_runtime()
+    clear_bibliographic_settings_cache()
+
+
 def restore_backup(
     source: Path,
     password: str,
@@ -702,6 +711,7 @@ def restore_backup(
                 master_key_path=master_key_path,
                 scripts_directory=scripts_directory,
             )
+            _reload_runtime_configuration()
         except Exception as rollback_error:
             raise RestoreError(
                 "A restauração falhou e o retorno automático também falhou. "
@@ -713,6 +723,7 @@ def restore_backup(
             f"Detalhe: {restore_error}"
         ) from restore_error
 
+    _reload_runtime_configuration()
     return {
         "manifest": applied_manifest or manifest,
         "recovery_path": recovery["path"],

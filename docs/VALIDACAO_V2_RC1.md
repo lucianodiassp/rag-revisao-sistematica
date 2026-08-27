@@ -44,6 +44,48 @@ criado e validado o backup v2
 ## Resultado
 
 Os blocos locais de integridade, compatibilidade, recuperação e validação funcional
-da candidata foram concluídos. A promoção para a versão estável ainda depende do
-piloto em servidor com domínio público, HTTPS e callback OIDC reais descrito no
+da candidata foram concluídos.
+
+## Piloto em servidor público
+
+Em 27 de agosto de 2026, a tag imutável `v2.0.0-rc.1` foi instalada em um VPS com
+Ubuntu 24.04 LTS, Docker Engine 29.7.2 e Docker Compose 5.5.0. O domínio
+`revisaorag.tech` foi apontado ao servidor sem registrar o endereço IP neste
+documento.
+
+Foram validados:
+
+- preflight com os arquivos reais da implantação;
+- certificado HTTPS automático e resposta HTTP/2 pelo Caddy;
+- login e logout OIDC pelo Google com lista explícita de um e-mail;
+- serviços PostgreSQL, aplicação, worker e proxy saudáveis;
+- restauração do backup real previamente validado, incluindo banco, 21 PDFs e
+  credencial Gemini cifrada;
+- consulta ao Assistente RAG com resposta fundamentada;
+- geração do Relatório Final pela fila persistente;
+- criação, validação e download de um novo `.ragbackup` no servidor.
+
+### Achados da candidata
+
+O piloto revelou quatro ajustes necessários antes da promoção estável:
+
+1. o healthcheck do Caddy consultava `localhost`, que não alcançava o endpoint
+   administrativo nessa imagem, apesar de o HTTPS público responder corretamente;
+2. o worker estava somente na rede interna do banco e, sem publicar portas, também
+   precisava ingressar na rede de saída para alcançar os provedores externos;
+3. a restauração substituía banco e chave-mestra, mas a configuração de IA já
+   carregada pelo processo podia permanecer em memória até uma nova validação;
+4. as páginas de credenciais exibiam o texto fixo "instalação local" mesmo no
+   perfil Web privado.
+
+As correções mantêm PostgreSQL, Streamlit e worker sem portas públicas: somente o
+proxy publica tráfego da aplicação. A falha de resolução do worker foi apresentada
+sem segredo, e a mesma geração de relatório terminou com sucesso após a correção.
+
+### Situação da promoção
+
+O piloto funcional foi concluído após os ajustes, mas a tag `v2.0.0-rc.1` não será
+alterada. As correções devem originar uma nova candidata. Permanecem como gates a
+reinicialização completa do servidor, o fluxo científico integral pelo domínio, a
+desconexão durante tarefa longa e a auditoria final de logs descritos no
 [checklist da candidata](CHECKLIST_RELEASE_V2.md).

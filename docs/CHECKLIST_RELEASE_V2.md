@@ -58,10 +58,11 @@ O primeiro ensaio da candidata está registrado em
 
 ## 4. Piloto em servidor com domínio público
 
-- [ ] DNS aponta para o servidor e somente as portas `80` e `443` estão públicas.
-- [ ] O preflight Web termina com sucesso usando os arquivos reais do servidor.
+- [x] DNS aponta para o servidor; a aplicação publica somente `80` e `443`, além
+  do acesso administrativo por SSH protegido por chave.
+- [x] O preflight Web termina com sucesso usando os arquivos reais do servidor.
 - [ ] O Caddy obtém um certificado HTTPS válido e redireciona HTTP para HTTPS.
-- [ ] A URI OIDC cadastrada é exatamente
+- [x] A URI OIDC cadastrada é exatamente
   `https://DOMINIO/oauth2callback`.
 - [ ] `db`, `app`, `worker` e `proxy` permanecem saudáveis após reinicialização.
 - [ ] O fluxo completo foi executado pelo domínio: login, projeto, busca/importação,
@@ -71,6 +72,12 @@ O primeiro ensaio da candidata está registrado em
   confirmada após reiniciá-lo.
 - [ ] Logs e relatórios de suporte não contêm chaves, tokens, e-mails ou conteúdo
   científico dos projetos.
+- [x] Um backup real foi restaurado, um novo backup foi gerado no servidor,
+  validado pela aplicação e guardado fora do VPS.
+
+O primeiro piloto público e as correções que ele revelou estão registrados em
+[VALIDACAO_V2_RC1.md](VALIDACAO_V2_RC1.md). Os itens ainda abertos devem ser
+repetidos sobre a próxima candidata antes da promoção para `v2.0.0`.
 
 ## 5. Promoção da versão
 

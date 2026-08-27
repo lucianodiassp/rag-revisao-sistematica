@@ -27,6 +27,7 @@ from backend.app.bibliographic_config_repository import (  # noqa: E402
     list_configuration_audit,
 )
 from backend.app.secret_store import get_master_key_path  # noqa: E402
+from backend.app.version import application_metadata  # noqa: E402
 
 
 SOURCE_HELP = {
@@ -52,7 +53,10 @@ STATUS_LABELS = {
 
 st.set_page_config(page_title="Fontes bibliográficas", page_icon="🌐", layout="wide")
 st.title("🌐 Fontes bibliográficas e credenciais")
-st.caption("Escopo atual: instalação local · usuário único")
+metadata = application_metadata()
+st.caption(
+    f"Escopo atual: {metadata['deployment_label']} · {metadata['user_mode_label']}"
+)
 st.info(
     "As chaves são cifradas antes de chegar ao PostgreSQL. Os coletores recebem apenas "
     "a configuração efetiva em memória e nenhum segredo é salvo na proveniência das buscas."

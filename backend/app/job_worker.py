@@ -65,6 +65,15 @@ def _progress(job_id):
     return callback
 
 
+def reload_job_runtime_configuration():
+    """Garante que cada trabalho use credenciais restauradas ou alteradas recentemente."""
+    from backend.app.ai_service import reload_ai_runtime
+    from backend.app.bibliographic_config import clear_bibliographic_settings_cache
+
+    reload_ai_runtime()
+    clear_bibliographic_settings_cache()
+
+
 def execute_job(job):
     """Executa um trabalho já reservado e devolve um resultado JSON seguro."""
     job_id = job["id"]
@@ -177,6 +186,7 @@ class JobWorker:
         heartbeat = HeartbeatThread(job["id"], self.heartbeat_seconds)
         heartbeat.start()
         try:
+            reload_job_runtime_configuration()
             result = execute_job(job)
             complete_job(job["id"], result)
             log_event(
