@@ -2,7 +2,8 @@
 
 Data: 27 de agosto de 2026  
 Ambiente: VPS Ubuntu 24.04, Docker Compose, domínio público com HTTPS e login OIDC  
-Resultado: funcionalmente aprovada, promoção bloqueada pela auditoria de privacidade
+Resultado: a tag permaneceu bloqueada; sua correção de privacidade foi revalidada
+com sucesso para compor a próxima candidata
 
 ## Evidências aprovadas
 
@@ -34,4 +35,24 @@ conteúdo científico não atendem ao gate de privacidade. Por isso, a tag
 - Remover cabeçalhos dos logs de acesso, filtrar parâmetros OAuth e mascarar IPs.
 - Suprimir saídas legadas dos jobs sem remover os eventos operacionais estruturados.
 - Repetir a auditoria considerando apenas os logs gerados após a implantação.
-- Aceitar a promoção somente se os quatro contadores resultarem em zero.
+- Aceitar o gate somente se todas as categorias auditadas resultarem em zero.
+
+## Revalidação da correção
+
+A branch `feature/v2-privacidade-logs`, no commit `6803546`, foi implantada no
+mesmo VPS. Após recriar aplicação, worker e proxy, foram repetidos o login OIDC,
+a navegação e a execução de uma tarefa científica em segundo plano.
+
+Os contadores dos novos logs foram:
+
+| Verificação por serviço | Total |
+|---|---:|
+| E-mails na aplicação | 0 |
+| E-mails no worker | 0 |
+| E-mails no proxy | 0 |
+| Conteúdo científico na aplicação | 0 |
+| Conteúdo científico no worker | 0 |
+
+O gate de privacidade foi aprovado sem regressão funcional. A tag
+`v2.0.0-rc.2` não será alterada; a correção validada deve ser incorporada à
+`v2-web` e publicada em uma nova candidata `v2.0.0-rc.3`.

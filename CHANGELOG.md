@@ -15,6 +15,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - O progresso da auditoria quantitativa não imprime mais a pergunta avaliada.
 - Adicionados contratos automatizados para impedir regressões na filtragem do
   proxy e na proteção do conteúdo processado pelo worker.
+- A correção foi revalidada no VPS com login, navegação e tarefa científica; os
+  cinco contadores de e-mail e conteúdo por serviço resultaram em zero.
 
 ## [2.0.0-rc.2] — 2026-08-27
 

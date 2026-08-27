@@ -70,7 +70,7 @@ O primeiro ensaio da candidata está registrado em
 - [x] Uma desconexão do navegador durante uma tarefa longa não interrompe o job.
 - [x] Uma falha controlada do worker aparece no diagnóstico e a recuperação foi
   confirmada após reiniciá-lo.
-- [ ] Logs e relatórios de suporte não contêm chaves, tokens, e-mails ou conteúdo
+- [x] Logs e relatórios de suporte não contêm chaves, tokens, e-mails ou conteúdo
   científico dos projetos.
 - [x] Um backup real foi restaurado, um novo backup foi gerado no servidor,
   validado pela aplicação e guardado fora do VPS.
@@ -78,7 +78,9 @@ O primeiro ensaio da candidata está registrado em
 O primeiro piloto público e as correções que ele revelou estão registrados em
 [VALIDACAO_V2_RC1.md](VALIDACAO_V2_RC1.md). A repetição sobre a segunda candidata
 está em [VALIDACAO_V2_RC2.md](VALIDACAO_V2_RC2.md). A auditoria de logs manteve
-o último item aberto e exige uma nova candidata antes da promoção para `v2.0.0`.
+o último item inicialmente aberto; após a correção, os cinco contadores por
+serviço resultaram em zero. A correção validada deve formar uma nova candidata
+antes da promoção para `v2.0.0`.
 
 ## 5. Promoção da versão
 
