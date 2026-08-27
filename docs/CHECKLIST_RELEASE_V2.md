@@ -3,7 +3,8 @@
 Este checklist transforma os critérios do roadmap em uma decisão objetiva de
 publicação. Os blocos 1 a 3 foram concluídos em 26 de agosto de 2026 e sustentaram
 a candidata `2.0.0-rc.1`. As correções do primeiro piloto formam a `2.0.0-rc.2`.
-A tag estável `v2.0.0` exige concluir os itens restantes do bloco 4 nessa candidata.
+A proteção de privacidade validada após a segunda candidata forma a `2.0.0-rc.3`.
+A tag estável `v2.0.0` exige a verificação final dessa terceira candidata.
 
 ## 1. Integridade do código
 
@@ -110,3 +111,11 @@ Não reutilize a tag de uma candidata corrigida. Se houver alteração depois da
 2. atualizar README, roadmap, versionamento e `CHANGELOG.md`;
 3. criar a tag anotada `v2.0.0-rc.2` na `v2-web` e publicar uma pre-release;
 4. atualizar o VPS exatamente para essa tag e repetir os itens abertos do bloco 4.
+
+### Publicação da terceira candidata
+
+1. alterar `VERSION`, imagens do Compose e testes de identidade para `2.0.0-rc.3`;
+2. registrar a auditoria de privacidade aprovada e atualizar a documentação;
+3. criar a tag anotada `v2.0.0-rc.3` na `v2-web` e publicar uma pre-release;
+4. atualizar o VPS exatamente para essa tag e confirmar versão, saúde dos serviços
+   e os contadores de privacidade em zero antes da promoção estável.

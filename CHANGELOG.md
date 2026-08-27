@@ -6,6 +6,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.0.0-rc.3] — 2026-08-27
+
 ### Privacidade operacional
 
 - Os logs de acesso do Caddy deixam de registrar cabeçalhos e valores temporários
@@ -101,7 +103,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.2...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.3...HEAD
+[2.0.0-rc.3]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.2...v2.0.0-rc.3
 [2.0.0-rc.2]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.1...v2.0.0-rc.2
 [2.0.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v1.0.0...v2.0.0-rc.1
 [1.0.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/releases/tag/v1.0.0
