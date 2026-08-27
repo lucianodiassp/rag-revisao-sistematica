@@ -12,13 +12,12 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: versão estável publicada; recebe a `v2.0.0` após a promoção final.
-- `v2-web`: integração da futura `v2.0.0`.
-- `feature/v2-*`: entregas pequenas criadas a partir de `v2-web` e mescladas de
-  volta em `v2-web`.
+- `main`: versão estável publicada, atualmente `v2.0.0`.
+- `v2-web`: linha histórica usada para integrar a primeira versão Web.
+- novas branches: correções e funcionalidades passam a partir da `main`.
 
-Enquanto a v2 estiver em desenvolvimento, pull requests de funcionalidades Web
-devem usar **`v2-web` como branch de destino**, e não `main`.
+O ciclo inicial da v2 foi encerrado. A partir da versão estável, pull requests de
+manutenção e evolução usam **`main` como branch de destino**.
 
 ## Etapas
 
@@ -130,5 +129,14 @@ na verificação final em servidor real e tornou a `v2-web` elegível para incor
 - Cobrança, planos ou limites por usuário.
 - Execução distribuída e escalabilidade horizontal.
 
-Esses itens continuam possíveis, mas serão tratados somente depois da validação da
-Web privada de usuário único.
+Esses itens continuam possíveis, mas pertencem a ciclos posteriores ao
+endurecimento operacional da Web privada de usuário único.
+
+## Radar pós-release
+
+1. `v2.0.x`: integração contínua, documentação pós-release e operação mais segura.
+2. `v2.1.x`: backup externo agendado, retenção e alertas operacionais.
+3. `v2.2.x`: provedores adicionais de IA, começando pelos modelos de geração.
+4. ciclo posterior: instrumentos científicos adicionais e interpretação de tabelas
+   e figuras dos PDFs.
+5. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.

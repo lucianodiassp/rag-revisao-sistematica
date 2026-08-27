@@ -6,6 +6,15 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Manutenção pós-release
+
+- Adicionada integração contínua para executar testes e validar Compose e Caddy em
+  pull requests, alterações na `main` e tags.
+- Adicionados contratos que impedem o rastreamento dos arquivos reais de segredos.
+- Atualizado o estado da documentação após a promoção estável da `v2.0.0`.
+- O procedimento de atualização passa a aguardar serviços saudáveis e documenta
+  a breve resposta `502` possível durante a troca da única instância Web.
+
 ## [2.0.0] — 2026-08-27
 
 ### Web privada estável

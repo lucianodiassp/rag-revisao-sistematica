@@ -1,0 +1,79 @@
+name: Integridade contínua
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Testes Python
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Obter repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --requirement requirements.txt pytest
+
+      - name: Executar suíte automatizada
+        run: python -m pytest -q
+
+  deployment-contracts:
+    name: Contratos de implantação
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Obter repositório
+        uses: actions/checkout@v4
+
+      - name: Confirmar arquivos sensíveis fora do Git
+        shell: bash
+        run: |
+          tracked="$(git ls-files -- backend/.env deploy/web.env .streamlit/secrets.toml)"
+          if [ -n "$tracked" ]; then
+            echo "Arquivos sensíveis rastreados indevidamente:"
+            echo "$tracked"
+            exit 1
+          fi
+
+      - name: Validar Compose local
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Preparar configuração Web descartável
+        run: |
+          cp deploy/web.env.example deploy/web.env
+          cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+
+      - name: Validar Compose Web
+        run: >-
+          docker compose --env-file deploy/web.env
+          -f docker-compose.web.yml config --quiet
+
+      - name: Validar configuração do Caddy
+        run: >-
+          docker run --rm
+          -e RAG_DOMAIN=rag.example.org
+          --mount type=bind,source="${{ github.workspace }}/deploy/Caddyfile",target=/etc/caddy/Caddyfile,readonly
+          caddy:2.11.4-alpine
+          caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile --validate

@@ -95,14 +95,28 @@ docker compose restart worker
    ```
 
 4. Atualize a branch destinada à implantação.
-5. Reconstrua e suba os serviços sem remover volumes:
+5. Reconstrua e suba os serviços sem remover volumes. O parâmetro `--wait` faz o
+   comando terminar somente quando os serviços permanentes estiverem prontos ou o
+   limite de cinco minutos for atingido:
 
    ```bash
-   docker compose up -d --build
+   docker compose up -d --build --wait --wait-timeout 300
    ```
 
 6. Confirme `db`, `app` e `worker` como saudáveis e `migrate` concluído.
 7. Execute o diagnóstico completo e um teste curto de navegação.
+
+No perfil Web use o mesmo controle de prontidão:
+
+```bash
+docker compose --env-file deploy/web.env -f docker-compose.web.yml \
+  up -d --build --wait --wait-timeout 300
+```
+
+Como há uma única instância da interface, o proxy pode responder `502` por alguns
+segundos enquanto o contêiner antigo é substituído. Não considere a atualização
+concluída antes do término do comando e da confirmação de `HTTP/2 200`. Eliminar
+essa breve janela exigiria uma implantação com mais de uma réplica.
 
 Nunca use `docker compose down -v` numa atualização: essa opção remove os dados
 persistentes.
