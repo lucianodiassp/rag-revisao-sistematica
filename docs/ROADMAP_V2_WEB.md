@@ -12,7 +12,7 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: versão estável publicada, atualmente `v2.0.0`.
+- `main`: versão estável publicada, atualmente `v2.0.1`.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 
