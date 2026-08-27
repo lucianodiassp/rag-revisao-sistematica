@@ -4,7 +4,8 @@ Este checklist transforma os critérios do roadmap em uma decisão objetiva de
 publicação. Os blocos 1 a 3 foram concluídos em 26 de agosto de 2026 e sustentaram
 a candidata `2.0.0-rc.1`. As correções do primeiro piloto formam a `2.0.0-rc.2`.
 A proteção de privacidade validada após a segunda candidata forma a `2.0.0-rc.3`.
-A tag estável `v2.0.0` exige a verificação final dessa terceira candidata.
+A terceira candidata passou na verificação final e está apta à promoção para a
+tag estável `v2.0.0` após a incorporação da `v2-web` à `main`.
 
 ## 1. Integridade do código
 
@@ -80,8 +81,10 @@ O primeiro piloto público e as correções que ele revelou estão registrados e
 [VALIDACAO_V2_RC1.md](VALIDACAO_V2_RC1.md). A repetição sobre a segunda candidata
 está em [VALIDACAO_V2_RC2.md](VALIDACAO_V2_RC2.md). A auditoria de logs manteve
 o último item inicialmente aberto; após a correção, os cinco contadores por
-serviço resultaram em zero. A correção validada deve formar uma nova candidata
-antes da promoção para `v2.0.0`.
+serviço resultaram em zero e a correção validada formou a terceira candidata.
+
+A verificação da candidata publicada exatamente pela tag `v2.0.0-rc.3` está em
+[VALIDACAO_V2_RC3.md](VALIDACAO_V2_RC3.md) e aprovou a promoção estável.
 
 ## 5. Promoção da versão
 
@@ -119,3 +122,13 @@ Não reutilize a tag de uma candidata corrigida. Se houver alteração depois da
 3. criar a tag anotada `v2.0.0-rc.3` na `v2-web` e publicar uma pre-release;
 4. atualizar o VPS exatamente para essa tag e confirmar versão, saúde dos serviços
    e os contadores de privacidade em zero antes da promoção estável.
+
+### Resultado da terceira candidata
+
+- [x] A tag `v2.0.0-rc.3` foi publicada como pré-release.
+- [x] O VPS foi atualizado exatamente para essa tag.
+- [x] A identidade exibida correspondeu à candidata implantada.
+- [x] Uma tarefa real do worker foi concluída com sucesso.
+- [x] Os cinco contadores de privacidade permaneceram em zero.
+
+Decisão: candidata aprovada para promoção estável.
