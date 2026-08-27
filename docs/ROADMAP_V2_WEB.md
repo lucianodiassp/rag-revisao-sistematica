@@ -12,7 +12,7 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: versão estável publicada; atualmente `v1.0.0`.
+- `main`: versão estável publicada; recebe a `v2.0.0` após a promoção final.
 - `v2-web`: integração da futura `v2.0.0`.
 - `feature/v2-*`: entregas pequenas criadas a partir de `v2-web` e mescladas de
   volta em `v2-web`.
@@ -108,7 +108,7 @@ dos projetos.
 Critério de aceite: o operador deve conseguir distinguir falha de configuração,
 banco, armazenamento, provedor de IA e fonte bibliográfica.
 
-## Próxima fase: terceira candidata e promoção final
+## Resultado do primeiro ciclo da v2
 
 As cinco etapas técnicas do primeiro ciclo e o gate local de integridade,
 compatibilidade e validação funcional foram concluídos. A `2.0.0-rc.1` foi usada
@@ -119,9 +119,9 @@ todos os contadores em zero e forma a `2.0.0-rc.3`, antes da publicação estáv
 `v2.0.0`.
 
 O procedimento e as evidências esperadas estão no
-[Checklist da candidata v2](CHECKLIST_RELEASE_V2.md). A `v2-web` permanece a linha
-de integração até a verificação final da terceira candidata; `main` continua sendo
-a versão local estável até a promoção da `v2.0.0`.
+[Checklist da candidata v2](CHECKLIST_RELEASE_V2.md). A terceira candidata passou
+na verificação final em servidor real e tornou a `v2-web` elegível para incorporação
+à `main` e publicação da versão estável `v2.0.0`.
 
 ## Fora do primeiro ciclo da v2
 

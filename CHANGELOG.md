@@ -6,6 +6,23 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.0.0] — 2026-08-27
+
+### Web privada estável
+
+- Preservado o perfil local de usuário único e adicionado o perfil Web privado.
+- Adicionados login OIDC e autorização explícita para um único e-mail.
+- Adicionados proxy HTTPS, configuração segura e armazenamento persistente para
+  banco, PDFs, backups e chave-mestra.
+- Adicionados fila persistente, worker separado e retomada de tarefas longas após
+  atualização ou desconexão do navegador.
+- Adicionados diagnóstico operacional, health checks e eventos estruturados.
+- Preservadas a compatibilidade do backup `.ragbackup` v1 e a recuperação em uma
+  instalação Web limpa.
+- Protegidos os logs contra chaves, parâmetros OAuth, e-mails e conteúdo científico.
+- Concluídos piloto público, restauração real, teste de falha do worker e auditoria
+  final de privacidade com todos os contadores em zero.
+
 ## [2.0.0-rc.3] — 2026-08-27
 
 ### Privacidade operacional
@@ -103,7 +120,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.3...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v1.0.0...v2.0.0
 [2.0.0-rc.3]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.2...v2.0.0-rc.3
 [2.0.0-rc.2]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.1...v2.0.0-rc.2
 [2.0.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v1.0.0...v2.0.0-rc.1

@@ -6,7 +6,7 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.0.0-rc.3` | Funcionalidades e compatibilidade do produto |
+| Aplicação | `2.0.0` | Funcionalidades e compatibilidade do produto |
 | Migração do banco | `013` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
@@ -29,11 +29,12 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 
 ## Estado atual
 
-- `v1.0.0`: versão local estável, etiquetada e publicada no GitHub.
-- `v2-web`: linha de integração da candidata Web, criada a partir da `v1.0.0`.
+- `v1.0.0`: primeira versão local estável, etiquetada e publicada no GitHub.
+- `v2-web`: linha de integração usada na construção da versão Web.
 - `2.0.0-rc.1`: primeira candidata, usada no piloto Web real.
 - `2.0.0-rc.2`: candidata corrigida após o primeiro piloto público.
 - `2.0.0-rc.3`: candidata com o gate de privacidade dos logs aprovado.
+- `2.0.0`: versão estável local e Web privada, inicialmente de usuário único.
 
 O sufixo `-rc.N` identifica uma candidata e impede que ela seja confundida com a
 futura Release estável `v2.0.0`.
