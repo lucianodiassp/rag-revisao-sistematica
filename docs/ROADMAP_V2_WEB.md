@@ -43,7 +43,7 @@ Web privado antes da autenticação e da verificação da lista de acesso.
 
 Branch: `feature/v2-configuracao-producao`
 
-Estado: **implementada, aguardando validação em servidor com domínio público**.
+Estado: **implementada e validada em servidor com domínio público**.
 
 - Separar o Compose local da sobreposição Web.
 - Retirar credenciais padrão do perfil Web e exigir segredos externos.
@@ -108,17 +108,18 @@ dos projetos.
 Critério de aceite: o operador deve conseguir distinguir falha de configuração,
 banco, armazenamento, provedor de IA e fonte bibliográfica.
 
-## Próxima fase: candidata e piloto
+## Próxima fase: segunda candidata e gates finais
 
 As cinco etapas técnicas do primeiro ciclo e o gate local de integridade,
-compatibilidade e validação funcional foram concluídos. A linha foi promovida para
-`2.0.0-rc.1`. A publicação estável `v2.0.0` depende agora de um piloto em servidor
-com domínio, HTTPS e callback OIDC reais.
+compatibilidade e validação funcional foram concluídos. A `2.0.0-rc.1` foi usada
+no primeiro piloto com domínio, HTTPS e callback OIDC reais. Os ajustes encontrados
+nesse ensaio formam a `2.0.0-rc.2`, que deve repetir os gates ainda abertos antes da
+publicação estável `v2.0.0`.
 
 O procedimento e as evidências esperadas estão no
-[Checklist da candidata v2](CHECKLIST_RELEASE_V2.md). Enquanto o piloto não for
-concluído, `v2-web` permanece a linha de integração e `main` continua sendo a
-versão local estável.
+[Checklist da candidata v2](CHECKLIST_RELEASE_V2.md). Enquanto os gates finais não
+forem concluídos, `v2-web` permanece a linha de integração e `main` continua sendo
+a versão local estável.
 
 ## Fora do primeiro ciclo da v2
 

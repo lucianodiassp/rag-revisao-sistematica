@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.0.0--rc.1-orange.svg)
+![Version](https://img.shields.io/badge/version-2.0.0--rc.2-orange.svg)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
 multifonte, triagem assistida por IA, RAG sobre texto integral, extração rastreável
@@ -42,13 +42,13 @@ protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, intera�
 agentes, auditorias e relatórios próprios.
 
 O perfil padrão de implantação continua sendo **local e de usuário único**. A candidata
-`2.0.0-rc.1` acrescenta o perfil **Web privado**, também de usuário único, protegido
+`2.0.0-rc.2` acrescenta o perfil **Web privado**, também de usuário único, protegido
 por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
 continua reservado para uma evolução posterior.
 
 A versão estável publicada é **1.0.0 — Local, usuário único**. Esta branch de
-integração contém a candidata **2.0.0-rc.1 — Web privada**, pronta para o piloto em
-servidor com domínio e HTTPS reais. A
+integração contém a candidata **2.0.0-rc.2 — Web privada**, que incorpora as
+correções encontradas no primeiro piloto público e aguarda os gates finais. A
 identidade efetiva aparece no menu lateral e acompanha backups e pacotes de
 reprodutibilidade.
 
@@ -77,9 +77,9 @@ qualquer serviço de dados, um preflight exige domínio público, HTTPS/OIDC coe
 um único e-mail autorizado e senha forte de banco, sem imprimir esses valores.
 
 O procedimento completo está em
-[Implantação Web privada](docs/IMPLANTACAO_WEB.md). Esta configuração ainda precisa
-ser validada em um servidor com domínio e DNS públicos antes de ser considerada
-pronta para produção.
+[Implantação Web privada](docs/IMPLANTACAO_WEB.md). A configuração foi exercitada
+em servidor com domínio, DNS, HTTPS e OIDC reais; a promoção estável ainda depende
+dos itens abertos no checklist da candidata.
 
 Banco, PDFs, backups, chave-mestra e certificados usam volumes nomeados separados.
 A aplicação valida escrita, reserva mínima de disco e limites distintos para PDFs e
