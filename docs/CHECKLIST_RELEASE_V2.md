@@ -1,9 +1,9 @@
 # Checklist da candidata v2 Web privada
 
 Este checklist transforma os critérios do roadmap em uma decisão objetiva de
-publicação. Os blocos 1 a 3 foram concluídos em 26 de agosto de 2026 e sustentam a
-candidata `2.0.0-rc.1`. A tag estável `v2.0.0` exige também o bloco 4 em uma
-instalação Web real.
+publicação. Os blocos 1 a 3 foram concluídos em 26 de agosto de 2026 e sustentaram
+a candidata `2.0.0-rc.1`. As correções do primeiro piloto formam a `2.0.0-rc.2`.
+A tag estável `v2.0.0` exige concluir os itens restantes do bloco 4 nessa candidata.
 
 ## 1. Integridade do código
 
@@ -100,3 +100,10 @@ Depois do piloto sem pendências críticas:
 
 Não reutilize a tag de uma candidata corrigida. Se houver alteração depois da
 `rc.1`, publique `rc.2`, `rc.3` e assim por diante.
+
+### Publicação da segunda candidata
+
+1. alterar `VERSION`, imagens do Compose e testes de identidade para `2.0.0-rc.2`;
+2. atualizar README, roadmap, versionamento e `CHANGELOG.md`;
+3. criar a tag anotada `v2.0.0-rc.2` na `v2-web` e publicar uma pre-release;
+4. atualizar o VPS exatamente para essa tag e repetir os itens abertos do bloco 4.
