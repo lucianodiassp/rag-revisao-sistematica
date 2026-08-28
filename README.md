@@ -70,7 +70,7 @@ Git nem incluído no build. Consulte o guia
 [Autenticação da Web privada](docs/AUTENTICACAO_WEB.md) para configurar Google,
 Microsoft ou outro provedor OIDC e validar o fluxo completo.
 
-### Perfil Web de produção (v2 candidata)
+### Perfil Web de produção
 
 O arquivo `docker-compose.web.yml` mantém PostgreSQL e Streamlit em redes Docker
 sem portas públicas e expõe somente o Caddy nas portas `80/443`. Antes de iniciar
@@ -79,13 +79,12 @@ um único e-mail autorizado e senha forte de banco, sem imprimir esses valores.
 
 O procedimento completo está em
 [Implantação Web privada](docs/IMPLANTACAO_WEB.md). A configuração foi exercitada
-em servidor com domínio, DNS, HTTPS e OIDC reais; a promoção estável ainda depende
-dos itens abertos no checklist da candidata.
+em servidor com domínio, DNS, HTTPS e OIDC reais e integra a versão estável.
 
 Banco, PDFs, backups, chave-mestra e certificados usam volumes nomeados separados.
 A aplicação valida escrita, reserva mínima de disco e limites distintos para PDFs e
-`.ragbackup` antes de gravar. O mesmo guia documenta cópia externa e recuperação em
-uma instalação Web limpa sem alterar o formato de backup da v1.
+`.ragbackup` antes de gravar. A linha `2.1.0-dev` acrescenta backup externo agendado,
+retenção e alerta opcional sem alterar o formato de backup da v1.
 
 As operações demoradas de coleta, indexação, extração, relatório e benchmark são
 enviadas a uma fila persistente no PostgreSQL e executadas por um processo separado.
@@ -141,6 +140,9 @@ atualização, investigação de falhas e retorno seguro de versão.
 - Retorno automático ao estado anterior quando uma etapa da restauração falha.
 - Limites de upload e reserva livre conferidos antes de validar, criar ou restaurar.
 - Compatibilidade do formato `.ragbackup` v1 entre os perfis local e Web privado.
+- Agendamento diário para armazenamento compatível com S3, com confirmação de
+  tamanho e SHA-256 antes da retenção local e remota.
+- Estado operacional, solicitação manual e alerta opcional sem exibir credenciais.
 
 ### Pacote de reprodutibilidade por projeto
 
@@ -862,6 +864,11 @@ menos 12 caracteres e gere o arquivo. A aplicação:
 
 A senha não é armazenada e não pode ser recuperada pela aplicação. Guarde o arquivo
 e a senha separadamente.
+
+Na Web privada, um serviço opcional pode criar e verificar diariamente o mesmo
+arquivo em um armazenamento compatível com S3. Consulte
+[Backup externo agendado](docs/BACKUP_EXTERNO.md) para configurar destino, horário,
+retenção, primeiro teste e alertas sem enviar credenciais ao repositório.
 
 Para restaurar, envie o `.ragbackup`, informe a senha e use primeiro **Validar
 backup**. Somente depois da validação a confirmação destrutiva será habilitada. A

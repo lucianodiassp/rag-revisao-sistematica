@@ -135,7 +135,8 @@ endurecimento operacional da Web privada de usuário único.
 ## Radar pós-release
 
 1. `v2.0.x`: integração contínua, documentação pós-release e operação mais segura.
-2. `v2.1.x`: backup externo agendado, retenção e alertas operacionais.
+2. `v2.1.x`: backup externo agendado, retenção e alertas operacionais — **em
+   implementação na branch `feature/v2.1-backup-externo`**.
 3. `v2.2.x`: provedores adicionais de IA, começando pelos modelos de geração.
 4. ciclo posterior: instrumentos científicos adicionais e interpretação de tabelas
    e figuras dos PDFs.

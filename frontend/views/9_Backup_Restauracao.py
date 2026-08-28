@@ -17,6 +17,12 @@ from backend.app.backup_service import (
     inspect_backup,
     restore_backup,
 )
+from backend.app.external_backup import (
+    external_backup_configuration,
+    next_scheduled_run,
+    read_external_backup_status,
+    request_external_backup_now,
+)
 from backend.app.storage_service import (
     StorageCapacityError,
     ensure_upload_allowed,
@@ -142,7 +148,74 @@ if last_backup and Path(last_backup).is_file():
     )
 
 st.divider()
-st.header("2. Validar e restaurar um backup")
+st.header("2. Backup externo agendado")
+external_settings, external_errors = external_backup_configuration()
+external_status = read_external_backup_status()
+
+if external_errors:
+    st.error(
+        "A configuração do backup externo está incompleta. Corrija o arquivo seguro "
+        "`deploy/web.env` e execute novamente o preflight."
+    )
+elif not external_settings.enabled:
+    st.info(
+        "O backup externo ainda não está habilitado. Os backups manuais continuam "
+        "disponíveis, mas permanecem no mesmo servidor até serem baixados."
+    )
+else:
+    summary = external_settings.public_summary()
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Destino", summary["provider"])
+    col2.metric("Horário diário", f"{summary['schedule_hour_utc']:02d}:00 UTC")
+    col3.metric("Retenção local", summary["local_retention"])
+    col4.metric("Retenção externa", summary["remote_retention"])
+    st.caption(
+        "Credenciais e senha permanecem apenas no arquivo seguro do servidor. "
+        + (
+            "Um webhook de alerta está configurado."
+            if summary["alert_configured"]
+            else "Nenhum webhook de alerta foi configurado."
+        )
+    )
+
+    state = external_status.get("state")
+    if state == "success":
+        st.success(external_status.get("message"))
+    elif state == "error":
+        st.error(external_status.get("message"))
+    elif state == "running":
+        st.info("Um backup externo está em execução.")
+    else:
+        st.warning("A configuração está ativa, mas ainda não há execução concluída.")
+
+    status_columns = st.columns(3)
+    status_columns[0].metric(
+        "Último sucesso", external_status.get("last_success_at") or "Aguardando"
+    )
+    status_columns[1].metric(
+        "Última tentativa", external_status.get("last_attempt_at") or "Aguardando"
+    )
+    status_columns[2].metric(
+        "Próxima execução",
+        next_scheduled_run(external_settings, external_status).isoformat(),
+    )
+    if external_status.get("filename"):
+        st.caption(
+            f"Último arquivo: `{external_status['filename']}` · "
+            f"{_format_size(int(external_status.get('size_bytes') or 0))}."
+        )
+
+    if st.button("☁️ Solicitar backup externo agora", use_container_width=True):
+        try:
+            request_external_backup_now()
+            st.success(
+                "Solicitação registrada. O serviço iniciará o backup em até 30 segundos."
+            )
+        except Exception as error:
+            st.error(f"Não foi possível solicitar o backup externo: {error}")
+
+st.divider()
+st.header("3. Validar e restaurar um backup")
 st.caption(
     "A validação é somente leitura. A restauração cria primeiro um backup automático "
     "do estado atual em `data/backups/`."

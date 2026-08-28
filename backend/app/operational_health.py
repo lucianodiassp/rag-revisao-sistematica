@@ -514,6 +514,126 @@ def check_job_queue():
         )
 
 
+def check_external_backup():
+    try:
+        from backend.app.external_backup import (
+            external_backup_configuration,
+            external_backup_is_stale,
+            external_backup_run_is_stale,
+            next_scheduled_run,
+            read_external_backup_status,
+        )
+
+        settings, errors = external_backup_configuration()
+        profile = application_metadata()["deployment_profile"]
+        if errors:
+            return _check(
+                "external_backup",
+                "Backup externo",
+                "error",
+                "storage",
+                "A configuração do backup externo está incompleta.",
+                {
+                    "action": "Revise deploy/web.env e execute novamente o preflight.",
+                    "error_count": len(errors),
+                },
+            )
+        if not settings.enabled:
+            web_profile = profile == "web_private"
+            return _check(
+                "external_backup",
+                "Backup externo",
+                "warning" if web_profile else "ok",
+                "storage",
+                (
+                    "A instalação Web ainda depende de cópias manuais fora do servidor."
+                    if web_profile
+                    else "Backup externo opcional no perfil local."
+                ),
+                {
+                    "enabled": False,
+                    "action": (
+                        "Configure um destino S3 compatível em deploy/web.env."
+                        if web_profile
+                        else None
+                    ),
+                },
+            )
+
+        status = read_external_backup_status()
+        state = status.get("state")
+        details = settings.public_summary()
+        details.update(
+            {
+                "state": state,
+                "last_attempt_at": status.get("last_attempt_at"),
+                "last_success_at": status.get("last_success_at"),
+                "next_run_at": next_scheduled_run(settings, status).isoformat(),
+            }
+        )
+        if state in {"error", "invalid_status"}:
+            details["action"] = (
+                "Consulte os logs do serviço backup-scheduler e teste o destino externo."
+            )
+            return _check(
+                "external_backup",
+                "Backup externo",
+                "error",
+                "storage",
+                "A última tentativa de backup externo falhou.",
+                details,
+            )
+        if external_backup_run_is_stale(settings, status):
+            details["action"] = "Reinicie somente o serviço backup-scheduler."
+            return _check(
+                "external_backup",
+                "Backup externo",
+                "error",
+                "storage",
+                "Uma execução de backup externo ficou sem conclusão.",
+                details,
+            )
+        if state == "never_run":
+            details["action"] = "Solicite uma primeira execução na tela Backup e Restauração."
+            return _check(
+                "external_backup",
+                "Backup externo",
+                "warning",
+                "storage",
+                "O destino está configurado, mas ainda não há backup externo confirmado.",
+                details,
+            )
+        if external_backup_is_stale(status):
+            details["action"] = (
+                "Consulte o serviço backup-scheduler e solicite uma nova execução."
+            )
+            return _check(
+                "external_backup",
+                "Backup externo",
+                "error",
+                "storage",
+                "O último backup externo confirmado está atrasado.",
+                details,
+            )
+        return _check(
+            "external_backup",
+            "Backup externo",
+            "ok",
+            "storage",
+            "O backup externo está configurado e sem falha registrada.",
+            details,
+        )
+    except Exception:
+        return _check(
+            "external_backup",
+            "Backup externo",
+            "error",
+            "storage",
+            "Não foi possível verificar o estado do backup externo.",
+            {"action": "Confira a configuração e o serviço backup-scheduler."},
+        )
+
+
 def recent_job_failures(limit=10):
     try:
         with get_connection() as connection, connection.cursor(
@@ -563,15 +683,31 @@ def build_health_report(component="full", http_url=None):
         raise ValueError("Componente de diagnóstico desconhecido.")
     checks = [check_application_configuration(), check_database(), check_migrations()]
     if component in {"app", "full"}:
-        checks.extend([check_storage(), check_http(http_url or "http://localhost:8501/_stcore/health")])
+        checks.extend(
+            [
+                check_storage(),
+                check_http(http_url or "http://localhost:8501/_stcore/health"),
+            ]
+        )
     if component in {"worker", "full"}:
         checks.append(check_worker())
     if component == "full":
         checks.extend(
-            [check_job_queue(), check_ai_configuration(), check_bibliographic_sources()]
+            [
+                check_job_queue(),
+                check_external_backup(),
+                check_ai_configuration(),
+                check_bibliographic_sources(),
+            ]
         )
     statuses = [item.status for item in checks]
-    overall = "unhealthy" if "error" in statuses else "degraded" if "warning" in statuses else "healthy"
+    overall = (
+        "unhealthy"
+        if "error" in statuses
+        else "degraded"
+        if "warning" in statuses
+        else "healthy"
+    )
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "application_version": APP_VERSION,

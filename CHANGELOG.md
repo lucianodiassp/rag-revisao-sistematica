@@ -6,6 +6,17 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Backup externo — 2.1.0 em desenvolvimento
+
+- Adicionado serviço independente para criar backups criptografados em horário
+  diário e enviá-los a armazenamento compatível com S3.
+- Confirmados tamanho e SHA-256 do objeto remoto antes de aplicar retenção local e
+  externa, sem remover backups manuais ou cópias pré-restauração.
+- Adicionados solicitação manual, estado persistente, health check, diagnóstico e
+  webhook HTTPS opcional para falhas.
+- Adicionado preflight seguro das credenciais operacionais, sem registrar seus
+  valores, além de exemplos e guia de ativação e recuperação.
+
 ## [2.0.1] — 2026-08-27
 
 ### Manutenção pós-release

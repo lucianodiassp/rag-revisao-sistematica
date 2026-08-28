@@ -170,6 +170,13 @@ Docker.
 
 ## Cópia externa do backup
 
+A partir da linha `2.1`, o serviço `backup-scheduler` pode gerar, verificar e manter
+automaticamente cópias em qualquer armazenamento compatível com S3. A configuração
+completa, o teste inicial, a política de retenção e o alerta opcional estão em
+[BACKUP_EXTERNO.md](BACKUP_EXTERNO.md).
+
+O download manual continua sendo uma alternativa e um teste útil de recuperação.
+
 O botão **Baixar último backup** é a forma mais simples de retirar o `.ragbackup` do
 servidor. Guarde o arquivo e sua senha em locais separados. Para copiar uma cópia já
 preservada no volume sem usar o navegador:

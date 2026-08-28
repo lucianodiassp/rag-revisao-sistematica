@@ -111,6 +111,18 @@ def test_rejects_invalid_or_inconsistent_storage_limits():
     assert any("RAG_MIN_FREE_STORAGE_MB deve estar" in error for error in errors)
 
 
+def test_rejects_incomplete_external_backup_without_exposing_values():
+    environment = _valid_environment()
+    environment["RAG_EXTERNAL_BACKUP_ENABLED"] = "true"
+    environment["RAG_EXTERNAL_BACKUP_SECRET_ACCESS_KEY"] = "segredo-interno"
+
+    errors = validate_web_configuration(environment, _valid_auth())
+
+    assert any("BUCKET" in error for error in errors)
+    assert any("credenciais" in error for error in errors)
+    assert "segredo-interno" not in " ".join(errors)
+
+
 def test_rejects_missing_oidc_credentials_and_invalid_email():
     environment = _valid_environment()
     environment["RAG_AUTH_ALLOWED_EMAILS"] = "nao-e-email"

@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from dotenv import dotenv_values
 
 from backend.app.auth import AuthConfigurationError, parse_allowed_emails
+from backend.app.external_backup import external_backup_configuration
 from backend.app.observability import log_event
 
 try:
@@ -205,6 +206,9 @@ def validate_web_configuration(
         and backup_upload > server_upload
     ):
         errors.append("RAG_MAX_BACKUP_UPLOAD_MB não pode exceder RAG_MAX_UPLOAD_MB.")
+
+    _, external_backup_errors = external_backup_configuration(environ)
+    errors.extend(external_backup_errors)
 
     redirect_uri = _text(auth_config.get("redirect_uri"))
     expected_redirect = f"https://{domain}/oauth2callback" if domain else ""
