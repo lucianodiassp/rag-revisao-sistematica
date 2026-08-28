@@ -35,6 +35,19 @@ def test_web_app_and_worker_have_independent_healthchecks():
     assert "      - frontend" in worker
 
 
+def test_backup_scheduler_has_no_public_port_and_shares_protected_volumes():
+    scheduler = _service_block("backup-scheduler")
+
+    assert "    ports:" not in scheduler
+    assert "backend.app.external_backup" in scheduler
+    assert "        - --healthcheck" in scheduler
+    assert "web_pdfs:/app/data/pdfs" in scheduler
+    assert "web_backups:/app/data/backups" in scheduler
+    assert "web_private_data:/app/data/private" in scheduler
+    assert "      - backend" in scheduler
+    assert "      - frontend" in scheduler
+
+
 def test_proxy_healthcheck_uses_ipv4_loopback_and_get_request():
     compose = WEB_COMPOSE.read_text(encoding="utf-8")
 

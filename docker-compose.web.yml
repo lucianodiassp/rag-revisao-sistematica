@@ -8,7 +8,7 @@ services:
       args:
         APP_UID: ${RAG_UID:-1000}
         APP_GID: ${RAG_GID:-1000}
-    image: rag-revisao-sistematica-app:2.0.1
+    image: rag-revisao-sistematica-app:2.1.0-dev
     restart: "no"
     environment:
       RAG_DEPLOYMENT_PROFILE: ${RAG_DEPLOYMENT_PROFILE:-web_private}
@@ -71,7 +71,7 @@ services:
       - backend
 
   app:
-    image: rag-revisao-sistematica-app:2.0.1
+    image: rag-revisao-sistematica-app:2.1.0-dev
     container_name: rag_web_app
     restart: unless-stopped
     env_file:
@@ -115,7 +115,7 @@ services:
       - frontend
 
   worker:
-    image: rag-revisao-sistematica-app:2.0.1
+    image: rag-revisao-sistematica-app:2.1.0-dev
     container_name: rag_web_background_worker
     restart: unless-stopped
     env_file:
@@ -152,6 +152,45 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    networks:
+      - backend
+      - frontend
+
+  backup-scheduler:
+    image: rag-revisao-sistematica-app:2.1.0-dev
+    container_name: rag_web_backup_scheduler
+    restart: unless-stopped
+    env_file:
+      - ./deploy/web.env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      RAG_DEPLOYMENT_PROFILE: web_private
+      RAG_USER_MODE: single_user
+      RAG_MANAGED_STORAGE: "true"
+      AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+      PDF_DIRECTORY: /app/data/pdfs
+      BACKUP_DIRECTORY: /app/data/backups
+      PRIVATE_DIRECTORY: /app/data/private
+    command: ["python", "-m", "backend.app.external_backup"]
+    volumes:
+      - web_pdfs:/app/data/pdfs
+      - web_backups:/app/data/backups
+      - web_private_data:/app/data/private
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - backend.app.external_backup
+        - --healthcheck
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - backend
       - frontend

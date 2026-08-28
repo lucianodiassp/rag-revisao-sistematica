@@ -10,8 +10,11 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import threading
+import time
 import uuid
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -41,6 +44,9 @@ KDF_N = 2**15
 KDF_R = 8
 KDF_P = 1
 MAX_MANIFEST_SIZE = 1024 * 1024
+BACKUP_LOCK_FILENAME = "backup-operation.lock"
+DEFAULT_BACKUP_LOCK_STALE_SECONDS = 24 * 60 * 60
+_BACKUP_LOCK_STATE = threading.local()
 
 
 class BackupError(RuntimeError):
@@ -85,6 +91,77 @@ def default_pdf_directory() -> Path:
 
 def default_backup_directory() -> Path:
     return backup_directory()
+
+
+def _backup_lock_stale_seconds() -> int:
+    try:
+        value = int(
+            os.getenv(
+                "RAG_BACKUP_LOCK_STALE_SECONDS",
+                str(DEFAULT_BACKUP_LOCK_STALE_SECONDS),
+            )
+        )
+    except ValueError:
+        value = DEFAULT_BACKUP_LOCK_STALE_SECONDS
+    return max(3600, min(value, 7 * 24 * 60 * 60))
+
+
+def _backup_lock_held() -> bool:
+    return bool(getattr(_BACKUP_LOCK_STATE, "depth", 0))
+
+
+@contextmanager
+def backup_operation_lock(directory: Path | str):
+    """Impede backup e restauração concorrentes entre processos e contêineres."""
+    depth = int(getattr(_BACKUP_LOCK_STATE, "depth", 0))
+    if depth:
+        _BACKUP_LOCK_STATE.depth = depth + 1
+        try:
+            yield
+        finally:
+            _BACKUP_LOCK_STATE.depth -= 1
+        return
+
+    lock_directory = Path(directory).expanduser().resolve()
+    lock_directory.mkdir(parents=True, exist_ok=True)
+    path = lock_directory / BACKUP_LOCK_FILENAME
+    token = uuid.uuid4().hex
+    descriptor = None
+    for attempt in range(2):
+        try:
+            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            break
+        except FileExistsError as error:
+            try:
+                stale = time.time() - path.stat().st_mtime > _backup_lock_stale_seconds()
+            except OSError:
+                stale = False
+            if stale and attempt == 0:
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+                continue
+            raise BackupError(
+                "Outra operação de backup ou restauração já está em andamento."
+            ) from error
+    if descriptor is None:
+        raise BackupError("Não foi possível reservar a operação de backup.")
+    try:
+        os.write(descriptor, token.encode("ascii"))
+    finally:
+        os.close(descriptor)
+
+    _BACKUP_LOCK_STATE.depth = 1
+    try:
+        yield
+    finally:
+        _BACKUP_LOCK_STATE.depth = 0
+        try:
+            if path.read_text(encoding="ascii") == token:
+                path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def validate_backup_password(password: str) -> str:
@@ -459,6 +536,16 @@ def create_backup(
     pdf_directory = Path(pdf_directory or default_pdf_directory()).resolve()
     master_key_path = Path(master_key_path or get_master_key_path()).resolve()
     backup_directory = Path(backup_directory or default_backup_directory()).resolve()
+    if not _backup_lock_held():
+        with backup_operation_lock(master_key_path.parent):
+            return create_backup(
+                password,
+                settings=settings,
+                pdf_directory=pdf_directory,
+                master_key_path=master_key_path,
+                backup_directory=backup_directory,
+                prefix=prefix,
+            )
     backup_directory.mkdir(parents=True, exist_ok=True)
     ensure_free_space(backup_directory, operation="criar o backup")
 
@@ -667,6 +754,19 @@ def restore_backup(
     pdf_directory = Path(pdf_directory or default_pdf_directory()).resolve()
     master_key_path = Path(master_key_path or get_master_key_path()).resolve()
     backup_directory = Path(backup_directory or default_backup_directory()).resolve()
+
+    if not _backup_lock_held():
+        with backup_operation_lock(master_key_path.parent):
+            return restore_backup(
+                source,
+                password,
+                confirmation,
+                settings=settings,
+                pdf_directory=pdf_directory,
+                master_key_path=master_key_path,
+                backup_directory=backup_directory,
+                scripts_directory=scripts_directory,
+            )
 
     manifest = inspect_backup(source, password)
     declared_pdf_size = sum(

@@ -284,3 +284,23 @@ def test_restore_success_reloads_runtime_configuration(tmp_path, monkeypatch):
 def test_backup_password_rejects_weak_values(password):
     with pytest.raises(ValueError):
         validate_backup_password(password)
+
+
+def test_backup_operation_lock_is_reentrant_and_removed_after_use(tmp_path):
+    lock = tmp_path / backup_service.BACKUP_LOCK_FILENAME
+
+    with backup_service.backup_operation_lock(tmp_path):
+        assert lock.is_file()
+        with backup_service.backup_operation_lock(tmp_path):
+            assert lock.is_file()
+
+    assert not lock.exists()
+
+
+def test_backup_operation_lock_rejects_parallel_operation(tmp_path):
+    lock = tmp_path / backup_service.BACKUP_LOCK_FILENAME
+    lock.write_text("outro-processo", encoding="ascii")
+
+    with pytest.raises(BackupError, match="já está em andamento"):
+        with backup_service.backup_operation_lock(tmp_path):
+            pass

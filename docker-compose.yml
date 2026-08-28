@@ -58,6 +58,8 @@ services:
       DB_NAME: rag_systematic_review
       DB_USER: rag_user
       DB_PASSWORD: rag_password
+      RAG_DEPLOYMENT_PROFILE: local
+      RAG_USER_MODE: single_user
       AI_CONFIG_DATABASE_ENABLED: "true"
       AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
       PDF_DIRECTORY: /app/data/pdfs
@@ -107,6 +109,8 @@ services:
       DB_NAME: rag_systematic_review
       DB_USER: rag_user
       DB_PASSWORD: rag_password
+      RAG_DEPLOYMENT_PROFILE: local
+      RAG_USER_MODE: single_user
       AI_CONFIG_DATABASE_ENABLED: "true"
       AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
       PDF_DIRECTORY: /app/data/pdfs
@@ -133,6 +137,52 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    networks:
+      - rag_network
+
+  backup-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_UID: ${RAG_UID:-1000}
+        APP_GID: ${RAG_GID:-1000}
+    container_name: rag_backup_scheduler
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: rag_systematic_review
+      DB_USER: rag_user
+      DB_PASSWORD: rag_password
+      RAG_DEPLOYMENT_PROFILE: local
+      RAG_USER_MODE: single_user
+      AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
+      PDF_DIRECTORY: /app/data/pdfs
+      BACKUP_DIRECTORY: /app/data/backups
+      PRIVATE_DIRECTORY: /app/data/private
+    command: ["python", "-m", "backend.app.external_backup"]
+    volumes:
+      - ./data/pdfs:/app/data/pdfs
+      - ./data/backups:/app/data/backups
+      - app_private_data:/app/data/private
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - backend.app.external_backup
+        - --healthcheck
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - rag_network
 

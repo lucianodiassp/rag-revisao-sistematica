@@ -18,6 +18,7 @@ def _check(code, status):
 @patch("backend.app.operational_health.recent_job_failures", return_value=[])
 @patch("backend.app.operational_health.check_bibliographic_sources", return_value=_check("sources", "ok"))
 @patch("backend.app.operational_health.check_ai_configuration", return_value=_check("ai", "warning"))
+@patch("backend.app.operational_health.check_external_backup", return_value=_check("backup", "ok"))
 @patch("backend.app.operational_health.check_job_queue", return_value=_check("queue", "ok"))
 @patch("backend.app.operational_health.check_worker", return_value=_check("worker", "ok"))
 @patch("backend.app.operational_health.check_http", return_value=_check("http", "ok"))
@@ -29,12 +30,13 @@ def test_full_report_marks_warnings_as_degraded(*_mocks):
     report = build_health_report("full")
 
     assert report["overall_status"] == "degraded"
-    assert len(report["checks"]) == 9
+    assert len(report["checks"]) == 10
 
 
 @patch("backend.app.operational_health.recent_job_failures", return_value=[])
 @patch("backend.app.operational_health.check_bibliographic_sources", return_value=_check("sources", "ok"))
 @patch("backend.app.operational_health.check_ai_configuration", return_value=_check("ai", "ok"))
+@patch("backend.app.operational_health.check_external_backup", return_value=_check("backup", "ok"))
 @patch("backend.app.operational_health.check_job_queue", return_value=_check("queue", "ok"))
 @patch("backend.app.operational_health.check_worker", return_value=_check("worker", "error"))
 @patch("backend.app.operational_health.check_http", return_value=_check("http", "ok"))
