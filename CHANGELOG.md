@@ -6,7 +6,9 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
-### Backup externo — 2.1.0 em desenvolvimento
+## [2.1.0-rc.1] — 2026-08-29
+
+### Backup externo agendado
 
 - Adicionado serviço independente para criar backups criptografados em horário
   diário e enviá-los a armazenamento compatível com S3.
@@ -16,6 +18,10 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   webhook HTTPS opcional para falhas.
 - Adicionado preflight seguro das credenciais operacionais, sem registrar seus
   valores, além de exemplos e guia de ativação e recuperação.
+- Validado o fluxo completo em servidor Web real com bucket S3 compatível privado:
+  geração, envio, confirmação de integridade, download e validação do `.ragbackup`.
+- Promovida a identidade da aplicação para `2.1.0-rc.1`; a observação da primeira
+  execução automática diária permanece como gate para a versão estável `2.1.0`.
 
 ## [2.0.1] — 2026-08-27
 
@@ -142,7 +148,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.1...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0-rc.1...HEAD
+[2.1.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.1...v2.1.0-rc.1
 [2.0.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v1.0.0...v2.0.0
 [2.0.0-rc.3]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0-rc.2...v2.0.0-rc.3
