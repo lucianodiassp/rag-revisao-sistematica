@@ -6,7 +6,7 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.0.1` | Funcionalidades e compatibilidade do produto |
+| Aplicação | `2.1.0-rc.1` | Funcionalidades e compatibilidade do produto |
 | Migração do banco | `013` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
@@ -36,9 +36,11 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 - `2.0.0-rc.3`: candidata com o gate de privacidade dos logs aprovado.
 - `2.0.0`: versão estável local e Web privada, inicialmente de usuário único.
 - `2.0.1`: manutenção pós-lançamento com integração contínua e contratos de implantação.
+- `2.1.0-rc.1`: candidata com backup externo agendado validado em um destino S3 real.
 
 O sufixo `-rc.N` identificou as candidatas e impediu que fossem confundidas com
-releases estáveis. A versão estável atual é `v2.0.1`.
+releases estáveis. A versão estável atual é `v2.0.1`; `v2.1.0-rc.1` permanece uma
+pré-release até a conclusão do gate operacional diário.
 
 ## Fluxo concluído da v1.0.0
 
@@ -79,7 +81,7 @@ candidatas (`rc.2`, `rc.3`), sem mover ou reutilizar tags já publicadas.
 O planejamento incremental, os critérios de aceite e os itens fora do primeiro
 ciclo estão detalhados em [ROADMAP_V2_WEB.md](ROADMAP_V2_WEB.md).
 O gate de promoção está detalhado em
-[CHECKLIST_RELEASE_V2.md](CHECKLIST_RELEASE_V2.md).
+[CHECKLIST_RELEASE_V2_1.md](CHECKLIST_RELEASE_V2_1.md).
 
 ## Compatibilidade e retorno
 

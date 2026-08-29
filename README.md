@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.0--rc.1-orange.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -53,10 +53,15 @@ observabilidade e proteção de privacidade validadas em um servidor real. A
 identidade efetiva aparece no menu lateral e acompanha backups e pacotes de
 reprodutibilidade.
 
+A candidata **2.1.0-rc.1** acrescenta backup externo criptografado e agendado,
+retenção controlada, verificação remota de integridade e alerta opcional. O fluxo
+completo foi validado em armazenamento S3 compatível privado; a primeira execução
+automática diária é o gate restante para a promoção estável.
+
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
 As condições para publicar a candidata e promover a versão estável estão no
-[Checklist da candidata v2](docs/CHECKLIST_RELEASE_V2.md).
+[Checklist da candidata v2.1](docs/CHECKLIST_RELEASE_V2_1.md).
 
 ### Autenticação da Web privada (v2 candidata)
 
@@ -83,7 +88,7 @@ em servidor com domínio, DNS, HTTPS e OIDC reais e integra a versão estável.
 
 Banco, PDFs, backups, chave-mestra e certificados usam volumes nomeados separados.
 A aplicação valida escrita, reserva mínima de disco e limites distintos para PDFs e
-`.ragbackup` antes de gravar. A linha `2.1.0-dev` acrescenta backup externo agendado,
+`.ragbackup` antes de gravar. A candidata `2.1.0-rc.1` acrescenta backup externo agendado,
 retenção e alerta opcional sem alterar o formato de backup da v1.
 
 As operações demoradas de coleta, indexação, extração, relatório e benchmark são
