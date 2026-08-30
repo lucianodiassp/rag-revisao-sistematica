@@ -8,7 +8,7 @@ services:
       args:
         APP_UID: ${RAG_UID:-1000}
         APP_GID: ${RAG_GID:-1000}
-    image: rag-revisao-sistematica-app:2.1.0
+    image: rag-revisao-sistematica-app:2.2.0-rc.1
     restart: "no"
     environment:
       RAG_DEPLOYMENT_PROFILE: ${RAG_DEPLOYMENT_PROFILE:-web_private}
@@ -71,7 +71,7 @@ services:
       - backend
 
   app:
-    image: rag-revisao-sistematica-app:2.1.0
+    image: rag-revisao-sistematica-app:2.2.0-rc.1
     container_name: rag_web_app
     restart: unless-stopped
     env_file:
@@ -115,7 +115,7 @@ services:
       - frontend
 
   worker:
-    image: rag-revisao-sistematica-app:2.1.0
+    image: rag-revisao-sistematica-app:2.2.0-rc.1
     container_name: rag_web_background_worker
     restart: unless-stopped
     env_file:
@@ -157,7 +157,7 @@ services:
       - frontend
 
   backup-scheduler:
-    image: rag-revisao-sistematica-app:2.1.0
+    image: rag-revisao-sistematica-app:2.2.0-rc.1
     container_name: rag_web_backup_scheduler
     restart: unless-stopped
     env_file:

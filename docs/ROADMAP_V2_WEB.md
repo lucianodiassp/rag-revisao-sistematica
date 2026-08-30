@@ -137,8 +137,8 @@ endurecimento operacional da Web privada de usuário único.
 1. `v2.0.x`: integração contínua, documentação pós-release e operação mais segura.
 2. `v2.1.x`: backup externo agendado, retenção e alertas operacionais — concluído e
    validado em destino S3 real, incluindo execução automática diária.
-3. `v2.2.x`: provedores adicionais de IA — em desenvolvimento, com Gemini e OpenAI
-   selecionáveis por função e embeddings Gemini preservados na primeira entrega.
+3. `v2.2.x`: provedores adicionais de IA — candidata `2.2.0-rc.1` em validação,
+   com Gemini e OpenAI selecionáveis por função e embeddings Gemini preservados.
 4. ciclo posterior: instrumentos científicos adicionais e interpretação de tabelas
    e figuras dos PDFs.
 5. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.
