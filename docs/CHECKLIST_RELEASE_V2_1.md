@@ -1,8 +1,8 @@
 # Checklist da candidata v2.1
 
-Este checklist registra os critérios objetivos para publicar `v2.1.0-rc.1` e
-promovê-la posteriormente para `v2.1.0`. A versão estável vigente permanece
-`v2.0.1` até que o último gate operacional seja concluído.
+Este checklist registra os critérios objetivos usados para publicar
+`v2.1.0-rc.1` e promovê-la para `v2.1.0`. O gate operacional foi concluído em
+30 de agosto de 2026; permanecem abaixo apenas as ações de publicação da release.
 
 ## 1. Integridade da candidata
 
@@ -40,12 +40,14 @@ As evidências narrativas do piloto estão em
 
 ## 4. Gate para promoção estável
 
-- [ ] Observar uma execução no horário diário, sem solicitação manual.
-- [ ] Confirmar que o novo objeto aparece no destino e atualiza o último sucesso.
-- [ ] Confirmar que o Diagnóstico Operacional permanece sem erros após a execução.
-- [ ] Gerar e validar um backup final antes de criar a tag estável.
-- [ ] Promover a identidade para `2.1.0` em uma branch de release própria.
-- [ ] Executar CI, mesclar na `main`, criar a tag `v2.1.0` e publicar a Release.
+- [x] Observar uma execução no horário diário, sem solicitação manual.
+- [x] Confirmar que o novo objeto aparece no destino e atualiza o último sucesso.
+- [x] Confirmar que o Diagnóstico Operacional permanece sem erros após a execução.
+- [x] Confirmar a integridade remota do backup automático final antes da tag estável.
+- [x] Promover a identidade para `2.1.0` em uma branch de release própria.
+- [x] Executar a suíte e os contratos locais da branch de release.
+- [ ] Aprovar o CI e mesclar a branch de release na `main`.
+- [ ] Criar a tag `v2.1.0` e publicar a GitHub Release como versão estável.
 
 Não reutilize nem mova a tag de uma candidata já publicada. Qualquer correção após
 `rc.1` deve produzir `2.1.0-rc.2`.

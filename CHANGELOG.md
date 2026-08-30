@@ -6,6 +6,20 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.1.0] — 2026-08-30
+
+### Backup externo estável
+
+- Promovido o backup externo agendado depois da aprovação da candidata
+  `v2.1.0-rc.1` em uma instalação Web real.
+- Confirmada a primeira execução diária sem intervenção manual: início às
+  `06:00 UTC`, conclusão verificada em aproximadamente cinco segundos e novo
+  `.ragbackup` de 55,9 MB no destino privado.
+- Confirmados o próximo agendamento, o estado operacional do diagnóstico e a
+  ocultação das credenciais na interface e nos registros apresentados ao usuário.
+- Mantidos o formato `.ragbackup` v1 e a compatibilidade dos perfis local e Web
+  privada de usuário único.
+
 ## [2.1.0-rc.1] — 2026-08-29
 
 ### Backup externo agendado
@@ -148,7 +162,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0-rc.1...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.1...v2.1.0
 [2.1.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.1...v2.1.0-rc.1
 [2.0.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v1.0.0...v2.0.0

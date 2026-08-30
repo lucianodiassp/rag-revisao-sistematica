@@ -12,7 +12,7 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: versão estável publicada, atualmente `v2.0.1`.
+- `main`: versão estável publicada, atualmente `v2.1.0`.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 
@@ -135,9 +135,8 @@ endurecimento operacional da Web privada de usuário único.
 ## Radar pós-release
 
 1. `v2.0.x`: integração contínua, documentação pós-release e operação mais segura.
-2. `v2.1.x`: backup externo agendado, retenção e alertas operacionais — candidata
-   `2.1.0-rc.1` validada manualmente em destino S3 real; execução automática diária
-   pendente antes da promoção estável.
+2. `v2.1.x`: backup externo agendado, retenção e alertas operacionais — concluído e
+   validado em destino S3 real, incluindo execução automática diária.
 3. `v2.2.x`: provedores adicionais de IA, começando pelos modelos de geração.
 4. ciclo posterior: instrumentos científicos adicionais e interpretação de tabelas
    e figuras dos PDFs.

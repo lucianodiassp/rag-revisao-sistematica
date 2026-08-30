@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.1.0--rc.1-orange.svg)
+![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -43,27 +43,27 @@ protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, intera�
 agentes, auditorias e relatórios próprios.
 
 O perfil padrão de implantação continua sendo **local e de usuário único**. A versão
-`2.0.1` oferece o perfil **Web privado**, também de usuário único, protegido
+`2.1.0` oferece o perfil **Web privado**, também de usuário único, protegido
 por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
 continua reservado para uma evolução posterior.
 
-A versão estável é **2.0.1 — Local e Web privada, usuário único**. Ela preserva o
+A versão estável é **2.1.0 — Local e Web privada, usuário único**. Ela preserva o
 uso local da `1.0.0` e incorpora autenticação, operação resiliente, recuperação,
 observabilidade e proteção de privacidade validadas em um servidor real. A
 identidade efetiva aparece no menu lateral e acompanha backups e pacotes de
 reprodutibilidade.
 
-A candidata **2.1.0-rc.1** acrescenta backup externo criptografado e agendado,
-retenção controlada, verificação remota de integridade e alerta opcional. O fluxo
-completo foi validado em armazenamento S3 compatível privado; a primeira execução
-automática diária é o gate restante para a promoção estável.
+A versão `2.1.0` acrescenta backup externo criptografado e agendado, retenção
+controlada, verificação remota de integridade e alerta opcional. O fluxo completo e
+a primeira execução automática diária foram validados em armazenamento S3
+compatível privado.
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
-As condições para publicar a candidata e promover a versão estável estão no
+Os critérios usados para publicar a candidata e promover a versão estável estão no
 [Checklist da candidata v2.1](docs/CHECKLIST_RELEASE_V2_1.md).
 
-### Autenticação da Web privada (v2 candidata)
+### Autenticação da Web privada
 
 Quando `RAG_DEPLOYMENT_PROFILE=web_private`, a aplicação exige login OIDC antes de
 criar a navegação ou exibir dados. A autorização é limitada aos e-mails definidos
@@ -88,7 +88,7 @@ em servidor com domínio, DNS, HTTPS e OIDC reais e integra a versão estável.
 
 Banco, PDFs, backups, chave-mestra e certificados usam volumes nomeados separados.
 A aplicação valida escrita, reserva mínima de disco e limites distintos para PDFs e
-`.ragbackup` antes de gravar. A candidata `2.1.0-rc.1` acrescenta backup externo agendado,
+`.ragbackup` antes de gravar. A versão `2.1.0` acrescenta backup externo agendado,
 retenção e alerta opcional sem alterar o formato de backup da v1.
 
 As operações demoradas de coleta, indexação, extração, relatório e benchmark são
