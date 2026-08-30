@@ -6,6 +6,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.2.0-rc.1] — 2026-08-30
+
 ### Geração multiprovedor
 
 - Adicionados adaptadores independentes para Google Gemini e OpenAI, com despacho

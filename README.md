@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.0--rc.1-orange.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -58,13 +58,13 @@ controlada, verificação remota de integridade e alerta opcional. O fluxo compl
 a primeira execução automática diária foram validados em armazenamento S3
 compatível privado.
 
-A branch de desenvolvimento `2.2.0-dev` acrescenta geração multiprovedor por
-função com Google Gemini e OpenAI, sem alterar os embeddings existentes.
+A candidata **2.2.0-rc.1** acrescenta geração multiprovedor por função com Google
+Gemini e OpenAI, sem alterar os embeddings existentes nem exigir nova indexação.
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
-Os critérios usados para publicar a candidata e promover a versão estável estão no
-[Checklist da candidata v2.1](docs/CHECKLIST_RELEASE_V2_1.md).
+Os critérios usados para validar a candidata e promover a versão estável estão no
+[Checklist da candidata v2.2](docs/CHECKLIST_RELEASE_V2_2.md).
 
 ### Autenticação da Web privada
 
