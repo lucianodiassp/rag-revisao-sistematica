@@ -20,7 +20,7 @@ st.caption(f"Projeto ativo: **{projeto['title']}**")
 st.markdown(
     """
 Bem-vindo! Este assistente utiliza **Recuperação de Informação (pgvector)** e
-**Inteligência Artificial (Gemini)** para responder a perguntas com base nos
+**Inteligência Artificial configurável (Gemini ou OpenAI)** para responder a perguntas com base nos
 artigos científicos recolhidos.
 """
 )

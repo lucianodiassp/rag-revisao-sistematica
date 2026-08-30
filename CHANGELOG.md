@@ -6,6 +6,19 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Geração multiprovedor
+
+- Adicionados adaptadores independentes para Google Gemini e OpenAI, com despacho
+  por função e compatibilidade com o contrato de resposta usado pelos agentes.
+- Permitido combinar provedores em formulação, triagem, RAG, reranking, auditoria,
+  extração, qualidade metodológica e relatório sem reindexar PDFs.
+- Mantidos os embeddings no Gemini e no schema de 768 dimensões nesta primeira
+  etapa, evitando incompatibilidade com índices existentes.
+- Ampliadas a tela de Configuração de IA, a auditoria e o diagnóstico operacional
+  para credenciais e modelos por provedor.
+- A integração OpenAI usa Responses API, `store=false`, modo JSON quando solicitado
+  e mensagens de erro saneadas sem exposição da credencial.
+
 ## [2.1.0] — 2026-08-30
 
 ### Backup externo estável

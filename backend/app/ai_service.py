@@ -2,11 +2,14 @@ from google.genai import types
 
 from backend.app.ai_config import (
     CURRENT_VECTOR_DIMENSIONS,
+    PROVIDER_GOOGLE_GEMINI,
+    PROVIDER_OPENAI,
     clear_ai_settings_cache,
     get_embedding_config,
     get_generation_config,
 )
 from backend.app.gemini_client import clear_ai_client_cache, get_gemini_client
+from backend.app.openai_client import clear_openai_client_cache, get_openai_client
 
 
 def generate_content(
@@ -18,6 +21,17 @@ def generate_content(
 ):
     """Executa geração usando a configuração central da função solicitada."""
     config = get_generation_config(task)
+    if config.provider == PROVIDER_OPENAI:
+        return get_openai_client().generate_content(
+            model=config.model,
+            contents=contents,
+            response_mime_type=response_mime_type,
+            system_instruction=system_instruction,
+            temperature=config.effective_temperature,
+        )
+    if config.provider != PROVIDER_GOOGLE_GEMINI:
+        raise RuntimeError(f"Provedor de IA não suportado: {config.provider}.")
+
     parametros = {}
     if response_mime_type:
         parametros["response_mime_type"] = response_mime_type
@@ -36,6 +50,11 @@ def generate_content(
 def generate_embedding(contents):
     """Gera embedding com modelo e dimensão definidos em um único local."""
     config = get_embedding_config()
+    if config.provider != PROVIDER_GOOGLE_GEMINI:
+        raise RuntimeError(
+            "A versão 2.2 mantém embeddings no Google Gemini. "
+            "Selecione google_gemini e reindexe somente após uma futura migração vetorial."
+        )
     if config.dimensions != CURRENT_VECTOR_DIMENSIONS:
         raise RuntimeError(
             "O schema atual usa vector(768). Altere AI_EMBEDDING_DIMENSIONS somente "
@@ -52,4 +71,5 @@ def generate_embedding(contents):
 def reload_ai_runtime():
     """Invalida configuração e cliente após uma futura alteração persistida."""
     clear_ai_client_cache()
+    clear_openai_client_cache()
     clear_ai_settings_cache()

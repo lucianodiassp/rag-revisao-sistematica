@@ -373,10 +373,17 @@ def check_worker():
 
 def check_ai_configuration():
     try:
-        from backend.app.ai_config import get_ai_settings
+        from backend.app.ai_config import get_ai_settings, get_provider_api_key
 
         settings = get_ai_settings()
-        configured = bool(settings.api_key)
+        providers = sorted(
+            {config.provider for config in settings.generation.values()}
+            | {settings.embedding.provider}
+        )
+        missing_providers = [
+            provider for provider in providers if not get_provider_api_key(provider)
+        ]
+        configured = not missing_providers
         return _check(
             "ai_configuration",
             "Provedor de IA",
@@ -388,9 +395,9 @@ def check_ai_configuration():
                 else "Modelos configurados, mas nenhuma credencial de IA está disponível."
             ),
             {
-                "provider": settings.provider,
+                "providers": providers,
+                "missing_providers": missing_providers,
                 "access_configured": configured,
-                "access_source": settings.credential_source,
                 "generation_tasks": len(settings.generation),
                 "embedding_model": settings.embedding.model,
                 "action": (

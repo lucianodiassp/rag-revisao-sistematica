@@ -80,7 +80,7 @@ def carregar_criterios_dinamicos(project_id, protocol=None):
     return escopo, inclusao, exclusao
 
 def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1, protocol=None):
-    """Submete o artigo ao Gemini com critérios injetados dinamicamente e rate limit."""
+    """Submete o artigo ao provedor configurado com critérios rastreáveis."""
     
     # Busca os critérios do JSON
     escopo_elegibilidade, criterios_inclusao, criterios_exclusao = carregar_criterios_dinamicos(
