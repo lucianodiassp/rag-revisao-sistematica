@@ -1,5 +1,6 @@
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from backend.app.ai_config import (
@@ -9,8 +10,22 @@ from backend.app.ai_config import (
     clear_ai_settings_cache,
     get_ai_settings,
     get_generation_config,
+    get_provider_api_key,
 )
+from backend.app.ai_config_repository import SUPPORTED_TASKS
 from backend.app.ai_service import generate_content
+
+
+def test_historical_reranking_migration_accepts_every_supported_task():
+    migration = (
+        Path(__file__).resolve().parents[1]
+        / "database"
+        / "scripts"
+        / "008_reranking_configuration.sql"
+    ).read_text(encoding="utf-8")
+
+    for task in SUPPORTED_TASKS:
+        assert f"'{task}'" in migration
 
 
 class AIConfigTests(unittest.TestCase):
@@ -177,6 +192,38 @@ class AIConfigTests(unittest.TestCase):
             self.assertEqual(settings.generation[TASK_REPORT].source, "database")
             self.assertEqual(settings.embedding.model, "embedding-do-banco")
             self.assertNotIn("chave-decifrada", repr(settings))
+
+    def test_credencial_openai_cifrada_tem_precedencia_sobre_ambiente(self):
+        credential = {
+            "id": "cred-openai",
+            "provider_code": "openai",
+            "encrypted_secret": "segredo-cifrado",
+        }
+        with patch.dict(
+            os.environ,
+            {
+                "OPENAI_API_KEY": "chave-env",
+                "AI_CONFIG_DATABASE_ENABLED": "true",
+            },
+            clear=True,
+        ), patch(
+            "backend.app.ai_config_repository.configuration_tables_available",
+            return_value=True,
+        ), patch(
+            "backend.app.ai_config_repository.get_installation_credential",
+            return_value=credential,
+        ), patch(
+            "backend.app.secret_store.decrypt_secret",
+            return_value="chave-openai-decifrada",
+        ):
+            clear_ai_settings_cache()
+            try:
+                self.assertEqual(
+                    get_provider_api_key("openai"),
+                    "chave-openai-decifrada",
+                )
+            finally:
+                clear_ai_settings_cache()
 
 
 if __name__ == "__main__":

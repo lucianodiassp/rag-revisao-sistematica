@@ -43,6 +43,29 @@ def get_installation_credential(provider_code="google_gemini"):
         return dict(zip(colunas, linha))
 
 
+def list_installation_credentials():
+    """Lista metadados e segredos cifrados das credenciais ativas por provedor."""
+    with get_connection() as conexao, conexao.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, provider_code, label, encrypted_secret, secret_hint,
+                   validation_status, last_validated_at, validation_error,
+                   created_at, updated_at
+            FROM ai_provider_credentials
+            WHERE scope_type = 'installation'
+              AND scope_id IS NULL
+              AND owner_user_id IS NULL
+              AND is_active = TRUE
+            ORDER BY provider_code, updated_at DESC
+            """
+        )
+        colunas = [item[0] for item in cursor.description]
+        return {
+            linha[1]: dict(zip(colunas, linha))
+            for linha in cursor.fetchall()
+        }
+
+
 def save_installation_credential(
     provider_code,
     label,
@@ -198,6 +221,12 @@ def save_installation_model_settings(provider_code, credential_id, settings):
                 raise ValueError(f"Modelo não informado para {task_type}.")
             parameters = config.get("parameters") or {}
             dimensions = config.get("embedding_dimensions")
+            task_provider_code = str(
+                config.get("provider_code") or provider_code or ""
+            ).strip()
+            task_credential_id = config.get("credential_id", credential_id)
+            if not task_provider_code:
+                raise ValueError(f"Provedor não informado para {task_type}.")
             cursor.execute(
                 """
                 SELECT id FROM ai_model_settings
@@ -224,8 +253,8 @@ def save_installation_model_settings(provider_code, credential_id, settings):
                     WHERE id = %s
                     """,
                     (
-                        provider_code,
-                        credential_id,
+                        task_provider_code,
+                        task_credential_id,
                         model_name,
                         Json(parameters),
                         dimensions,
@@ -242,8 +271,8 @@ def save_installation_model_settings(provider_code, credential_id, settings):
                     """,
                     (
                         task_type,
-                        provider_code,
-                        credential_id,
+                        task_provider_code,
+                        task_credential_id,
                         model_name,
                         Json(parameters),
                         dimensions,
@@ -260,6 +289,7 @@ def save_installation_model_settings(provider_code, credential_id, settings):
                 "credential_id": str(credential_id) if credential_id else None,
                 "models": {
                     tarefa: {
+                        "provider_code": config.get("provider_code") or provider_code,
                         "model_name": config["model_name"],
                         "parameters": config.get("parameters") or {},
                         "embedding_dimensions": config.get("embedding_dimensions"),

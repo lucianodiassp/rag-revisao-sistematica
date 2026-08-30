@@ -58,6 +58,9 @@ controlada, verificação remota de integridade e alerta opcional. O fluxo compl
 a primeira execução automática diária foram validados em armazenamento S3
 compatível privado.
 
+A branch de desenvolvimento `2.2.0-dev` acrescenta geração multiprovedor por
+função com Google Gemini e OpenAI, sem alterar os embeddings existentes.
+
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
 Os critérios usados para publicar a candidata e promover a versão estável estão no
@@ -205,7 +208,8 @@ atualização, investigação de falhas e retorno seguro de versão.
 
 ### Configuração central de IA
 
-- Adaptador atual para Google Gemini.
+- Geração configurável por função com adaptadores para Google Gemini e OpenAI.
+- Combinação segura de provedores, preservando o Gemini nos embeddings de 768 dimensões.
 - Credencial cifrada no banco, com `backend/.env` como fallback.
 - Validação da chave pela listagem de modelos, sem gerar conteúdo.
 - Modelo e temperatura configuráveis para formulação, triagem, RAG, auditoria,
@@ -359,7 +363,7 @@ flowchart LR
 | Interface | Streamlit multipágina |
 | Aplicação | Python, agentes e serviços de configuração |
 | Banco | PostgreSQL 16 com `pgvector` |
-| IA | Google Gemini com configuração central por função |
+| IA | Google Gemini e OpenAI com configuração central por função |
 | Coleta | OpenAlex, Semantic Scholar, NCBI E-utilities/PubMed e BibTeX |
 | Documentos | PyMuPDF para leitura e segmentação por página |
 | Segurança local | Fernet e chave-mestra fora do banco |
@@ -576,13 +580,18 @@ das versões estáveis e criação das próximas branches a partir da `main`.
 
 Na página **4. Configuração de IA** é possível:
 
-1. Testar e salvar uma nova chave Gemini.
-2. Importar a chave presente em `backend/.env`.
-3. Consultar os modelos liberados para a credencial.
-4. Selecionar modelos e temperaturas por função.
-5. Ativar o reranking e configurar candidatos, trechos finais e peso da ordem RRF.
-6. Configurar o modelo de embedding.
-7. Consultar a configuração efetiva e o histórico.
+1. Selecionar Google Gemini ou OpenAI para administrar suas credenciais.
+2. Testar, cifrar e salvar uma chave independente para cada provedor.
+3. Importar `GEMINI_API_KEY` ou `OPENAI_API_KEY` do ambiente como fallback.
+4. Consultar os modelos liberados para cada credencial sem gerar conteúdo.
+5. Selecionar provedor, modelo e temperatura por função.
+6. Combinar provedores; por exemplo, OpenAI no relatório e Gemini na triagem.
+7. Ativar o reranking e configurar candidatos, trechos finais e peso da ordem RRF.
+8. Consultar a configuração efetiva e o histórico auditável.
+
+Na linha `2.2`, os embeddings permanecem no Google Gemini e no schema de 768
+dimensões. Essa separação permite trocar somente os modelos generativos sem
+reindexar os PDFs. Consulte o guia de [provedores de IA](docs/PROVEDORES_IA.md).
 
 Trocar o modelo de embedding exige nova indexação dos PDFs. O sistema identifica o
 índice incompatível, reconstrói o documento de forma transacional e devolve a
@@ -936,7 +945,8 @@ docker compose --profile tools down -v
 | Porta `8501`, `5432` ou `5050` ocupada | Defina `RAG_APP_PORT`, `RAG_DB_PORT` ou `RAG_PGADMIN_PORT` antes de iniciar o Compose. |
 | Backup não pode ser validado | Confirme a senha e se o arquivo `.ragbackup` terminou de ser copiado ou baixado. |
 | Restauração falhou | Preserve o arquivo `pre-restore-*.ragbackup` criado em `data/backups/` e consulte a mensagem apresentada. |
-| Modelo Gemini indisponível | Abra **Configuração de IA**, teste a chave e escolha um modelo listado para a conta. |
+| Modelo de IA indisponível | Abra **Configuração de IA**, selecione o provedor, teste a chave e escolha um modelo listado para a conta. |
+| OpenAI não configurada | Cadastre e valide a chave na tela ou disponibilize `OPENAI_API_KEY` no ambiente. |
 | Erro `429` em uma API | Aguarde a renovação do limite, reduza chamadas ou use uma credencial com cota adequada. |
 | PDF armazenado, mas não indexado | Execute a vetorização e consulte o motivo individual apresentado na página. |
 | OCR não reconhece uma página | Confirme a legibilidade, os idiomas instalados e `PDF_OCR_LANGUAGES`; consulte os avisos por artigo. |
@@ -950,7 +960,7 @@ docker compose --profile tools down -v
 ## Limites atuais
 
 - Instalação local de usuário único, sem login ou autorização.
-- Adaptador de IA implementado apenas para Google Gemini.
+- Geração disponível por Google Gemini e OpenAI; embeddings ainda restritos ao Gemini e a 768 dimensões.
 - Schema vetorial fixado em 768 dimensões.
 - Coleta dependente da disponibilidade, cobertura e limites das APIs externas.
 - Campos ausentes no BibTeX permanecem identificados como indisponíveis e exigem revisão na triagem.

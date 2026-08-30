@@ -7,6 +7,15 @@ from dotenv import load_dotenv
 
 
 PROVIDER_GOOGLE_GEMINI = "google_gemini"
+PROVIDER_OPENAI = "openai"
+SUPPORTED_GENERATION_PROVIDERS = (
+    PROVIDER_GOOGLE_GEMINI,
+    PROVIDER_OPENAI,
+)
+PROVIDER_ENV_KEYS = {
+    PROVIDER_GOOGLE_GEMINI: "GEMINI_API_KEY",
+    PROVIDER_OPENAI: "OPENAI_API_KEY",
+}
 DEFAULT_GENERATION_MODEL = "gemini-2.5-flash"
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
 CURRENT_VECTOR_DIMENSIONS = 768
@@ -80,6 +89,8 @@ def _normalizar_provider(valor):
         "google": PROVIDER_GOOGLE_GEMINI,
         "gemini": PROVIDER_GOOGLE_GEMINI,
         "google_gemini": PROVIDER_GOOGLE_GEMINI,
+        "open_ai": PROVIDER_OPENAI,
+        "openai": PROVIDER_OPENAI,
     }
     normalizado = str(valor or PROVIDER_GOOGLE_GEMINI).strip().lower()
     return aliases.get(normalizado, normalizado)
@@ -174,9 +185,13 @@ def _booleano_configuracao(valor, padrao):
 
 def model_supports_sampling_parameters(provider, model):
     """Evita enviar parâmetros removidos por modelos Gemini mais recentes."""
+    modelo = str(model).lower()
+    if provider == PROVIDER_OPENAI:
+        # Modelos de raciocínio podem rejeitar temperatura. A omissão mantém a
+        # configuração compatível sem uma tentativa faturável adicional.
+        return not modelo.startswith(("gpt-5", "o1", "o3", "o4"))
     if provider != PROVIDER_GOOGLE_GEMINI:
         return True
-    modelo = str(model).lower()
     sem_amostragem = (
         "gemini-3.5-",
         "gemini-3.6-",
@@ -266,7 +281,7 @@ def _apply_database_overrides(settings):
         if not configuration_tables_available():
             return settings
         modelos_banco = get_installation_model_settings()
-        credencial = get_installation_credential()
+        credencial = get_installation_credential(settings.provider)
     except Exception:
         # O aplicativo continua inicializável antes da migração ou se o banco estiver offline.
         return settings
@@ -353,6 +368,36 @@ def _apply_database_overrides(settings):
     )
 
 
+@lru_cache(maxsize=None)
+def get_provider_api_key(provider):
+    """Obtém a credencial efetiva de um provedor sem expô-la na configuração."""
+    provider = _normalizar_provider(provider)
+    if provider not in SUPPORTED_GENERATION_PROVIDERS:
+        raise RuntimeError(f"Provedor de IA não suportado: {provider}.")
+
+    if _database_configuration_enabled():
+        try:
+            from backend.app.ai_config_repository import (
+                configuration_tables_available,
+                get_installation_credential,
+            )
+
+            if configuration_tables_available():
+                credencial = get_installation_credential(provider)
+                if credencial:
+                    from backend.app.secret_store import decrypt_secret
+
+                    return decrypt_secret(credencial["encrypted_secret"])
+        except RuntimeError:
+            raise
+        except Exception:
+            # O ambiente continua sendo um fallback durante inicialização/migração.
+            pass
+
+    nome_variavel = PROVIDER_ENV_KEYS[provider]
+    return os.getenv(nome_variavel)
+
+
 def get_environment_ai_settings():
     """Monta a configuração de fallback sem consultar credenciais persistidas."""
     provider = _normalizar_provider(os.getenv("AI_PROVIDER"))
@@ -399,8 +444,16 @@ def get_environment_ai_settings():
             rrf_weight=rrf_weight,
         )
 
+    embedding_provider = _normalizar_provider(
+        os.getenv("AI_EMBEDDING_PROVIDER", PROVIDER_GOOGLE_GEMINI)
+    )
+    if embedding_provider != PROVIDER_GOOGLE_GEMINI:
+        raise RuntimeError(
+            "A versão 2.2 aceita OpenAI somente para geração. "
+            "Mantenha AI_EMBEDDING_PROVIDER=google_gemini nesta fase."
+        )
     embedding = EmbeddingConfig(
-        provider=provider,
+        provider=embedding_provider,
         model=os.getenv("AI_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL).strip(),
         dimensions=_ler_inteiro("AI_EMBEDDING_DIMENSIONS", CURRENT_VECTOR_DIMENSIONS),
     )
@@ -409,7 +462,7 @@ def get_environment_ai_settings():
 
     return AISettings(
         provider=provider,
-        api_key=os.getenv("GEMINI_API_KEY"),
+        api_key=os.getenv(PROVIDER_ENV_KEYS[provider]),
         generation=geracao,
         embedding=embedding,
     )
@@ -438,3 +491,4 @@ def get_reranking_config():
 def clear_ai_settings_cache():
     """Permite recarregar a configuração após mudanças futuras pela interface."""
     get_ai_settings.cache_clear()
+    get_provider_api_key.cache_clear()

@@ -38,10 +38,16 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 - `2.0.1`: manutenção pós-lançamento com integração contínua e contratos de implantação.
 - `2.1.0-rc.1`: candidata com backup externo agendado validado em um destino S3 real.
 - `2.1.0`: backup externo diário, verificação de integridade e retenção controlada.
+- `2.2.0-dev`: geração configurável por função com adaptadores Gemini e OpenAI;
+  embeddings Gemini preservados para compatibilidade vetorial.
 
 O sufixo `-rc.N` identificou as candidatas e impediu que fossem confundidas com
 releases estáveis. A versão estável atual é `v2.1.0`; `v2.1.0-rc.1` permanece no
 histórico como a pré-release usada no piloto operacional.
+
+O desenvolvimento da próxima versão ocorre em `feature/v2.2-provedores-ia`, criada
+a partir da `main` estável. Sua promoção seguirá novamente por candidata antes da
+tag `v2.2.0`.
 
 ## Fluxo concluído da v1.0.0
 

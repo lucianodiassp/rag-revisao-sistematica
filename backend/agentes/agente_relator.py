@@ -82,7 +82,7 @@ def coletar_evidencias(project_id):
     return evidencias
 
 def gerar_relatorio_final(project_id=None, progress_callback=None):
-    """Orquestra a coleta de dados e a geração do texto pelo Gemini."""
+    """Orquestra a coleta de dados e a geração pelo provedor configurado."""
     project_id = resolver_project_id(project_id)
     if progress_callback:
         progress_callback(0, 4, "Calculando e registrando o fluxo PRISMA")
@@ -112,7 +112,7 @@ def gerar_relatorio_final(project_id=None, progress_callback=None):
             ),
         }
     
-    print("🧠 A solicitar síntese ao Gemini...")
+    print("🧠 A solicitar síntese ao provedor de IA configurado...")
     
     # Preparar o prompt com rigor académico
     prompt = f"""

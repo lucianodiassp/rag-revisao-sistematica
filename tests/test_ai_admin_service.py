@@ -100,6 +100,46 @@ class AIAdminServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "peso RRF"):
             save_ai_models(generation, "embedding-test", 768)
 
+    @patch("backend.app.ai_admin_service.reload_ai_runtime")
+    @patch("backend.app.ai_admin_service.save_installation_model_settings")
+    @patch("backend.app.ai_admin_service.get_installation_credential")
+    def test_salva_provedor_e_credencial_independentes_por_funcao(
+        self,
+        get_credential,
+        save_settings,
+        _reload,
+    ):
+        get_credential.side_effect = lambda provider: {
+            "id": "cred-gemini" if provider == "google_gemini" else "cred-openai"
+        }
+        generation = {
+            task: {
+                "provider_code": "google_gemini",
+                "model_name": "gemini-test",
+                "temperature": 0.0,
+            }
+            for task in GENERATION_TASKS
+        }
+        generation["report"].update(
+            {"provider_code": "openai", "model_name": "openai-test"}
+        )
+        generation[TASK_RERANKING].update(
+            {
+                "enabled": True,
+                "candidate_limit": 12,
+                "final_limit": 4,
+                "rrf_weight": 0.5,
+            }
+        )
+
+        save_ai_models(generation, "embedding-test", 768)
+
+        settings = save_settings.call_args.args[2]
+        self.assertEqual(settings["report"]["provider_code"], "openai")
+        self.assertEqual(settings["report"]["credential_id"], "cred-openai")
+        self.assertEqual(settings["embedding"]["provider_code"], "google_gemini")
+        self.assertEqual(settings["embedding"]["credential_id"], "cred-gemini")
+
 
 if __name__ == "__main__":
     unittest.main()
