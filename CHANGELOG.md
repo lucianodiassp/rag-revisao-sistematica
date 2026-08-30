@@ -6,6 +6,20 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.2.0] — 2026-08-30
+
+### Geração multiprovedor estável
+
+- Promovida a configuração de IA por função depois da aprovação da candidata
+  `v2.2.0-rc.1` nos perfis local e Web privado.
+- Validados Google Gemini e OpenAI no mesmo projeto para triagem, RAG, extração e
+  relatório final, preservando `paper_id`, página e trechos literais.
+- Confirmadas a persistência cifrada das credenciais após reinicialização e a
+  ausência de formatos reconhecíveis de chaves nos logs dos serviços.
+- Preservados os embeddings Gemini em 768 dimensões e a compatibilidade dos PDFs
+  já indexados, sem necessidade de nova vetorização.
+- Confirmados diagnóstico operacional saudável e backup pós-piloto íntegro.
+
 ## [2.2.0-rc.1] — 2026-08-30
 
 ### Geração multiprovedor
@@ -177,7 +191,9 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...v2.2.0
+[2.2.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...v2.2.0-rc.1
 [2.1.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.1...v2.1.0
 [2.1.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.1...v2.1.0-rc.1
 [2.0.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.0...v2.0.1

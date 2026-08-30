@@ -1,7 +1,7 @@
 # Validação da candidata v2.2.0-rc.1
 
 - Data da validação local: 30 de agosto de 2026
-- Perfil: Local, usuário único
+- Perfis: Local e Web privada, usuário único
 - Versão estável anterior: `2.1.0`
 
 ## Objetivo
@@ -28,8 +28,18 @@ credenciais cifradas, compatibilidade dos embeddings e rastreabilidade científi
 6. Gemini e OpenAI foram combinados por função sem reindexar os PDFs existentes.
 7. O diagnóstico operacional apresentou a configuração efetiva dos provedores.
 
-## Gate pendente
+## Evidências do piloto Web
 
-A candidata será publicada como pré-release e instalada no servidor Web privado.
-A promoção para `2.2.0` depende da repetição dos fluxos essenciais no ambiente real,
-da confirmação de logs sem segredos e da geração e validação de um novo backup.
+- A tag imutável `v2.2.0-rc.1` foi implantada com HTTPS e autenticação OIDC.
+- Login, navegação, versão e configuração efetiva foram confirmados na interface.
+- Gemini e OpenAI executaram funções reais no servidor; RAG e relatório final
+  preservaram as referências científicas.
+- O Diagnóstico Operacional permaneceu saudável.
+- A busca por formatos reconhecíveis de chaves retornou zero nos quatro serviços
+  auditados: aplicação, worker, agendador e proxy.
+- Um backup posterior ao piloto foi gerado, baixado e validado com sucesso.
+
+## Resultado e decisão
+
+Todos os gates da candidata foram aprovados. A implementação está apta à promoção
+estável `v2.2.0`, preservando `v2.2.0-rc.1` como registro imutável do piloto.

@@ -6,7 +6,7 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.1.0` | Funcionalidades e compatibilidade do produto |
+| Aplicação | `2.2.0` | Funcionalidades e compatibilidade do produto |
 | Migração do banco | `013` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
@@ -42,14 +42,15 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
   embeddings Gemini preservados para compatibilidade vetorial.
 - `2.2.0-rc.1`: primeira candidata multiprovedor, validada localmente com Gemini
   e OpenAI antes do piloto Web.
+- `2.2.0`: geração multiprovedor por função validada nos perfis local e Web privado.
 
 O sufixo `-rc.N` identificou as candidatas e impediu que fossem confundidas com
-releases estáveis. A versão estável atual é `v2.1.0`; `v2.1.0-rc.1` permanece no
-histórico como a pré-release usada no piloto operacional.
+releases estáveis. A versão estável atual é `v2.2.0`; as candidatas permanecem no
+histórico como pré-releases imutáveis usadas nos pilotos operacionais.
 
-A implementação multiprovedor foi incorporada à `main` pelo PR #51. A candidata
-segue em `release/v2.2.0-rc.1`; sua promoção para `v2.2.0` depende do piloto Web e
-dos critérios documentados, sem mover ou reutilizar a tag da candidata.
+A implementação multiprovedor foi incorporada à `main` pelo PR #51, validada na
+candidata `v2.2.0-rc.1` e promovida em `release/v2.2.0`, sem mover ou reutilizar a
+tag da candidata.
 
 ## Fluxo concluído da v1.0.0
 
