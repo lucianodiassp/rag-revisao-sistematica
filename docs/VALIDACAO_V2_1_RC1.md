@@ -40,12 +40,13 @@ Nenhum identificador de credencial, endpoint, token ou senha integra este regist
 8. O arquivo foi baixado diretamente do destino e validado pela aplicação com a
    senha de criptografia, sem executar restauração desnecessária.
 
-## Resultado e decisão
+## Execução automática e decisão final
 
-O fluxo manual ponta a ponta foi aprovado. A implementação está apta a receber a
-identidade `2.1.0-rc.1` e ser publicada como pré-release.
+Em 30 de agosto de 2026, o agendador iniciou sem intervenção manual às
+`06:00:00 UTC` e concluiu às `06:00:05 UTC`. O novo `.ragbackup` de 55,9 MB foi
+confirmado no destino privado, o último sucesso foi atualizado, a próxima execução
+avançou para o dia seguinte e o Diagnóstico Operacional permaneceu sem erros.
 
-A promoção para `2.1.0` permanece condicionada à observação de ao menos uma
-execução automática diária, à confirmação do novo objeto remoto e à permanência do
-diagnóstico operacional sem erros. Uma falha deve gerar correção e nova candidata,
-sem mover a tag `v2.1.0-rc.1`.
+O fluxo manual ponta a ponta e o agendamento real foram aprovados. A candidata
+`v2.1.0-rc.1` está apta à promoção estável `v2.1.0`, preservando a tag da
+pré-release como registro imutável do piloto.

@@ -6,7 +6,7 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.1.0-rc.1` | Funcionalidades e compatibilidade do produto |
+| Aplicação | `2.1.0` | Funcionalidades e compatibilidade do produto |
 | Migração do banco | `013` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
@@ -37,10 +37,11 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 - `2.0.0`: versão estável local e Web privada, inicialmente de usuário único.
 - `2.0.1`: manutenção pós-lançamento com integração contínua e contratos de implantação.
 - `2.1.0-rc.1`: candidata com backup externo agendado validado em um destino S3 real.
+- `2.1.0`: backup externo diário, verificação de integridade e retenção controlada.
 
 O sufixo `-rc.N` identificou as candidatas e impediu que fossem confundidas com
-releases estáveis. A versão estável atual é `v2.0.1`; `v2.1.0-rc.1` permanece uma
-pré-release até a conclusão do gate operacional diário.
+releases estáveis. A versão estável atual é `v2.1.0`; `v2.1.0-rc.1` permanece no
+histórico como a pré-release usada no piloto operacional.
 
 ## Fluxo concluído da v1.0.0
 
