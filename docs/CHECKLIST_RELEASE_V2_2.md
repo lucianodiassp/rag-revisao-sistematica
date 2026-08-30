@@ -1,7 +1,8 @@
 # Checklist da candidata v2.2
 
-Este checklist registra os critérios objetivos para publicar `v2.2.0-rc.1` e,
-depois do piloto, promover a implementação para `v2.2.0`.
+Este checklist registra os critérios objetivos usados para publicar
+`v2.2.0-rc.1` e promovê-la para `v2.2.0`. O piloto Web foi concluído em
+30 de agosto de 2026; permanecem abaixo apenas as ações de publicação estável.
 
 ## 1. Integridade da candidata
 
@@ -34,14 +35,15 @@ depois do piloto, promover a implementação para `v2.2.0`.
 
 ## 4. Piloto Web e promoção estável
 
-- [ ] Implantar exatamente a tag `v2.2.0-rc.1` no servidor Web privado.
-- [ ] Confirmar login, navegação e versão no menu lateral.
-- [ ] Validar no servidor ao menos uma função Gemini e uma função OpenAI.
-- [ ] Confirmar RAG e relatório final com referências preservadas.
-- [ ] Confirmar diagnóstico operacional sem erros e logs sem segredos.
-- [ ] Gerar e validar um backup após o piloto.
-- [ ] Promover a identidade para `2.2.0` em branch de release própria.
-- [ ] Aprovar o CI, mesclar na `main`, criar a tag e publicar a release estável.
+- [x] Implantar exatamente a tag `v2.2.0-rc.1` no servidor Web privado.
+- [x] Confirmar login, navegação e versão no menu lateral.
+- [x] Validar no servidor ao menos uma função Gemini e uma função OpenAI.
+- [x] Confirmar RAG e relatório final com referências preservadas.
+- [x] Confirmar diagnóstico operacional sem erros e logs sem segredos.
+- [x] Gerar e validar um backup após o piloto.
+- [x] Promover a identidade para `2.2.0` em branch de release própria.
+- [ ] Aprovar o CI e mesclar a branch de release na `main`.
+- [ ] Criar a tag `v2.2.0` e publicar a GitHub Release como versão estável.
 
 Não reutilize nem mova a tag de uma candidata publicada. Uma correção posterior
 deve produzir `2.2.0-rc.2`.
