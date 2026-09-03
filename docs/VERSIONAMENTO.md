@@ -6,7 +6,7 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.3.0-rc.1` | Funcionalidades e compatibilidade do produto |
+| Aplicação | `2.3.0` | Funcionalidades e compatibilidade do produto |
 | Migração do banco | `017` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
@@ -45,7 +45,9 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 - `2.2.0`: geração multiprovedor por função validada nos perfis local e Web privado.
 - `2.3.0-rc.1`: candidata com catálogo rastreável de figuras e tabelas, interpretação multimodal
   opcional após aprovação e segunda revisão humana, ainda sem inclusão automática
-  no RAG; piloto Web pendente.
+  no RAG; aprovada no piloto Web.
+- `2.3.0`: identidade estável preparada após validação local, piloto Web,
+  portabilidade e restauração isolada; publicação após o merge da promoção.
 
 O sufixo `-rc.N` identificou as candidatas e impediu que fossem confundidas com
 releases estáveis. A versão estável atual é `v2.2.0`; as candidatas permanecem no
@@ -56,10 +58,10 @@ candidata `v2.2.0-rc.1` e promovida em `release/v2.2.0`, sem mover ou reutilizar
 tag da candidata.
 
 O catálogo visual e a interpretação multimodal foram incorporados à `main` pelos
-PRs #54 e #55. A branch `release/v2.3.0-rc.1` prepara a identidade da candidata;
-a tag só deve ser criada depois do merge e dos checks. A pré-release não deve ser
-marcada como a versão estável mais recente. Correções do piloto exigem uma nova
-candidata, sem mover a tag publicada.
+PRs #54 e #55. O PR #56 preparou a candidata `v2.3.0-rc.1`, publicada como
+pré-release imutável. O piloto Web e o ensaio isolado de recuperação aprovaram a
+promoção em `release/v2.3.0`. A tag estável deve ser criada somente depois do merge
+e dos checks, sem mover a tag da candidata.
 
 ## Fluxo concluído da v1.0.0
 

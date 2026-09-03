@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.3.0--rc.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -47,7 +47,8 @@ O perfil padrão de implantação continua sendo **local e de usuário único**.
 por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
 continua reservado para uma evolução posterior.
 
-A versão estável é **2.2.0 — Local e Web privada, usuário único**. Ela preserva o
+A versão **2.3.0 — Local e Web privada, usuário único** está preparada para promoção
+estável após a aprovação do piloto da candidata. Ela preserva o
 uso local da `1.0.0` e incorpora autenticação, operação resiliente, recuperação,
 observabilidade e proteção de privacidade validadas em um servidor real. A
 identidade efetiva aparece no menu lateral e acompanha backups e pacotes de
@@ -62,13 +63,14 @@ A versão **2.2.0** acrescenta geração multiprovedor por função com Google G
 OpenAI, sem alterar os embeddings existentes nem exigir nova indexação. O fluxo
 foi validado nos perfis local e Web privado com credenciais cifradas.
 
-A candidata **2.3.0-rc.1** inicia o tratamento rastreável de conteúdo visual: figuras,
+A versão **2.3.0** acrescenta o tratamento rastreável de conteúdo visual: figuras,
 tabelas e legendas são catalogadas com página e recorte de origem e aguardam uma
 decisão humana. Candidatos aprovados podem receber uma interpretação multimodal
 opcional, enviada individualmente ao provedor configurado mediante consentimento e
 submetida a uma segunda revisão. Essas interpretações ainda não alimentam o RAG ou
-o relatório automaticamente. A candidata aguarda validação na VPS antes da promoção
-para uma versão estável; `v2.2.0` permanece como a última release estável.
+o relatório automaticamente. O fluxo foi validado localmente, na Web privada e em
+um ensaio de restauração isolado. A publicação da tag estável depende do merge da
+promoção; a pré-release `v2.3.0-rc.1` permanece imutável.
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).

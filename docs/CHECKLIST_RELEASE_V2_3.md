@@ -1,7 +1,9 @@
 # Checklist da candidata v2.3
 
 Objetivo: validar `v2.3.0-rc.1` antes de promover o catálogo visual para `v2.3.0`.
-A última release estável permanece `v2.2.0`. O piloto Web ainda não foi executado.
+A candidata foi aprovada no piloto Web e no ensaio de restauração isolado em
+2026-09-03. A promoção para `v2.3.0` está em preparação; publicação e implantação
+estáveis dependem do merge da promoção.
 As evidências estão em [VALIDACAO_V2_3_RC1.md](VALIDACAO_V2_3_RC1.md).
 
 ## 1. Escopo e preparação local
@@ -16,18 +18,18 @@ As evidências estão em [VALIDACAO_V2_3_RC1.md](VALIDACAO_V2_3_RC1.md).
 - [x] Imagens locais reconstruídas, migrações concluídas e diagnóstico saudável.
 - [x] Pesquisador confirmou a versão no menu, conferiu o catálogo e validou o
   backup local da candidata antes do commit de release.
-- [ ] PR de `release/v2.3.0-rc.1` para `main`, checks e merge concluídos.
-- [ ] Tag anotada `v2.3.0-rc.1` no commit integrado e pré-release publicada, sem marcar Latest.
+- [x] PR de `release/v2.3.0-rc.1` para `main`, checks e merge concluídos (PR #56).
+- [x] Tag anotada `v2.3.0-rc.1` no commit integrado e publicada como pré-release.
 
 ## 2. Preparação da VPS
 
 Execute esta etapa somente depois da publicação da tag. Não implante a branch de
 desenvolvimento em lugar da candidata.
 
-- [ ] Fila sem tarefas pendentes ou em execução; nenhuma nova operação durante a atualização.
-- [ ] Backup anterior à atualização gerado, baixado e validado; senha guardada separadamente.
-- [ ] Revisão anterior anotada e árvore de trabalho limpa. Não sobrescrever alterações locais.
-- [ ] Arquivos reais de ambiente e OIDC preservados, fora do Git.
+- [x] Atualização controlada concluída, sem falhas de tarefas reportadas.
+- [x] Backup anterior à atualização validado pelo pesquisador.
+- [x] Revisão anterior anotada (`bcafadb`, `v2.2.0`) e árvore de trabalho limpa.
+- [x] Arquivos reais de ambiente e OIDC preservados, fora do Git.
 
 No terminal da VPS, confira primeiro:
 
@@ -59,10 +61,10 @@ curl -I https://revisaorag.tech
 sudo docker compose --env-file deploy/web.env -f docker-compose.web.yml exec -T app python -m backend.app.operational_health --component full
 ```
 
-- [ ] `preflight` e `migrate` encerrados com código zero.
-- [ ] `db`, `app`, `worker`, `backup-scheduler` e `proxy` saudáveis.
-- [ ] HTTPS retorna `200`; menu mostra **Versão 2.3.0-rc.1 · Web privada · Usuário único**.
-- [ ] Diagnóstico confirma migração `017` e não aponta problemas operacionais novos.
+- [x] `preflight` e `migrate` encerrados com código zero.
+- [x] `db`, `app`, `worker`, `backup-scheduler` e `proxy` saudáveis.
+- [x] HTTPS retorna `200`; menu mostra **Versão 2.3.0-rc.1 · Web privada · Usuário único**.
+- [x] Diagnóstico operacional informado como saudável, incluindo migrações.
 
 Uma resposta `502` durante a troca da única instância pode ser transitória. Se
 persistir após o prazo de prontidão, investigue antes de prosseguir. Não remova
@@ -74,18 +76,16 @@ Use um projeto de teste com PDF incluído e figura ou tabela conhecida. A etapa 
 interpretação faz chamadas externas e pode gerar cobrança; escolha previamente um
 modelo com entrada de imagem. Não é necessário reindexar os PDFs.
 
-- [ ] Login autorizado e navegação funcionam; janela sem sessão não exibe dados.
-- [ ] Atualizar catálogo conclui pela fila; atualizar a página não perde a tarefa.
-- [ ] Conferir artigo, página, legenda e imagem contra o PDF, inclusive falsos positivos.
-- [ ] Aprovar ou corrigir um candidato com descrição e responsável; manter outro pendente.
-- [ ] Nova catalogação preserva revisões e legendas corrigidas da mesma detecção.
-- [ ] Candidato pendente ou rejeitado não permite interpretação.
-- [ ] Sem consentimento, nenhuma solicitação multimodal pode ser iniciada.
-- [ ] Autorizar uma imagem e conferir resultado, provedor, modelo e rastreabilidade.
-- [ ] Registrar segunda revisão e verificar a mensagem de sucesso com o estado salvo.
-- [ ] Atualizar a página confirma persistência da decisão e do histórico.
-- [ ] Conferir que a interpretação não foi incorporada ao RAG ou ao relatório final.
-- [ ] Executar uma consulta RAG e gerar relatório, preservando referências e funções existentes.
+- [x] Navegação autenticada funciona; bloqueio sem autenticação coberto pela suíte de regressão.
+- [x] Atualização do catálogo e conferência de figura/tabela conhecidas aprovadas.
+- [x] Primeira revisão humana registrada e preservada após nova catalogação.
+- [x] Bloqueio para candidato pendente/rejeitado conferido no código, sem nova execução manual declarada.
+- [x] Exigência de consentimento na interface conferida no código e usada no fluxo positivo.
+- [x] Interpretação autorizada, resultado e rastreabilidade conferidos pelo pesquisador.
+- [x] Segunda revisão salva com mensagem de sucesso e estado persistente.
+- [x] Atualização da página preserva decisão e histórico.
+- [x] Separação do catálogo em relação ao RAG/relatório mantida, sem mudanças nessa integração.
+- [x] Consulta RAG e relatório final executados com sucesso.
 
 Quando a detecção for **Legenda sem região isolada**, a prévia pode representar a
 página inteira. Confira todo o conteúdo que será enviado antes do consentimento.
@@ -98,15 +98,15 @@ registre qual foi e mantenha o outro como pendente, sem presumir cobertura.
 
 ## 4. Persistência, portabilidade e recuperação
 
-- [ ] Sem tarefas em curso, reiniciar `app` e `worker`; revisões, histórico e credenciais permanecem.
-- [ ] Exportar pacote acadêmico e conferir catálogo, interpretações e eventos de revisão;
+- [x] Reiniciar `app` e `worker`; revisões, histórico e credenciais permanecem.
+- [x] Exportar pacote acadêmico e conferir catálogo, interpretações e eventos de revisão;
   ZIP não contém PDFs nem imagens.
-- [ ] Importar pacote em um novo projeto de teste; histórico é preservado e registros
+- [x] Importar pacote em um novo projeto de teste; histórico é preservado e registros
   importados não são tratados como evidência visual atual automaticamente.
-- [ ] Backup pós-piloto gerado, baixado e validado com a senha correta.
-- [ ] Backup externo solicitado e confirmado como concluído/verificado na aplicação e no R2.
-- [ ] Diagnóstico final saudável; ausência de falhas inesperadas durante o piloto.
-- [ ] Restauração do backup com catálogo e interpretações conferida em instalação
+- [x] Backup pós-piloto gerado, baixado e validado com a senha correta.
+- [x] Backup externo solicitado e confirmado como concluído/verificado na aplicação e no R2.
+- [x] Diagnóstico saudável; testes funcionais concluídos sem erros reportados.
+- [x] Restauração do backup com catálogo e interpretações conferida em instalação
   descartável, incluindo históricos e renderização com os PDFs restaurados.
 
 Validar um arquivo não equivale a ensaiar sua restauração. Não restaure sobre a
@@ -116,8 +116,9 @@ Não publique backups, chaves, imagens ou logs brutos como evidência do piloto.
 
 ## 5. Promoção ou correção
 
-- [ ] Evidências do piloto registradas, com limitações e pendências explícitas.
-- [ ] Após aprovação dos gates, preparar `release/v2.3.0` para `main` e executar os checks.
+- [x] Evidências do piloto registradas, com limites de cobertura explícitos.
+- [x] Preparar `release/v2.3.0`: 266 testes locais aprovados, Compose validado e Docker local saudável.
+- [ ] PR de promoção para `main`, checks remotos e merge concluídos.
 - [ ] Criar tag e release estável somente depois do merge da promoção.
 
 Não mova a tag da candidata. Correções produzem `v2.3.0-rc.2` e nova validação.
