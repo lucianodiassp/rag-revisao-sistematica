@@ -6,13 +6,15 @@ O catálogo visual identifica candidatos a figuras e tabelas nos PDFs dos artigo
 incluídos. Cada registro preserva o artigo, a página, o recorte, a legenda próxima,
 o contexto textual, o método de detecção e o SHA-256 do PDF examinado.
 
-Esta primeira etapa é deliberadamente conservadora:
+O fluxo é deliberadamente conservador:
 
-- não envia imagens ou tabelas a provedores de IA;
-- não atribui significado científico ao conteúdo;
+- a catalogação local não envia imagens ou tabelas a provedores de IA;
+- somente candidatos aprovados ou corrigidos podem ser interpretados;
+- cada envio exige autorização explícita para um único recorte;
 - não insere descrições ou células no índice RAG;
 - não transforma uma detecção automática em evidência aprovada;
-- exige conferência humana para aprovar, corrigir ou rejeitar cada candidato.
+- exige conferência humana para aprovar, corrigir ou rejeitar cada candidato e
+  uma segunda decisão humana para a interpretação da IA.
 
 ## Fluxo de uso
 
@@ -21,6 +23,10 @@ Esta primeira etapa é deliberadamente conservadora:
 3. Aguarde a tarefa persistente concluir; o navegador pode ser atualizado ou fechado.
 4. Confira o recorte contra o PDF, a página, a legenda e o contexto exibidos.
 5. Registre a decisão humana, uma descrição verificável e o responsável.
+6. Opcionalmente, confirme o envio daquele recorte ao provedor configurado e
+   solicite a interpretação multimodal.
+7. Compare a resposta estruturada com o recorte e o PDF original; aprove, corrija
+   ou rejeite a interpretação e identifique o segundo responsável.
 
 Uma nova varredura preserva decisões ligadas à mesma detecção. Legendas corrigidas
 por uma pessoa não são substituídas pela legenda automática em varreduras futuras.
@@ -32,13 +38,15 @@ voltam a exigir revisão.
 O backup integral `.ragbackup` preserva o banco e os PDFs, portanto consegue
 restaurar o catálogo e renderizar novamente seus recortes. O pacote acadêmico ZIP
 inclui metadados e eventos de revisão, mas continua sem PDFs ou imagens por motivos
-de portabilidade e direitos autorais. Ao importar esse ZIP, o catálogo permanece
-histórico até que os PDFs sejam novamente associados e catalogados.
+de portabilidade e direitos autorais. As interpretações estruturadas, seus hashes,
+modelo, provedor e duas trilhas de revisão entram no pacote. Ao importar esse ZIP,
+o catálogo e as interpretações permanecem históricos até que os PDFs sejam
+novamente associados, catalogados e conferidos.
 
 ## Limitações conhecidas
 
 PDFs digitalizados, imagens compostas, tabelas sem linhas e legendas afastadas
 podem produzir omissões ou falsos positivos. A visualização e a decisão humana são
-obrigatórias. A futura interpretação multimodal deverá consumir apenas candidatos
-aprovados, registrar o provedor e o modelo e manter ligação explícita com página e
-região de origem.
+obrigatórias. A interpretação multimodal depende da capacidade do modelo selecionado,
+pode omitir ou interpretar incorretamente elementos e não substitui a leitura do PDF.
+Mesmo uma saída aprovada permanece fora do índice RAG e do relatório nesta fase.

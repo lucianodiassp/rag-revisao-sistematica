@@ -1,3 +1,4 @@
+import base64
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -70,6 +71,28 @@ class OpenAIResponsesClient:
             }
         )
 
+    @staticmethod
+    def _parse_text_response(data, fallback_model):
+        textos = []
+        recusas = []
+        for output in data.get("output") or []:
+            for content in output.get("content") or []:
+                tipo = content.get("type")
+                if tipo == "output_text" and content.get("text"):
+                    textos.append(str(content["text"]))
+                elif tipo == "refusal" and content.get("refusal"):
+                    recusas.append(str(content["refusal"]))
+        texto = "\n".join(textos).strip()
+        if not texto:
+            detalhe = recusas[0][:300] if recusas else "nenhum texto foi retornado"
+            raise RuntimeError(f"A OpenAI não produziu conteúdo utilizável: {detalhe}.")
+        return OpenAITextResponse(
+            text=texto,
+            model=str(data.get("model") or fallback_model),
+            request_id=str(data.get("id")) if data.get("id") else None,
+            usage=dict(data.get("usage") or {}),
+        )
+
     def generate_content(
         self,
         *,
@@ -94,25 +117,43 @@ class OpenAIResponsesClient:
             payload["text"] = {"format": {"type": "json_object"}}
 
         data = self._request("POST", "/responses", json_body=payload)
-        textos = []
-        recusas = []
-        for output in data.get("output") or []:
-            for content in output.get("content") or []:
-                tipo = content.get("type")
-                if tipo == "output_text" and content.get("text"):
-                    textos.append(str(content["text"]))
-                elif tipo == "refusal" and content.get("refusal"):
-                    recusas.append(str(content["refusal"]))
-        texto = "\n".join(textos).strip()
-        if not texto:
-            detalhe = recusas[0][:300] if recusas else "nenhum texto foi retornado"
-            raise RuntimeError(f"A OpenAI não produziu conteúdo utilizável: {detalhe}.")
-        return OpenAITextResponse(
-            text=texto,
-            model=str(data.get("model") or model),
-            request_id=str(data.get("id")) if data.get("id") else None,
-            usage=dict(data.get("usage") or {}),
-        )
+        return self._parse_text_response(data, model)
+
+    def generate_multimodal_content(
+        self,
+        *,
+        model,
+        prompt,
+        image_bytes,
+        mime_type="image/png",
+        response_mime_type=None,
+        system_instruction=None,
+        temperature=None,
+    ):
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        payload = {
+            "model": str(model).strip(),
+            "input": [{
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": str(prompt)},
+                    {
+                        "type": "input_image",
+                        "image_url": f"data:{mime_type};base64,{encoded}",
+                        "detail": "high",
+                    },
+                ],
+            }],
+            "store": False,
+        }
+        if system_instruction:
+            payload["instructions"] = str(system_instruction)
+        if temperature is not None:
+            payload["temperature"] = float(temperature)
+        if response_mime_type == "application/json":
+            payload["text"] = {"format": {"type": "json_object"}}
+        data = self._request("POST", "/responses", json_body=payload)
+        return self._parse_text_response(data, model)
 
 
 @lru_cache(maxsize=1)

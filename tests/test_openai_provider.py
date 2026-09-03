@@ -78,6 +78,39 @@ def test_erro_openai_remove_credencial_da_mensagem():
     assert "[REDACTED]" in str(context.value)
 
 
+def test_responses_api_envia_imagem_inline_sem_solicitar_armazenamento():
+    session = Mock()
+    session.request.return_value = FakeResponse(
+        200,
+        {
+            "id": "resp_visual",
+            "model": "gpt-visual",
+            "output": [{"content": [{"type": "output_text", "text": '{"summary":"ok"}'}]}],
+        },
+    )
+    client = OpenAIResponsesClient("segredo", session=session)
+
+    response = client.generate_multimodal_content(
+        model="gpt-visual",
+        prompt="Interprete o recorte",
+        image_bytes=b"png-bytes",
+        response_mime_type="application/json",
+        system_instruction="Não invente dados.",
+    )
+
+    assert response.text == '{"summary":"ok"}'
+    payload = session.request.call_args.kwargs["json"]
+    assert payload["store"] is False
+    assert payload["input"][0]["content"][0] == {
+        "type": "input_text",
+        "text": "Interprete o recorte",
+    }
+    image = payload["input"][0]["content"][1]
+    assert image["type"] == "input_image"
+    assert image["image_url"].startswith("data:image/png;base64,")
+    assert payload["text"] == {"format": {"type": "json_object"}}
+
+
 @patch("backend.app.ai_admin_service.OpenAIResponsesClient")
 def test_validacao_openai_lista_modelos_sem_gerar_conteudo(client_class):
     client = Mock()

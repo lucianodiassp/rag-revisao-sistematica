@@ -11,9 +11,11 @@ from backend.app.operational_health import (
 
 
 def test_visual_catalog_schema_is_required_by_operational_health():
-    assert LATEST_REQUIRED_MIGRATION == "016_visual_artifacts.sql"
+    assert LATEST_REQUIRED_MIGRATION == "017_visual_interpretations.sql"
     assert "visual_artifacts" in REQUIRED_TABLES
     assert "visual_artifact_review_events" in REQUIRED_TABLES
+    assert "visual_interpretations" in REQUIRED_TABLES
+    assert "visual_interpretation_review_events" in REQUIRED_TABLES
 
 
 def _check(code, status):

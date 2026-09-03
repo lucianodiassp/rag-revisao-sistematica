@@ -27,6 +27,7 @@ from backend.app.ai_config import (  # noqa: E402
     TASK_RERANKING,
     TASK_REPORT,
     TASK_SCREENING,
+    TASK_VISUAL_INTERPRETATION,
 )
 from backend.app.ai_config_repository import (  # noqa: E402
     configuration_tables_available,
@@ -45,6 +46,7 @@ TASK_LABELS = {
     TASK_EXTRACTION: "Extração de evidências",
     TASK_METHOD_QUALITY: "Qualidade metodológica",
     TASK_REPORT: "Relatório final",
+    TASK_VISUAL_INTERPRETATION: "Interpretação visual",
 }
 STATUS_LABELS = {
     "valid": "✅ Válida",

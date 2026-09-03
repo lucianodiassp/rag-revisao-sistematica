@@ -1,3 +1,5 @@
+import os
+
 from google.genai import types
 
 from backend.app.ai_config import (
@@ -43,6 +45,51 @@ def generate_content(
     return get_gemini_client().models.generate_content(
         model=config.model,
         contents=contents,
+        config=types.GenerateContentConfig(**parametros),
+    )
+
+
+def generate_multimodal_content(
+    task,
+    prompt,
+    image_bytes,
+    *,
+    mime_type="image/png",
+    response_mime_type=None,
+    system_instruction=None,
+):
+    """Envia um único recorte em memória, sem persistir a imagem ou seu base64."""
+    if not isinstance(image_bytes, (bytes, bytearray)) or not image_bytes:
+        raise ValueError("A imagem para interpretação está vazia.")
+    maximum = max(1, int(os.getenv("AI_VISUAL_MAX_IMAGE_MB", "8"))) * 1024 * 1024
+    if len(image_bytes) > maximum:
+        raise ValueError("O recorte visual excede o limite seguro configurado.")
+    config = get_generation_config(task)
+    if config.provider == PROVIDER_OPENAI:
+        return get_openai_client().generate_multimodal_content(
+            model=config.model,
+            prompt=prompt,
+            image_bytes=bytes(image_bytes),
+            mime_type=mime_type,
+            response_mime_type=response_mime_type,
+            system_instruction=system_instruction,
+            temperature=config.effective_temperature,
+        )
+    if config.provider != PROVIDER_GOOGLE_GEMINI:
+        raise RuntimeError(f"Provedor de IA não suportado: {config.provider}.")
+    parametros = {}
+    if response_mime_type:
+        parametros["response_mime_type"] = response_mime_type
+    if system_instruction:
+        parametros["system_instruction"] = system_instruction
+    if config.effective_temperature is not None:
+        parametros["temperature"] = config.effective_temperature
+    return get_gemini_client().models.generate_content(
+        model=config.model,
+        contents=[
+            types.Part.from_bytes(data=bytes(image_bytes), mime_type=mime_type),
+            str(prompt),
+        ],
         config=types.GenerateContentConfig(**parametros),
     )
 

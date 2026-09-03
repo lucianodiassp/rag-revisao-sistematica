@@ -64,7 +64,10 @@ foi validado nos perfis local e Web privado com credenciais cifradas.
 
 A linha **2.3.0-dev** inicia o tratamento rastreável de conteúdo visual: figuras,
 tabelas e legendas são catalogadas com página e recorte de origem e aguardam uma
-decisão humana. Esta etapa ainda não atribui significado científico por IA.
+decisão humana. Candidatos aprovados podem receber uma interpretação multimodal
+opcional, enviada individualmente ao provedor configurado mediante consentimento e
+submetida a uma segunda revisão. Essas interpretações ainda não alimentam o RAG ou
+o relatório automaticamente.
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
@@ -977,8 +980,9 @@ docker compose --profile tools down -v
   checklist PRISMA 2020 pelo pesquisador.
 - O OCR permite indexar texto presente em imagens, mas pode introduzir erros de
   reconhecimento e exige conferência humana. O catálogo visual localiza candidatos,
-  legendas e estruturas de tabelas, mas figuras, diagramas e relações visuais ainda
-  não são interpretados semanticamente nem usados automaticamente pelo RAG.
+  legendas e estruturas de tabelas; candidatos aprovados podem ser interpretados
+  individualmente por IA, mas a saída exige uma segunda revisão e não é usada
+  automaticamente pelo RAG.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
 - O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo e
   pode realizar uma segunda tentativa controlada quando a primeira saída falha.

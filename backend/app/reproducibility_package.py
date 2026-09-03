@@ -504,6 +504,36 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
                 """,
                 (project_id, project_id),
             )
+            visual_interpretations = _fetch_all(
+                cursor,
+                """
+                SELECT i.id, i.project_id, i.artifact_id,
+                       i.source_file_sha256, i.image_sha256, i.prompt_version,
+                       i.provider_code, i.model_name, i.model_metadata_jsonb,
+                       i.interpretation_jsonb, i.review_status,
+                       i.human_interpretation_jsonb, i.human_notes,
+                       i.reviewer_name, i.is_current, i.created_at,
+                       i.reviewed_at, i.updated_at
+                FROM visual_interpretations i
+                JOIN visual_artifacts a ON a.id = i.artifact_id
+                WHERE i.project_id = %s AND a.project_id = %s
+                ORDER BY i.created_at, i.id
+                """,
+                (project_id, project_id),
+            )
+            visual_interpretation_review_events = _fetch_all(
+                cursor,
+                """
+                SELECT e.id, e.project_id, e.interpretation_id, e.action,
+                       e.previous_jsonb, e.current_jsonb, e.reviewer_name,
+                       e.created_at
+                FROM visual_interpretation_review_events e
+                JOIN visual_interpretations i ON i.id = e.interpretation_id
+                WHERE e.project_id = %s AND i.project_id = %s
+                ORDER BY e.created_at, e.id
+                """,
+                (project_id, project_id),
+            )
         if hasattr(connection, "rollback"):
             connection.rollback()
     finally:
@@ -557,6 +587,8 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
             "synthesis_confidence_snapshots": synthesis_confidence_snapshots,
             "visual_artifacts": visual_artifacts,
             "visual_artifact_review_events": visual_artifact_review_events,
+            "visual_interpretations": visual_interpretations,
+            "visual_interpretation_review_events": visual_interpretation_review_events,
         }
     )
 
@@ -655,6 +687,12 @@ def _counts(dataset: dict) -> dict:
             for item in dataset.get("visual_artifacts") or []
             if item.get("review_status") in {"approved", "corrected", "rejected"}
         ),
+        "visual_interpretations": len(dataset.get("visual_interpretations") or []),
+        "reviewed_visual_interpretations": sum(
+            1
+            for item in dataset.get("visual_interpretations") or []
+            if item.get("review_status") in {"approved", "corrected", "rejected"}
+        ),
         "agent_interactions": len(dataset.get("interactions") or []),
         "evaluation_runs": len(dataset.get("evaluations") or []),
         "golden_set_queries": len(dataset.get("golden_queries") or []),
@@ -711,6 +749,8 @@ literais já usados como evidência permanecem presentes para permitir a auditor
 - Avaliações metodológicas revisadas: {counts['reviewed_methodological_assessments']}
 - Candidatos visuais atuais: {counts['current_visual_artifacts']}
 - Candidatos visuais revisados: {counts['reviewed_visual_artifacts']}
+- Interpretações visuais: {counts['visual_interpretations']}
+- Interpretações visuais com segunda revisão: {counts['reviewed_visual_interpretations']}
 - Limitações registradas: {counts['review_limitations']}
 - Limitações atuais confirmadas ou mitigadas: {counts['confirmed_or_mitigated_limitations']}
 - Snapshots de confiança da síntese: {counts['synthesis_confidence_snapshots']}
@@ -800,6 +840,12 @@ def build_reproducibility_package(dataset: dict, generated_at: str | None = None
         "04_documentos/catalogo_visual.csv": _csv_bytes(dataset.get("visual_artifacts") or []),
         "04_documentos/revisoes_catalogo_visual.json": _json_bytes(
             dataset.get("visual_artifact_review_events") or []
+        ),
+        "04_documentos/interpretacoes_visuais.json": _json_bytes(
+            dataset.get("visual_interpretations") or []
+        ),
+        "04_documentos/revisoes_interpretacoes_visuais.json": _json_bytes(
+            dataset.get("visual_interpretation_review_events") or []
         ),
         "05_evidencias/matriz_evidencias.csv": _csv_bytes(matrix),
         "05_evidencias/extracoes_rastreaveis.json": _json_bytes(dataset.get("extractions") or []),

@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS ai_model_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CHECK (task_type IN (
         'formulation', 'screening', 'rag', 'reranking', 'evaluation',
-        'extraction', 'report', 'embedding'
+        'extraction', 'report', 'visual_interpretation', 'embedding'
     )),
     CHECK (scope_type IN ('installation', 'user', 'team')),
     CHECK (embedding_dimensions IS NULL OR embedding_dimensions > 0)

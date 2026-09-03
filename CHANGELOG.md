@@ -16,8 +16,15 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   fechamento do navegador.
 - Metadados e revisões do catálogo entram no pacote de reprodutibilidade; PDFs e
   imagens continuam excluídos do ZIP.
-- Nesta primeira etapa nenhum conteúdo visual é interpretado por IA nem inserido
-  no índice RAG.
+- Adicionada interpretação multimodal opcional somente para candidatos aprovados
+  ou corrigidos, com consentimento explícito antes do envio de cada recorte.
+- Provedor e modelo são configuráveis por função; hash do recorte, versão do prompt,
+  saída estruturada e metadados da chamada permanecem auditáveis sem persistir a imagem.
+- Criada uma segunda revisão humana para aprovar, corrigir ou rejeitar a interpretação.
+- A confirmação de salvamento da segunda revisão permanece visível após a
+  atualização da página, junto ao formulário e com o estado registrado.
+- Mesmo depois de revisada, a interpretação não entra automaticamente no índice RAG
+  nem no relatório final nesta fase.
 
 ## [2.2.0] — 2026-08-30
 

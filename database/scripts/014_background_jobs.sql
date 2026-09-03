@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS background_jobs (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (job_type IN (
         'bibliographic_search', 'pdf_indexing', 'evidence_extraction',
-        'final_report', 'rag_benchmark', 'visual_cataloging'
+        'final_report', 'rag_benchmark', 'visual_cataloging',
+        'visual_interpretation'
     )),
     CHECK (status IN (
         'queued', 'running', 'retry_wait', 'succeeded', 'failed', 'cancelled'

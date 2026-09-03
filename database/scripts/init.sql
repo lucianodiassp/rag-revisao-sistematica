@@ -39,7 +39,8 @@ CREATE TABLE background_jobs (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (job_type IN (
         'bibliographic_search', 'pdf_indexing', 'evidence_extraction',
-        'final_report', 'rag_benchmark', 'visual_cataloging'
+        'final_report', 'rag_benchmark', 'visual_cataloging',
+        'visual_interpretation'
     )),
     CHECK (status IN (
         'queued', 'running', 'retry_wait', 'succeeded', 'failed', 'cancelled'
@@ -234,6 +235,47 @@ CREATE TABLE visual_artifact_review_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
     artifact_id UUID NOT NULL REFERENCES visual_artifacts(id) ON DELETE CASCADE,
+    action VARCHAR(20) NOT NULL,
+    previous_jsonb JSONB NOT NULL,
+    current_jsonb JSONB NOT NULL,
+    reviewer_name VARCHAR(200) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (action IN ('approved', 'corrected', 'rejected')),
+    CHECK (length(btrim(reviewer_name)) >= 2)
+);
+
+CREATE TABLE visual_interpretations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    artifact_id UUID NOT NULL REFERENCES visual_artifacts(id) ON DELETE CASCADE,
+    source_file_sha256 CHAR(64) NOT NULL,
+    image_sha256 CHAR(64) NOT NULL,
+    prompt_version VARCHAR(80) NOT NULL,
+    provider_code VARCHAR(50) NOT NULL,
+    model_name VARCHAR(150) NOT NULL,
+    model_metadata_jsonb JSONB NOT NULL DEFAULT '{}'::jsonb,
+    interpretation_jsonb JSONB NOT NULL,
+    review_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    human_interpretation_jsonb JSONB,
+    human_notes TEXT,
+    reviewer_name VARCHAR(200),
+    is_current BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (length(source_file_sha256) = 64),
+    CHECK (length(image_sha256) = 64),
+    CHECK (review_status IN ('pending', 'approved', 'corrected', 'rejected')),
+    CHECK (jsonb_typeof(model_metadata_jsonb) = 'object'),
+    CHECK (jsonb_typeof(interpretation_jsonb) = 'object'),
+    CHECK (human_interpretation_jsonb IS NULL OR jsonb_typeof(human_interpretation_jsonb) = 'object'),
+    CHECK (human_notes IS NULL OR length(btrim(human_notes)) >= 5)
+);
+
+CREATE TABLE visual_interpretation_review_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    interpretation_id UUID NOT NULL REFERENCES visual_interpretations(id) ON DELETE CASCADE,
     action VARCHAR(20) NOT NULL,
     previous_jsonb JSONB NOT NULL,
     current_jsonb JSONB NOT NULL,
@@ -500,7 +542,8 @@ CREATE TABLE ai_model_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CHECK (task_type IN (
         'formulation', 'screening', 'rag', 'reranking', 'evaluation',
-        'extraction', 'methodological_quality', 'report', 'embedding'
+        'extraction', 'methodological_quality', 'report',
+        'visual_interpretation', 'embedding'
     )),
     CHECK (scope_type IN ('installation', 'user', 'team')),
     CHECK (embedding_dimensions IS NULL OR embedding_dimensions > 0)
@@ -750,6 +793,9 @@ CREATE INDEX idx_embeddings_chunk ON embeddings_metadata(chunk_id);
 CREATE INDEX idx_visual_artifacts_project_status ON visual_artifacts(project_id, is_current, review_status, page_number);
 CREATE INDEX idx_visual_artifacts_paper ON visual_artifacts(paper_id, page_number, artifact_order);
 CREATE INDEX idx_visual_artifact_events_artifact ON visual_artifact_review_events(artifact_id, created_at);
+CREATE UNIQUE INDEX uq_visual_interpretations_current ON visual_interpretations(project_id, artifact_id) WHERE is_current = TRUE;
+CREATE INDEX idx_visual_interpretations_project_status ON visual_interpretations(project_id, is_current, review_status, created_at DESC);
+CREATE INDEX idx_visual_interpretation_events ON visual_interpretation_review_events(interpretation_id, created_at);
 CREATE INDEX idx_evidence_sources_extraction ON evidence_field_sources(extraction_id);
 CREATE INDEX idx_evidence_sources_chunk ON evidence_field_sources(chunk_id);
 CREATE INDEX idx_methodological_instruments_project ON methodological_assessment_instruments(project_id, version DESC);

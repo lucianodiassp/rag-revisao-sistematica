@@ -56,6 +56,8 @@ OPTIONAL_JSON_FILES = {
     "06_avaliacao/confianca_sintese.json": "synthesis_confidence_snapshots",
     "04_documentos/catalogo_visual.json": "visual_artifacts",
     "04_documentos/revisoes_catalogo_visual.json": "visual_artifact_review_events",
+    "04_documentos/interpretacoes_visuais.json": "visual_interpretations",
+    "04_documentos/revisoes_interpretacoes_visuais.json": "visual_interpretation_review_events",
 }
 
 LIST_DATASETS = (set(REQUIRED_JSON_FILES.values()) | set(OPTIONAL_JSON_FILES.values())) - {"project"}
@@ -362,6 +364,14 @@ def _prepare_import(dataset: dict, title: str | None = None) -> dict:
             "revisões do catálogo visual",
             False,
         ),
+        "visual_interpretation": _new_id_map(
+            dataset["visual_interpretations"], "interpretações visuais", False
+        ),
+        "visual_interpretation_review_event": _new_id_map(
+            dataset["visual_interpretation_review_events"],
+            "revisões das interpretações visuais",
+            False,
+        ),
     }
 
     chunk_map = {}
@@ -661,6 +671,78 @@ def _insert_import(cursor, dataset: dict, prepared: dict) -> None:
                     maps["visual_artifact"],
                     row.get("artifact_id"),
                     "candidato visual da revisão",
+                ),
+                row.get("action") or "approved",
+                Json(_remap_json(row.get("previous_jsonb") or {}, remap)),
+                Json(_remap_json(row.get("current_jsonb") or {}, remap)),
+                row.get("reviewer_name") or "Importação do pacote",
+                row.get("created_at"),
+            ),
+        )
+
+    for row in dataset["visual_interpretations"]:
+        source_id = _source_id(row, "visual_interpretation")
+        source_hash = str(row.get("source_file_sha256") or "").strip().lower()
+        image_hash = str(row.get("image_sha256") or "").strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", source_hash):
+            source_hash = "0" * 64
+        if not re.fullmatch(r"[0-9a-f]{64}", image_hash):
+            image_hash = hashlib.sha256(source_id.encode("utf-8")).hexdigest()
+        cursor.execute(
+            """
+            INSERT INTO visual_interpretations
+                (id, project_id, artifact_id, source_file_sha256, image_sha256,
+                 prompt_version, provider_code, model_name, model_metadata_jsonb,
+                 interpretation_jsonb, review_status, human_interpretation_jsonb,
+                 human_notes, reviewer_name, is_current, created_at, reviewed_at,
+                 updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, FALSE,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP), %s::timestamptz,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["visual_interpretation"][source_id],
+                project_id,
+                _mapped(
+                    maps["visual_artifact"], row.get("artifact_id"),
+                    "candidato da interpretação visual",
+                ),
+                source_hash,
+                image_hash,
+                row.get("prompt_version") or "imported-visual-interpretation",
+                row.get("provider_code") or "imported",
+                row.get("model_name") or "imported",
+                Json(_remap_json(row.get("model_metadata_jsonb") or {}, remap)),
+                Json(_remap_json(row.get("interpretation_jsonb") or {}, remap)),
+                row.get("review_status") or "pending",
+                Json(_remap_json(row.get("human_interpretation_jsonb"), remap))
+                if row.get("human_interpretation_jsonb") is not None else None,
+                row.get("human_notes"),
+                row.get("reviewer_name"),
+                row.get("created_at"),
+                row.get("reviewed_at"),
+                row.get("updated_at"),
+            ),
+        )
+
+    for row in dataset["visual_interpretation_review_events"]:
+        cursor.execute(
+            """
+            INSERT INTO visual_interpretation_review_events
+                (id, project_id, interpretation_id, action, previous_jsonb,
+                 current_jsonb, reviewer_name, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["visual_interpretation_review_event"][
+                    _source_id(row, "visual_interpretation_review_event")
+                ],
+                project_id,
+                _mapped(
+                    maps["visual_interpretation"], row.get("interpretation_id"),
+                    "interpretação visual da revisão",
                 ),
                 row.get("action") or "approved",
                 Json(_remap_json(row.get("previous_jsonb") or {}, remap)),

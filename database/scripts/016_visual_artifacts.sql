@@ -5,7 +5,8 @@ ALTER TABLE background_jobs
 ALTER TABLE background_jobs
     ADD CONSTRAINT background_jobs_job_type_check CHECK (job_type IN (
         'bibliographic_search', 'pdf_indexing', 'evidence_extraction',
-        'final_report', 'rag_benchmark', 'visual_cataloging'
+        'final_report', 'rag_benchmark', 'visual_cataloging',
+        'visual_interpretation'
     ));
 
 CREATE TABLE IF NOT EXISTS visual_artifacts (

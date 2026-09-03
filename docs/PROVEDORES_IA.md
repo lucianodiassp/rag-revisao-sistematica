@@ -3,12 +3,14 @@
 A linha `2.2` permite usar Google Gemini e OpenAI nas tarefas generativas sem
 alterar os agentes científicos. Formulação, triagem, RAG, reranking, auditoria,
 extração, qualidade metodológica e relatório podem escolher provedor e modelo
-independentemente.
+independentemente. Na linha `2.3`, a interpretação de um candidato visual aprovado
+também é uma função configurável e exige um modelo com entrada de imagem.
 
 ## Escopo desta entrega
 
 - Google Gemini continua sendo o padrão e permanece responsável pelos embeddings.
-- OpenAI usa a Responses API somente para geração de texto e JSON.
+- OpenAI usa a Responses API para geração de texto/JSON e, na interpretação visual,
+  recebe um único recorte inline com `store=false`.
 - O schema vetorial continua em 768 dimensões; trocar apenas o gerador não exige
   reindexar PDFs.
 - Não há fallback silencioso entre provedores. Toda tarefa usa exatamente a
@@ -67,6 +69,9 @@ função. Credenciais nunca entram nesses metadados nem nas mensagens operaciona
 5. Execute uma triagem, uma extração e o benchmark com a combinação desejada.
 6. Reinicie os contêineres e confirme que credenciais e modelos permanecem ativos.
 7. Gere e valide um backup antes de promover uma candidata de release.
+8. Para testar multimodalidade, escolha um modelo com suporte a imagens na função
+   **Interpretação visual**, aprove um candidato no catálogo, autorize um único envio
+   e registre a segunda revisão humana.
 
 ## Limites
 
@@ -76,3 +81,5 @@ função. Credenciais nunca entram nesses metadados nem nas mensagens operaciona
 - os embeddings OpenAI não estão habilitados nesta versão;
 - fallback automático entre provedores pertence a uma evolução posterior e deverá
   ser explícito na auditoria.
+- interpretações visuais revisadas permanecem fora do RAG e do relatório automático
+  nesta fase.
