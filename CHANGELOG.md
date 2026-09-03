@@ -6,6 +6,21 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.3.0] — 2026-09-03
+
+### Promoção do catálogo visual
+
+- Preparada a versão estável após a aprovação de `v2.3.0-rc.1` nos perfis local e
+  Web privado, com catálogo, consentimento, interpretação multimodal e duas revisões humanas.
+- Confirmada a persistência das revisões, históricos e credenciais após reiniciar
+  os serviços, além da regressão do assistente e do relatório final.
+- Validada a exportação e importação acadêmica sem substituir o projeto original;
+  os registros visuais importados permanecem históricos.
+- Validados backup pós-piloto, cópia externa no R2 e restauração em instalação
+  isolada, com conferência de consultas, PDFs, catálogo, revisões e históricos.
+- Preservados migração `017`, formatos de backup e pacote acadêmico v1 e a
+  separação das interpretações em relação ao índice RAG e ao relatório final.
+
 ## [2.3.0-rc.1] — 2026-09-03
 
 ### Catálogo visual rastreável
@@ -216,7 +231,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.3.0-rc.1...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...v2.3.0
 [2.3.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...v2.3.0-rc.1
 [2.2.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...v2.2.0
 [2.2.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...v2.2.0-rc.1
