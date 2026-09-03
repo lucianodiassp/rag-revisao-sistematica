@@ -43,6 +43,20 @@ def test_dispatches_pdf_indexing_with_persistent_progress(_progress, process):
     assert callable(process.call_args.kwargs["progress_callback"])
 
 
+@patch(
+    "backend.app.visual_catalog.catalog_project_visuals",
+    return_value={"papers_processed": 1, "figures": 2, "tables": 1},
+)
+@patch("backend.app.job_worker.update_job_progress")
+def test_dispatches_visual_cataloging_with_persistent_progress(_progress, catalog):
+    result = job_worker.execute_job(_job("visual_cataloging"))
+
+    assert result == {"papers_processed": 1, "figures": 2, "tables": 1}
+    catalog.assert_called_once()
+    assert catalog.call_args.args[0] == _job()["project_id"]
+    assert callable(catalog.call_args.kwargs["progress_callback"])
+
+
 @patch("backend.app.job_worker.HeartbeatThread")
 @patch("backend.app.job_worker.complete_job")
 @patch("backend.app.job_worker.execute_job", return_value={"processados": 2})

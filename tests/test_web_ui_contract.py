@@ -15,3 +15,15 @@ def test_credential_pages_show_dynamic_deployment_scope():
         assert "metadata['deployment_label']" in source
         assert "metadata['user_mode_label']" in source
         assert "Escopo atual: instalação local" not in source
+
+
+def test_visual_catalog_is_exposed_with_explicit_human_review_scope():
+    navigation = (ROOT / "frontend/app.py").read_text(encoding="utf-8")
+    page = (ROOT / "frontend/views/14_Catalogo_Visual.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'title="Catálogo Visual"' in navigation
+    assert "Nenhuma imagem ou tabela é" in page
+    assert "interpretada por IA" in page
+    assert "Confirmo que conferi este candidato no PDF" in page

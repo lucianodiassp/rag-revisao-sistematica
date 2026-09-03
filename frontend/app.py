@@ -89,6 +89,11 @@ pages = [
     ),
     st.Page("views/5_Gestao_PDFs.py", title="Gestão de PDFs", icon="📂"),
     st.Page(
+        "views/14_Catalogo_Visual.py",
+        title="Catálogo Visual",
+        icon="🖼️",
+    ),
+    st.Page(
         "views/6_Fontes_Bibliograficas.py",
         title="Fontes Bibliográficas",
         icon="🌐",

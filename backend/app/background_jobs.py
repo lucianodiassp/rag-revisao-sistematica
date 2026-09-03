@@ -17,6 +17,7 @@ JOB_PDF_INDEXING = "pdf_indexing"
 JOB_EVIDENCE_EXTRACTION = "evidence_extraction"
 JOB_FINAL_REPORT = "final_report"
 JOB_RAG_BENCHMARK = "rag_benchmark"
+JOB_VISUAL_CATALOGING = "visual_cataloging"
 
 JOB_TYPES = {
     JOB_BIBLIOGRAPHIC_SEARCH,
@@ -24,6 +25,7 @@ JOB_TYPES = {
     JOB_EVIDENCE_EXTRACTION,
     JOB_FINAL_REPORT,
     JOB_RAG_BENCHMARK,
+    JOB_VISUAL_CATALOGING,
 }
 ACTIVE_STATUSES = {"queued", "running", "retry_wait"}
 

@@ -177,6 +177,38 @@ def _dataset():
                 "embedding_dimensions": [768],
             }
         ],
+        "visual_artifacts": [
+            {
+                "id": "visual-1",
+                "project_id": PROJECT_ID,
+                "paper_id": PAPER_ID,
+                "paper_title": "Título científico",
+                "detection_key": "a" * 64,
+                "file_sha256": "b" * 64,
+                "page_number": 4,
+                "artifact_type": "figure",
+                "artifact_order": 1,
+                "caption": "Figura 1. Arquitetura avaliada",
+                "bbox_jsonb": [10, 20, 300, 200],
+                "detection_method": "embedded_image",
+                "detection_metadata_jsonb": {"semantic_interpretation": False},
+                "review_status": "approved",
+                "human_description": "Diagrama conferido pelo pesquisador.",
+                "reviewer_name": "Pesquisador",
+                "is_current": True,
+            }
+        ],
+        "visual_artifact_review_events": [
+            {
+                "id": "visual-event-1",
+                "project_id": PROJECT_ID,
+                "artifact_id": "visual-1",
+                "action": "approved",
+                "previous_jsonb": {"review_status": "pending"},
+                "current_jsonb": {"review_status": "approved"},
+                "reviewer_name": "Pesquisador",
+            }
+        ],
         "interactions": [
             {
                 "id": "interaction-1",
@@ -242,6 +274,8 @@ def test_package_contains_readable_artifacts_and_manifest_hashes(monkeypatch):
         assert "06_avaliacao/fontes_metodologicas.csv" in names
         assert "06_avaliacao/limitacoes_sintese.json" in names
         assert "06_avaliacao/confianca_sintese.json" in names
+        assert "04_documentos/catalogo_visual.json" in names
+        assert "04_documentos/revisoes_catalogo_visual.json" in names
         assert "08_relatorio/relatorio_final.md" in names
         assert not any(name.lower().endswith(".pdf") for name in names)
 
@@ -255,6 +289,8 @@ def test_package_contains_readable_artifacts_and_manifest_hashes(monkeypatch):
         assert manifest["counts"]["reviewed_methodological_assessments"] == 1
         assert manifest["counts"]["review_limitations"] == 1
         assert manifest["counts"]["synthesis_confidence_snapshots"] == 1
+        assert manifest["counts"]["current_visual_artifacts"] == 1
+        assert manifest["counts"]["reviewed_visual_artifacts"] == 1
         assert manifest["scope"]["secrets_excluded"] is True
         for entry in manifest["integrity"]["files"]:
             content = archive.read(entry["path"])
