@@ -92,7 +92,7 @@ class RagRerankingIntegrationTests(unittest.TestCase):
         busca.return_value = [{"candidate_id": "c1"}]
         reranquear.return_value = ([{"candidate_id": "c1"}], {"status": "success"})
 
-        buscar_contexto_reranqueado("Pergunta", "project-1")
+        buscar_contexto_reranqueado("Pergunta", "project-1", visual_mode=False)
 
         self.assertEqual(busca.call_args.kwargs["limite"], 10)
         self.assertIs(reranquear.call_args.kwargs["config"], config)

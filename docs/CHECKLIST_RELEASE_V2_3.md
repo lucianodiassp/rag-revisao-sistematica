@@ -2,8 +2,8 @@
 
 Objetivo: validar `v2.3.0-rc.1` antes de promover o catálogo visual para `v2.3.0`.
 A candidata foi aprovada no piloto Web e no ensaio de restauração isolado em
-2026-09-03. A promoção para `v2.3.0` está em preparação; publicação e implantação
-estáveis dependem do merge da promoção.
+2026-09-03. A promoção para `v2.3.0`, publicação e implantação estáveis foram
+concluídas e confirmadas pelo pesquisador nessa data.
 As evidências estão em [VALIDACAO_V2_3_RC1.md](VALIDACAO_V2_3_RC1.md).
 
 ## 1. Escopo e preparação local
@@ -118,8 +118,9 @@ Não publique backups, chaves, imagens ou logs brutos como evidência do piloto.
 
 - [x] Evidências do piloto registradas, com limites de cobertura explícitos.
 - [x] Preparar `release/v2.3.0`: 266 testes locais aprovados, Compose validado e Docker local saudável.
-- [ ] PR de promoção para `main`, checks remotos e merge concluídos.
-- [ ] Criar tag e release estável somente depois do merge da promoção.
+- [x] PR de promoção para `main` integrado (PR #57; commit `5192cbd`).
+- [x] Tag e release estável publicadas depois do merge da promoção.
+- [x] VPS em `2.3.0`, serviços saudáveis, HTTPS `200` e conferência funcional confirmados.
 
 Não mova a tag da candidata. Correções produzem `v2.3.0-rc.2` e nova validação.
 Se for necessário retornar, preserve primeiro os dados e siga

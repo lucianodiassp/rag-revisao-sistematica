@@ -20,6 +20,10 @@ from backend.app.database import (
 from backend.app.golden_set import list_golden_queries
 from backend.app.rag_citations import RESPOSTA_SEM_CONTEXTO
 from backend.app.reranking import fundir_rankings
+from backend.app.visual_rag import (
+    evidence_metadata, get_visual_rag_setting, list_eligible_visual_evidence,
+    ensure_visual_evidence_current,
+)
 from backend.app.retrieval_metrics import (
     DEFAULT_K_VALUES,
     aggregate_ranking_metrics,
@@ -154,6 +158,7 @@ def _compact_ranking(ranking):
         {
             "rank": index,
             "chunk_id": str(item.get("chunk_id") or ""),
+            **evidence_metadata(item),
             "paper_id": str(item.get("paper_id") or ""),
             "paper_title": item.get("paper_title"),
             "page_number": item.get("page_number"),
@@ -171,6 +176,60 @@ def _compact_ranking(ranking):
 def _golden_hash(snapshot):
     canonical = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _compare_visual_runs(mixed_results, queries, baseline_results, k_values):
+    """Compara texto e texto+visual na mesma pergunta, sem misturar denominadores."""
+    by_id = {str(item["id"]): item for item in queries}
+    baseline_metrics, mixed_metrics, rows = [], [], []
+    cohorts = {"textual_regression": ([], []), "visual_retrieval": ([], [])}
+    for mixed in mixed_results:
+        query = by_id[str(mixed["query_id"])]
+        if query["expected_refusal"] or mixed.get("execution_status", "").startswith("failed"):
+            continue
+        baseline = baseline_results.get(query["id"], {})
+        response = baseline.get("response")
+        if not response:
+            continue
+        trace = response.get("reranking") or {}
+        ranking = trace.get("reranked_ranking") or trace.get("final_ranking") or []
+        before = evaluate_ranking(ranking, query["relevances"], k_values)
+        after = mixed.get("reranked_metrics")
+        if not after:
+            continue
+        baseline_metrics.append(before)
+        mixed_metrics.append(after)
+        for name, visual in (("textual_regression", False), ("visual_retrieval", True)):
+            judgments = [j for j in query["relevances"] if bool(j.get("artifact_id")) == visual]
+            if judgments:
+                cohorts[name][0].append(evaluate_ranking(ranking, judgments, k_values))
+                cohorts[name][1].append(evaluate_ranking(mixed.get("reranked_ranking") or [], judgments, k_values))
+        rows.append({"query_id": query["id"], "question": query["question"],
+                     "text_only": before, "text_plus_visual": after,
+                     "text_only_ranking": _compact_ranking(ranking),
+                     "text_plus_visual_ranking": mixed.get("reranked_ranking") or []})
+    before = aggregate_ranking_metrics(baseline_metrics)
+    after = aggregate_ranking_metrics(mixed_metrics)
+    keys = sorted(set(before) | set(after))
+    return {"status": "comparable" if rows else "unavailable", "query_count": len(rows),
+            "excluded_answerable_query_count": sum(not q["expected_refusal"] for q in queries) - len(rows),
+            "text_only": before, "text_plus_visual": after,
+            "delta": {key: round(after.get(key, 0) - before.get(key, 0), 6) for key in keys},
+            "results": rows,
+            "cohorts": {name: {"query_count": len(pair[0]),
+                                "text_only": aggregate_ranking_metrics(pair[0]),
+                                "text_plus_visual": aggregate_ranking_metrics(pair[1])}
+                        for name, pair in cohorts.items()}}
+
+
+def _validate_visual_benchmark_snapshot(project_id, snapshot, setting):
+    if get_visual_rag_setting(project_id) != setting:
+        raise ValueError("A configuração visual mudou durante o benchmark. Execute novamente.")
+    current = list_eligible_visual_evidence(project_id)
+    def signature(items):
+        return sorted((i["interpretation_id"], i["evidence_revision"], i["source_file_sha256"]) for i in items)
+    if signature(current) != signature(snapshot):
+        raise ValueError("O catálogo visual mudou durante o benchmark. Execute novamente com o catálogo estável.")
 
 
 def validate_golden_set(snapshot):
@@ -391,6 +450,7 @@ def run_rag_benchmark(
     retry_base_delay_seconds=DEFAULT_RETRY_BASE_DELAY_SECONDS,
     retry_max_delay_seconds=DEFAULT_RETRY_MAX_DELAY_SECONDS,
     sleep_func=time.sleep,
+    compare_visual=False,
 ):
     """Executa RAG uma vez por pergunta e avalia RRF, reranking, recusa e citações."""
     project_id = str(project_id)
@@ -398,6 +458,20 @@ def run_rag_benchmark(
     errors = validate_golden_set(golden)
     if errors:
         raise ValueError(" ".join(errors))
+    visual_snapshot = []
+    visual_judgments = [item for query in golden["queries"] for item in query["relevances"] if item.get("artifact_id")]
+    if compare_visual or visual_judgments:
+        visual_snapshot = list_eligible_visual_evidence(project_id)
+        eligible_ids = {item["artifact_id"] for item in visual_snapshot}
+        if any(item["artifact_id"] not in eligible_ids for item in visual_judgments):
+            raise ValueError("O Golden Set contém fonte visual desatualizada ou indisponível. Revise os julgamentos antes de executar.")
+    visual_setting = None
+    if compare_visual:
+        visual_setting = get_visual_rag_setting(project_id)
+        if not visual_setting["enabled"]:
+            raise ValueError("Ative o uso visual no Assistente deste projeto antes da comparação.")
+        for item in visual_snapshot:
+            item["setting_revision"] = visual_setting["revision"]
     if rag_runner is None:
         from backend.agentes.agente_rag import responder_com_rag
 
@@ -426,6 +500,7 @@ def run_rag_benchmark(
     refusal_reconsidered_count = 0
     refusal_recovered_count = 0
     queries = golden["queries"]
+    baseline_results = {}
 
     for index, query in enumerate(queries, 1):
         if progress_callback:
@@ -440,6 +515,15 @@ def run_rag_benchmark(
                     f"em {delay:g}s",
                 )
 
+        if compare_visual:
+            _validate_visual_benchmark_snapshot(project_id, visual_snapshot, visual_setting)
+            baseline, baseline_execution = _run_query_with_retry(
+                lambda *args, **kwargs: rag_runner(*args, **kwargs, visual_mode=False),
+                query["question"], project_id, max_attempts=retry_max_attempts,
+                base_delay_seconds=retry_base_delay_seconds, max_delay_seconds=retry_max_delay_seconds,
+                sleep_func=sleep_func, retry_callback=report_retry,
+            )
+            baseline_results[query["id"]] = {"response": baseline, "execution": baseline_execution}
         response, execution = _run_query_with_retry(
             rag_runner,
             query["question"],
@@ -518,6 +602,7 @@ def run_rag_benchmark(
             ),
             "comparison_eligible": False,
             "generation": generation_trace,
+            "visual_retrieval": trace.get("visual_retrieval") or {"enabled": False},
             "rrf_ranking": _compact_ranking(initial),
             "model_ranking": _compact_ranking(model_ranking),
             "reranked_ranking": _compact_ranking(reranked),
@@ -567,6 +652,11 @@ def run_rag_benchmark(
                 "format_compliant": compliant,
             }
         results.append(item)
+
+    visual_comparison = None
+    if compare_visual:
+        _validate_visual_benchmark_snapshot(project_id, visual_snapshot, visual_setting)
+        visual_comparison = _compare_visual_runs(results, queries, baseline_results, k_values)
 
     citation_denominator = citation_valid + citation_invalid
     reranking_config = get_reranking_config()
@@ -626,6 +716,7 @@ def run_rag_benchmark(
         "reranking_recovered_after_retry_count": reranking_recovered_count,
         "refusal_reconsidered_count": refusal_reconsidered_count,
         "refusal_recovered_count": refusal_recovered_count,
+        "visual_comparison": visual_comparison,
     }
     summary["interpretation"] = _interpret_summary(summary)
     golden_snapshot = json.loads(json.dumps(golden, ensure_ascii=False, default=str))
@@ -635,6 +726,9 @@ def run_rag_benchmark(
         "golden_set_snapshot": golden_snapshot,
         "k_values": [int(k) for k in k_values],
         "retrieval_pipeline": "hybrid_vector_fts_rrf_plus_optional_reranking",
+        "compare_visual": bool(compare_visual),
+        "visual_setting": visual_setting,
+        "visual_evidence_snapshot": [evidence_metadata(item) | {"paper_id": item["paper_id"], "page_number": item["page_number"]} for item in visual_snapshot],
         "embedding": get_embedding_config().metadata(),
         "rag_model": get_generation_config(TASK_RAG).metadata(),
         "reranking": reranking_config.metadata(),
@@ -647,6 +741,8 @@ def run_rag_benchmark(
         },
     }
     metrics = {"summary": summary, "results": results}
+    if compare_visual:
+        metrics["text_only_runs"] = baseline_results
     run_id = salvar_execucao_avaliacao(project_id, RUN_TYPE, metrics, params)
     if progress_callback:
         progress_callback(len(queries), len(queries), "Benchmark concluído")

@@ -6,6 +6,19 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### 2.4.0-dev — interpretações visuais no Assistente
+
+- Uso visual opcional e auditado por projeto, desligado por padrão, restrito a PDFs
+  incluídos e interpretações atuais com duas revisões humanas válidas.
+- Busca lexical visual combinada ao reranking textual, sem alterar embeddings nem
+  transmitir novas imagens. Correções humanas substituem a interpretação original.
+- Citações com artigo, página e ID visual, metadados completos e bloqueio de entrega
+  se PDF, revisão ou autorização mudarem durante a geração.
+- Golden Set por figura/tabela e comparação pareada texto × texto+visual, separando
+  recuperação visual e regressão textual. Importação mantém visuais históricos e opt-in desligado.
+- Migração 018 reaplicável; fluxo do Relatório Final preservado.
+- Fechamento documental da release estável 2.3.0 publicada e validada na VPS.
+
 ## [2.3.0] — 2026-09-03
 
 ### Promoção do catálogo visual

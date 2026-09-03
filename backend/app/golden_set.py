@@ -25,7 +25,7 @@ def _snapshot_from_cursor(cursor, project_id):
         """
         SELECT q.id, q.question, q.expected_refusal, q.notes,
                r.id, r.paper_id, p.title, r.page_number,
-               r.relevance_grade, r.notes
+               r.relevance_grade, r.notes, r.artifact_id
         FROM rag_golden_queries q
         LEFT JOIN rag_golden_relevances r ON r.golden_query_id = q.id
         LEFT JOIN deduplicated_papers p ON p.id = r.paper_id
@@ -58,6 +58,7 @@ def _snapshot_from_cursor(cursor, project_id):
                     "page_number": int(row[7]) if row[7] is not None else None,
                     "relevance_grade": int(row[8]),
                     "notes": row[9],
+                    "artifact_id": str(row[10]) if row[10] else None,
                 }
             )
     return {"project_id": str(project_id), "queries": queries}
@@ -245,6 +246,7 @@ def add_golden_relevance(
             SELECT page_number FROM rag_golden_relevances
             WHERE golden_query_id = %s
               AND paper_id = %s
+              AND artifact_id IS NULL
             """,
             (str(query_id), str(paper_id)),
         )
@@ -267,6 +269,38 @@ def add_golden_relevance(
         )
         relevance_id = str(cursor.fetchone()[0])
         version = _record_version(cursor, project_id, "Julgamento de relevância adicionado")
+    return {"id": relevance_id, "version": version["version"]}
+
+
+def add_visual_golden_relevance(project_id, query_id, artifact_id, relevance_grade=2, notes=None):
+    from backend.app.visual_rag import list_eligible_visual_evidence
+
+    if int(relevance_grade) not in {1, 2, 3}:
+        raise ValueError("O grau de relevância deve estar entre 1 e 3.")
+    artifact = next((item for item in list_eligible_visual_evidence(project_id)
+                     if item["artifact_id"] == str(artifact_id)), None)
+    if not artifact:
+        raise ValueError("A fonte visual não está elegível: confira o PDF e as duas revisões.")
+    with _get_connection_factory()() as connection, connection.cursor() as cursor:
+        _lock_project(cursor, project_id)
+        cursor.execute("SELECT expected_refusal FROM rag_golden_queries WHERE id = %s AND project_id = %s",
+                       (str(query_id), str(project_id)))
+        query = cursor.fetchone()
+        if not query or query[0]:
+            raise ValueError("Selecione uma pergunta respondível do projeto.")
+        cursor.execute("SELECT 1 FROM rag_golden_relevances WHERE golden_query_id = %s AND artifact_id = %s",
+                       (str(query_id), str(artifact_id)))
+        if cursor.fetchone():
+            raise ValueError("Esta fonte visual já está cadastrada para a pergunta.")
+        cursor.execute(
+            """INSERT INTO rag_golden_relevances
+               (golden_query_id, paper_id, page_number, artifact_id, relevance_grade, notes)
+               VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
+            (str(query_id), artifact["paper_id"], artifact["page_number"], str(artifact_id),
+             int(relevance_grade), str(notes or "").strip()[:5000] or None),
+        )
+        relevance_id = str(cursor.fetchone()[0])
+        version = _record_version(cursor, project_id, "Julgamento visual de relevância adicionado")
     return {"id": relevance_id, "version": version["version"]}
 
 

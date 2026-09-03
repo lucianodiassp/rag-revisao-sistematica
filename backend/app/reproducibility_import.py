@@ -985,15 +985,18 @@ def _insert_import(cursor, dataset: dict, prepared: dict) -> None:
                 """
                 INSERT INTO rag_golden_relevances
                     (id, golden_query_id, paper_id, page_number,
-                     relevance_grade, notes, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s,
+                     relevance_grade, notes, artifact_id, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s,
                         COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
                 """,
                 (
                     str(uuid.uuid4()), query_id,
                     _mapped(maps["paper"], relevance.get("paper_id"), "artigo relevante"),
                     relevance.get("page_number"), int(relevance.get("relevance_grade") or 2),
-                    relevance.get("notes"), relevance.get("created_at"),
+                    relevance.get("notes"),
+                    _mapped(maps["visual_artifact"], relevance["artifact_id"], "fonte visual relevante")
+                    if relevance.get("artifact_id") else None,
+                    relevance.get("created_at"),
                 ),
             )
 

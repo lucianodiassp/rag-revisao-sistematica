@@ -49,4 +49,7 @@ PDFs digitalizados, imagens compostas, tabelas sem linhas e legendas afastadas
 podem produzir omissões ou falsos positivos. A visualização e a decisão humana são
 obrigatórias. A interpretação multimodal depende da capacidade do modelo selecionado,
 pode omitir ou interpretar incorretamente elementos e não substitui a leitura do PDF.
-Mesmo uma saída aprovada permanece fora do índice RAG e do relatório nesta fase.
+Na versão estável 2.3, mesmo uma saída aprovada permanece fora do RAG e do relatório.
+Na linha 2.4, o Assistente pode recuperar interpretações revisadas quando o projeto
+ativa explicitamente essa opção; o índice vetorial textual não muda e o Relatório
+Final continua fora do escopo. Veja [RAG_VISUAL.md](RAG_VISUAL.md).

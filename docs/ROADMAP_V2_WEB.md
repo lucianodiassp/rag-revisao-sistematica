@@ -144,4 +144,8 @@ endurecimento operacional da Web privada de usuário único.
    recorte, interpretação multimodal controlada e duas revisões humanas concluídos
    e validados nos perfis local e Web privado, incluindo portabilidade e restauração
    isolada. Continua sem inclusão automática no RAG ou relatório final.
-5. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.
+5. `v2.4.x`: uso opt-in de interpretações visuais revisadas no Assistente, citações
+   específicas e benchmark comparativo com regressão textual — em desenvolvimento.
+   [Escopo e critérios de aceite](RAG_VISUAL.md). Relatório final visual fica para
+   uma etapa posterior, condicionada à validação desta recuperação.
+6. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.

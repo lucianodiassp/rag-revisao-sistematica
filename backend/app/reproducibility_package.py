@@ -404,7 +404,7 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
             golden_relevances = _fetch_all(
                 cursor,
                 """
-                SELECT r.id, r.golden_query_id, r.paper_id, p.title AS paper_title,
+                SELECT r.id, r.golden_query_id, r.paper_id, p.title AS paper_title, r.artifact_id,
                        r.page_number, r.relevance_grade, r.notes, r.created_at
                 FROM rag_golden_relevances r
                 JOIN rag_golden_queries q ON q.id = r.golden_query_id

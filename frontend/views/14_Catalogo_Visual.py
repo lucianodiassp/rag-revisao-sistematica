@@ -255,7 +255,8 @@ st.header("3. Interpretar candidato aprovado")
 st.info(
     "A interpretação é opcional e feita para um único recorte por vez. O recorte será "
     "enviado ao provedor externo configurado somente após sua confirmação. A resposta "
-    "ficará fora do RAG e do relatório até uma evolução posterior explicitamente controlada."
+    "só poderá ser usada no Assistente com o uso visual habilitado explicitamente no projeto. "
+    "Permanece fora do relatório final."
 )
 
 if artifact["review_status"] not in {"approved", "corrected"}:
