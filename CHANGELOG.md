@@ -6,7 +6,9 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
-### 2.4.0-dev — interpretações visuais no Assistente
+## [2.4.0-rc.1] — 2026-09-03
+
+### Interpretações visuais revisadas no Assistente
 
 - Uso visual opcional e auditado por projeto, desligado por padrão, restrito a PDFs
   incluídos e interpretações atuais com duas revisões humanas válidas.
@@ -18,6 +20,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   recuperação visual e regressão textual. Importação mantém visuais históricos e opt-in desligado.
 - Migração 018 reaplicável; fluxo do Relatório Final preservado.
 - Fechamento documental da release estável 2.3.0 publicada e validada na VPS.
+- Candidata preparada após aprovação da suíte automatizada, ensaio isolado do banco,
+  Docker local saudável e validação funcional completa pelo pesquisador.
 
 ## [2.3.0] — 2026-09-03
 
@@ -244,7 +248,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.3.0...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.4.0-rc.1...HEAD
+[2.4.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.3.0...v2.4.0-rc.1
 [2.3.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...v2.3.0
 [2.3.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...v2.3.0-rc.1
 [2.2.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...v2.2.0
