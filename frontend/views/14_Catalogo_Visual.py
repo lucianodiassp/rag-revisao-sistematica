@@ -8,12 +8,21 @@ import streamlit as st
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from backend.app.background_jobs import JOB_VISUAL_CATALOGING
+from backend.app.ai_config import TASK_VISUAL_INTERPRETATION, get_generation_config
+from backend.app.background_jobs import (
+    JOB_VISUAL_CATALOGING,
+    JOB_VISUAL_INTERPRETATION,
+    get_latest_job,
+)
 from backend.app.visual_catalog import (
     list_visual_artifacts,
     render_visual_artifact_preview,
     review_visual_artifact,
     summarize_visual_artifacts,
+)
+from backend.app.visual_interpretation import (
+    get_current_visual_interpretation,
+    review_visual_interpretation,
 )
 from frontend.background_jobs_ui import job_is_active, render_job_status, start_job
 from frontend.project_selector import selecionar_projeto_ativo
@@ -239,4 +248,167 @@ if submitted:
             st.error(f"Não foi possível registrar a revisão visual: {error}")
         else:
             st.success("Revisão visual registrada com histórico rastreável.")
+            st.rerun()
+
+st.divider()
+st.header("3. Interpretar candidato aprovado")
+st.info(
+    "A interpretação é opcional e feita para um único recorte por vez. O recorte será "
+    "enviado ao provedor externo configurado somente após sua confirmação. A resposta "
+    "ficará fora do RAG e do relatório até uma evolução posterior explicitamente controlada."
+)
+
+if artifact["review_status"] not in {"approved", "corrected"}:
+    st.warning(
+        "Aprove ou corrija o candidato visual na etapa 2 antes de solicitar uma "
+        "interpretação por IA."
+    )
+    st.stop()
+
+try:
+    interpretation_config = get_generation_config(TASK_VISUAL_INTERPRETATION)
+    current_interpretation = get_current_visual_interpretation(project_id, artifact_id)
+except Exception as error:
+    st.error(f"Não foi possível carregar a configuração de interpretação: {error}")
+    st.stop()
+
+provider_labels = {"google_gemini": "Google Gemini", "openai": "OpenAI"}
+config_col, model_col = st.columns(2)
+config_col.metric(
+    "Provedor",
+    provider_labels.get(interpretation_config.provider, interpretation_config.provider),
+)
+model_col.metric("Modelo", interpretation_config.model)
+
+interpret_job = render_job_status(
+    project_id,
+    JOB_VISUAL_INTERPRETATION,
+    key="visual_interpretation",
+    title="Interpretação visual",
+    parameters={"artifact_id": artifact_id},
+)
+global_interpret_job = get_latest_job(project_id, JOB_VISUAL_INTERPRETATION)
+another_interpretation_active = (
+    job_is_active(global_interpret_job)
+    and (global_interpret_job.get("parameters_jsonb") or {}).get("artifact_id")
+    != artifact_id
+)
+if another_interpretation_active:
+    st.info("Outro candidato visual deste projeto está sendo interpretado no momento.")
+external_confirmation = st.checkbox(
+    "Autorizo o envio deste recorte aprovado ao provedor de IA configurado.",
+    key=f"visual_external_confirmation_{artifact_id}",
+)
+if st.button(
+    "✨ Solicitar interpretação visual",
+    type="primary",
+    width="stretch",
+    disabled=(
+        job_is_active(interpret_job)
+        or another_interpretation_active
+        or not external_confirmation
+    ),
+):
+    try:
+        start_job(
+            project_id,
+            JOB_VISUAL_INTERPRETATION,
+            {"artifact_id": artifact_id},
+        )
+        st.rerun()
+    except Exception as error:
+        st.error(f"Não foi possível solicitar a interpretação visual: {error}")
+
+if not current_interpretation:
+    st.caption("Este candidato ainda não possui interpretação multimodal registrada.")
+    st.stop()
+
+st.subheader("Interpretação registrada")
+interpretation = current_interpretation.get("interpretation_jsonb") or {}
+status = current_interpretation.get("review_status", "pending")
+st.markdown(f"**Estado da segunda revisão:** {STATUS_LABELS.get(status, status)}")
+st.markdown(f"**Resumo da IA:** {interpretation.get('summary') or 'Não disponível'}")
+if interpretation.get("observations"):
+    st.markdown("**Observações verificáveis propostas:**")
+    for observation in interpretation["observations"]:
+        st.markdown(f"- {observation}")
+if interpretation.get("limitations"):
+    st.markdown("**Limitações declaradas:**")
+    for limitation in interpretation["limitations"]:
+        st.markdown(f"- {limitation}")
+st.caption(
+    f"Confiança declarada: {interpretation.get('confidence', 'não informada')} · "
+    f"prompt: {current_interpretation.get('prompt_version')} · "
+    f"hash do recorte: {current_interpretation.get('image_sha256')}"
+)
+if interpretation.get("structured_data") is not None:
+    with st.expander("Dados estruturados propostos pela IA"):
+        st.json(interpretation["structured_data"])
+
+SECOND_DECISIONS = {
+    "Aprovar interpretação": "approved",
+    "Corrigir resumo": "corrected",
+    "Rejeitar interpretação": "rejected",
+}
+second_review_success_key = (
+    f"visual_second_review_success_{project_id}_{current_interpretation['id']}"
+)
+with st.form(f"visual_interpretation_review_{current_interpretation['id']}"):
+    second_label = st.radio(
+        "Segunda decisão humana",
+        list(SECOND_DECISIONS),
+        horizontal=True,
+    )
+    second_action = SECOND_DECISIONS[second_label]
+    corrected_summary = st.text_area(
+        "Resumo humano corrigido",
+        value=(current_interpretation.get("human_interpretation_jsonb") or {}).get(
+            "summary", interpretation.get("summary") or ""
+        ),
+        help="Usado somente quando a decisão for Corrigir resumo.",
+    )
+    interpretation_notes = st.text_area(
+        "Justificativa ou notas da segunda revisão",
+        value=current_interpretation.get("human_notes") or "",
+        help="Obrigatória para corrigir ou rejeitar.",
+    )
+    interpretation_reviewer = st.text_input(
+        "Responsável pela segunda revisão",
+        value=current_interpretation.get("reviewer_name") or "",
+    )
+    second_confirmation = st.checkbox(
+        "Confirmo que comparei a interpretação com o recorte e o PDF original."
+    )
+    second_submitted = st.form_submit_button(
+        "Registrar segunda revisão",
+        type="primary",
+    )
+
+# Exibe o aviso após o rerun que recarrega a decisão salva, junto ao formulário.
+second_review_success = st.session_state.pop(second_review_success_key, None)
+if second_review_success:
+    st.success(second_review_success)
+
+if second_submitted:
+    if not second_confirmation:
+        st.warning("Confirme a conferência humana antes de registrar a decisão.")
+    else:
+        try:
+            review_visual_interpretation(
+                project_id,
+                str(current_interpretation["id"]),
+                second_action,
+                interpretation_reviewer,
+                corrected_summary=corrected_summary,
+                human_notes=interpretation_notes,
+            )
+        except ValueError as error:
+            st.warning(str(error))
+        except Exception as error:
+            st.error(f"Não foi possível registrar a segunda revisão: {error}")
+        else:
+            st.session_state[second_review_success_key] = (
+                "Segunda revisão salva com sucesso. "
+                f"Estado: {STATUS_LABELS[second_action]}. Histórico preservado."
+            )
             st.rerun()

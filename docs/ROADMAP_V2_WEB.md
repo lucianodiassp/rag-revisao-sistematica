@@ -139,7 +139,7 @@ endurecimento operacional da Web privada de usuário único.
    validado em destino S3 real, incluindo execução automática diária.
 3. `v2.2.x`: provedores adicionais de IA — concluído e validado nos perfis local e
    Web privado, com Gemini e OpenAI selecionáveis por função.
-4. `v2.3.x`: conteúdo visual dos PDFs — catálogo rastreável e revisão humana em
-   desenvolvimento; interpretação semântica multimodal virá somente após validar
-   a qualidade desta base.
+4. `v2.3.x`: conteúdo visual dos PDFs — catálogo rastreável e primeira revisão
+   humana concluídos; interpretação multimodal controlada, consentimento por recorte
+   e segunda revisão humana em desenvolvimento, ainda sem inclusão automática no RAG.
 5. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.

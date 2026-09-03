@@ -32,9 +32,9 @@ def start_job(project_id, job_type, parameters=None):
     return job
 
 
-def render_job_status(project_id, job_type, *, key, title="Andamento"):
+def render_job_status(project_id, job_type, *, key, title="Andamento", parameters=None):
     """Mostra o último estado persistido e oferece atualização/repetição segura."""
-    job = get_latest_job(project_id, job_type)
+    job = get_latest_job(project_id, job_type, parameters=parameters)
     if not job:
         return None
 

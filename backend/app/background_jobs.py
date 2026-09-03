@@ -18,6 +18,7 @@ JOB_EVIDENCE_EXTRACTION = "evidence_extraction"
 JOB_FINAL_REPORT = "final_report"
 JOB_RAG_BENCHMARK = "rag_benchmark"
 JOB_VISUAL_CATALOGING = "visual_cataloging"
+JOB_VISUAL_INTERPRETATION = "visual_interpretation"
 
 JOB_TYPES = {
     JOB_BIBLIOGRAPHIC_SEARCH,
@@ -26,6 +27,7 @@ JOB_TYPES = {
     JOB_FINAL_REPORT,
     JOB_RAG_BENCHMARK,
     JOB_VISUAL_CATALOGING,
+    JOB_VISUAL_INTERPRETATION,
 }
 ACTIVE_STATUSES = {"queued", "running", "retry_wait"}
 
@@ -126,17 +128,22 @@ def get_job(job_id, project_id=None):
         return _row_to_dict(cursor.fetchone())
 
 
-def get_latest_job(project_id, job_type):
+def get_latest_job(project_id, job_type, parameters=None):
     with get_connection() as connection, connection.cursor(
         cursor_factory=RealDictCursor
     ) as cursor:
+        filters = ["project_id = %s", "job_type = %s"]
+        values = [project_id, job_type]
+        if parameters:
+            filters.append("parameters_jsonb @> %s")
+            values.append(Json(_json_safe(parameters)))
         cursor.execute(
-            """
+            f"""
             SELECT * FROM background_jobs
-            WHERE project_id = %s AND job_type = %s
+            WHERE {' AND '.join(filters)}
             ORDER BY created_at DESC LIMIT 1
             """,
-            (project_id, job_type),
+            values,
         )
         return _row_to_dict(cursor.fetchone())
 

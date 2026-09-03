@@ -541,6 +541,16 @@ def review_visual_artifact(
             ),
         )
         current = cursor.fetchone()
+        # Qualquer nova decisão sobre o candidato invalida interpretações anteriores.
+        # Uma nova chamada multimodal deverá refletir a descrição humana atual.
+        cursor.execute(
+            """
+            UPDATE visual_interpretations
+            SET is_current = FALSE, updated_at = CURRENT_TIMESTAMP
+            WHERE project_id = %s AND artifact_id = %s AND is_current = TRUE
+            """,
+            (str(project_id), str(artifact_id)),
+        )
         cursor.execute(
             """
             INSERT INTO visual_artifact_review_events

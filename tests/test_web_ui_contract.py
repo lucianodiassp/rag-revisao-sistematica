@@ -27,3 +27,7 @@ def test_visual_catalog_is_exposed_with_explicit_human_review_scope():
     assert "Nenhuma imagem ou tabela é" in page
     assert "interpretada por IA" in page
     assert "Confirmo que conferi este candidato no PDF" in page
+    assert "Autorizo o envio deste recorte aprovado" in page
+    assert "Aprove ou corrija o candidato visual" in page
+    assert "Confirmo que comparei a interpretação com o recorte" in page
+    assert "ficará fora do RAG e do relatório" in page

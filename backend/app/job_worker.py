@@ -17,6 +17,7 @@ from backend.app.background_jobs import (
     JOB_PDF_INDEXING,
     JOB_RAG_BENCHMARK,
     JOB_VISUAL_CATALOGING,
+    JOB_VISUAL_INTERPRETATION,
     claim_next_job,
     complete_job,
     fail_job,
@@ -136,6 +137,15 @@ def execute_job(job):
         from backend.app.visual_catalog import catalog_project_visuals
 
         return catalog_project_visuals(project_id, progress_callback=callback)
+
+    if job["job_type"] == JOB_VISUAL_INTERPRETATION:
+        from backend.app.visual_interpretation import interpret_visual_artifact
+
+        return interpret_visual_artifact(
+            project_id,
+            parameters.get("artifact_id"),
+            progress_callback=callback,
+        )
 
     raise ValueError(f"Tipo de processamento sem executor: {job['job_type']}")
 

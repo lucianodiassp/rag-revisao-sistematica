@@ -5,7 +5,8 @@ ALTER TABLE ai_model_settings
 ALTER TABLE ai_model_settings
     ADD CONSTRAINT ai_model_settings_task_type_check CHECK (task_type IN (
         'formulation', 'screening', 'rag', 'reranking', 'evaluation',
-        'extraction', 'methodological_quality', 'report', 'embedding'
+        'extraction', 'methodological_quality', 'report',
+        'visual_interpretation', 'embedding'
     ));
 
 CREATE TABLE IF NOT EXISTS methodological_assessment_instruments (

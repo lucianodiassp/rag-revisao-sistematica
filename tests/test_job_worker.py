@@ -57,6 +57,23 @@ def test_dispatches_visual_cataloging_with_persistent_progress(_progress, catalo
     assert callable(catalog.call_args.kwargs["progress_callback"])
 
 
+@patch(
+    "backend.app.visual_interpretation.interpret_visual_artifact",
+    return_value={"interpretation_id": "visual-result", "review_status": "pending"},
+)
+@patch("backend.app.job_worker.update_job_progress")
+def test_dispatches_one_visual_interpretation_with_artifact_parameter(_progress, interpret):
+    job = _job("visual_interpretation")
+    job["parameters_jsonb"] = {"artifact_id": "visual-artifact"}
+
+    result = job_worker.execute_job(job)
+
+    assert result["review_status"] == "pending"
+    interpret.assert_called_once()
+    assert interpret.call_args.args == (job["project_id"], "visual-artifact")
+    assert callable(interpret.call_args.kwargs["progress_callback"])
+
+
 @patch("backend.app.job_worker.HeartbeatThread")
 @patch("backend.app.job_worker.complete_job")
 @patch("backend.app.job_worker.execute_job", return_value={"processados": 2})
