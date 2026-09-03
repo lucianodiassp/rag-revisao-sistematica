@@ -127,7 +127,10 @@ def execute_job(job):
     if job["job_type"] == JOB_RAG_BENCHMARK:
         from backend.app.rag_benchmark import run_rag_benchmark
 
-        run = run_rag_benchmark(project_id, progress_callback=callback)
+        run = run_rag_benchmark(
+            project_id, progress_callback=callback,
+            compare_visual=bool((job.get("parameters_jsonb") or {}).get("compare_visual")),
+        )
         return {
             "run_id": run["id"],
             "summary": (run.get("metrics") or {}).get("summary") or {},

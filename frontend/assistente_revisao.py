@@ -9,6 +9,9 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from backend.agentes.agente_rag import responder_com_rag  # noqa: E402
+from backend.app.visual_rag import (  # noqa: E402
+    get_visual_rag_setting, set_visual_rag_setting, ensure_visual_evidence_current,
+)
 from frontend.project_selector import selecionar_projeto_ativo  # noqa: E402
 
 
@@ -26,13 +29,44 @@ artigos científicos recolhidos.
 )
 st.divider()
 
+try:
+    visual_setting = get_visual_rag_setting(project_id)
+except Exception:
+    st.error("Não foi possível conferir a configuração visual. Verifique o diagnóstico operacional.")
+    st.stop()
+with st.expander("Uso de figuras e tabelas revisadas", expanded=False):
+    st.caption("Opcional e desativado por padrão. Usa somente interpretações com duas revisões válidas e PDF atual. Não altera o Relatório Final nem envia novas imagens à IA.")
+    with st.form(f"visual_rag_form_{project_id}"):
+        visual_enabled = st.checkbox(
+            "Permitir interpretações visuais revisadas nas respostas deste projeto",
+            value=visual_setting["enabled"],
+        )
+        if st.form_submit_button("Salvar uso de evidências visuais"):
+            try:
+                set_visual_rag_setting(project_id, visual_enabled)
+                st.session_state[f"visual_saved_{project_id}"] = True
+                st.rerun()
+            except Exception:
+                st.error("Não foi possível salvar a configuração visual.")
+if st.session_state.pop(f"visual_saved_{project_id}", False):
+    st.success("Configuração visual salva para este projeto.")
+st.caption("Evidência visual: " + ("habilitada — interpretações revisadas" if visual_setting["enabled"] else "desativada — somente texto"))
+
 if "mensagens_por_projeto" not in st.session_state:
     st.session_state.mensagens_por_projeto = {}
 mensagens = st.session_state.mensagens_por_projeto.setdefault(project_id, [])
 
 for mensagem in mensagens:
     with st.chat_message(mensagem["role"]):
-        st.markdown(mensagem["content"])
+        try:
+            ensure_visual_evidence_current(project_id, mensagem.get("visual_evidence") or [])
+            st.markdown(mensagem["content"])
+            if mensagem.get("visual_evidence"):
+                st.caption("Resposta histórica com interpretação visual. Gere uma nova resposta para atualizar a análise.")
+        except Exception:
+            st.warning("Não foi possível confirmar a validade atual das fontes visuais desta resposta histórica.")
+            with st.expander("Consultar resposta antiga — não representa evidência atual"):
+                st.markdown(mensagem["content"])
 
 pergunta_usuario = st.chat_input(
     "Faça uma pergunta sobre a literatura aprovada "
@@ -55,7 +89,9 @@ if pergunta_usuario:
                 resposta_agente = resultado_rag["answer"]
 
                 st.markdown(resposta_agente)
-                mensagens.append({"role": "assistant", "content": resposta_agente})
+                mensagens.append({"role": "assistant", "content": resposta_agente,
+                                  "visual_evidence": [item for item in resultado_rag.get("evidence", [])
+                                                      if item.get("source_type") == "visual_interpretation"]})
 
                 trace = resultado_rag.get("reranking") or {}
                 with st.expander("Como as evidências foram selecionadas"):
@@ -93,6 +129,11 @@ if pergunta_usuario:
                                     "Artigo": item["paper_id"],
                                     "Título": item.get("paper_title"),
                                     "Página": item["page_number"],
+                                    "Fonte": "Interpretação visual revisada" if item.get("artifact_id") else "Texto do PDF",
+                                    "Figura/tabela ID": item.get("artifact_id"),
+                                    "Tipo visual": item.get("artifact_type"),
+                                    "Legenda": item.get("caption"),
+                                    "Interpretação ID": item.get("interpretation_id"),
                                     "Posição RRF": item["original_rank"],
                                     "Posição IA": item.get("model_rank"),
                                     "Posição final": item["rerank_rank"],

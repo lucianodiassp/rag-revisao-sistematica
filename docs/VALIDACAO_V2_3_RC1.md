@@ -132,4 +132,11 @@ tag estável.
 Candidata aprovada para promoção a `2.3.0`, com fluxo funcional, persistência,
 portabilidade, backup externo e recuperação isolada confirmados. A promoção altera
 identidade e documentação, sem mudar a lógica funcional testada. A publicação e a
-implantação da tag estável ocorrerão somente depois do merge da branch de promoção.
+implantação da tag estável foram concluídas após o merge da branch de promoção.
+
+### Fechamento pós-release — 2026-09-03
+
+PR #57 integrado em `5192cbd`; tag/release `v2.3.0` publicada. O pesquisador confirmou
+o preflight com `app_version=2.3.0`, os serviços da aplicação, worker, agendador,
+PostgreSQL e proxy saudáveis, migrações com saída zero e HTTPS `HTTP/2 200`.
+A conferência final da aplicação foi confirmada. A candidata permanece imutável.

@@ -16,6 +16,14 @@ CREATE TABLE review_projects (
 );
 
 -- Operações demoradas executadas fora da sessão do navegador.
+CREATE TABLE project_rag_settings (
+    project_id UUID PRIMARY KEY REFERENCES review_projects(id) ON DELETE CASCADE,
+    visual_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Operações demoradas executadas fora da sessão do navegador.
 CREATE TABLE background_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
@@ -457,6 +465,7 @@ CREATE TABLE rag_golden_relevances (
     golden_query_id UUID NOT NULL REFERENCES rag_golden_queries(id) ON DELETE CASCADE,
     paper_id UUID NOT NULL REFERENCES deduplicated_papers(id) ON DELETE CASCADE,
     page_number INTEGER,
+    artifact_id UUID REFERENCES visual_artifacts(id) ON DELETE CASCADE,
     relevance_grade INTEGER NOT NULL DEFAULT 2,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -468,7 +477,8 @@ CREATE UNIQUE INDEX uq_rag_golden_relevance_target
     ON rag_golden_relevances (
         golden_query_id,
         paper_id,
-        COALESCE(page_number, 0)
+        COALESCE(page_number, 0),
+        COALESCE(artifact_id, '00000000-0000-0000-0000-000000000000'::uuid)
     );
 
 -- Cada edição do gabarito produz um retrato imutável, usado posteriormente

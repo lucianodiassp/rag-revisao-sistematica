@@ -4,22 +4,25 @@ import re
 
 
 RESPOSTA_SEM_CONTEXTO = "Não tenho dados suficientes nos artigos recolhidos"
+UUID_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 PADRAO_CITACAO_RAG = re.compile(
-    r"\[([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\s*,\s*p\.\s*(\d+)\]",
+    rf"\[({UUID_PATTERN})\s*,\s*p\.\s*(\d+)(?:\s*,\s*visual\s+({UUID_PATTERN}))?\]",
     flags=re.IGNORECASE,
 )
 PADRAO_REFERENCIA_INTERNA = re.compile(r"\[(\d{1,3})\]")
 
 
-def formatar_citacao(paper_id, page_number):
-    return f"[{paper_id}, p. {int(page_number)}]"
+def formatar_citacao(paper_id, page_number, artifact_id=None):
+    visual = f", visual {artifact_id}" if artifact_id else ""
+    return f"[{paper_id}, p. {int(page_number)}{visual}]"
 
 
 def validar_citacoes_rag(resposta, evidencias):
     """Aceita apenas artigo/página recuperados e desambigua referências internas."""
     resposta = str(resposta or "").strip()
     fontes_permitidas = {
-        (str(item["paper_id"]).lower(), int(item["page_number"]))
+        (str(item["paper_id"]).lower(), int(item["page_number"]),
+         str(item.get("artifact_id") or "").lower() if item.get("source_type") == "visual_interpretation" else "")
         for item in evidencias or []
         if item.get("paper_id") and item.get("page_number") is not None
     }
@@ -35,8 +38,9 @@ def validar_citacoes_rag(resposta, evidencias):
     def _validar(match):
         paper_id = match.group(1).lower()
         pagina = int(match.group(2))
-        if (paper_id, pagina) in fontes_permitidas:
-            citacao = formatar_citacao(paper_id, pagina)
+        artifact_id = (match.group(3) or "").lower()
+        if (paper_id, pagina, artifact_id) in fontes_permitidas:
+            citacao = formatar_citacao(paper_id, pagina, artifact_id)
             citacoes_validas.append(citacao)
             return citacao
         citacoes_invalidas.append(match.group(0))
@@ -47,8 +51,8 @@ def validar_citacoes_rag(resposta, evidencias):
     sem_contexto = RESPOSTA_SEM_CONTEXTO.lower() in resposta.lower()
     if not citacoes_validas and fontes_permitidas and not sem_contexto:
         fontes_adicionadas = [
-            formatar_citacao(paper_id, pagina)
-            for paper_id, pagina in sorted(fontes_permitidas)
+            formatar_citacao(paper_id, pagina, artifact_id)
+            for paper_id, pagina, artifact_id in sorted(fontes_permitidas)
         ]
         resposta += (
             "\n\n**Aviso de rastreabilidade:** o modelo não vinculou as afirmações "
@@ -62,7 +66,8 @@ def validar_citacoes_rag(resposta, evidencias):
         "internal_references_disambiguated": referencias_internas,
         "source_citations_appended": fontes_adicionadas,
         "allowed_sources": [
-            {"paper_id": paper_id, "page_number": pagina}
-            for paper_id, pagina in sorted(fontes_permitidas)
+            {"paper_id": paper_id, "page_number": pagina,
+             **({"artifact_id": artifact_id, "source_type": "visual_interpretation"} if artifact_id else {})}
+            for paper_id, pagina, artifact_id in sorted(fontes_permitidas)
         ],
     }

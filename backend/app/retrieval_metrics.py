@@ -8,7 +8,8 @@ DEFAULT_K_VALUES = (1, 3, 5, 10)
 
 def _judgment_key(judgment):
     page = judgment.get("page_number")
-    return (str(judgment["paper_id"]), int(page) if page is not None else None)
+    return (str(judgment["paper_id"]), int(page) if page is not None else None,
+            str(judgment.get("artifact_id") or ""))
 
 
 def _match_ranking(ranking, judgments):
@@ -22,6 +23,8 @@ def _match_ranking(ranking, judgments):
             (key, grade)
             for key, grade in remaining.items()
             if key[0] == paper_id and (key[1] is None or key[1] == page)
+            and key[2] == (str(result.get("artifact_id") or "")
+                           if result.get("source_type") == "visual_interpretation" else "")
         ]
         if not candidates:
             matched.append({"relevant": False, "grade": 0, "judgment_key": None})

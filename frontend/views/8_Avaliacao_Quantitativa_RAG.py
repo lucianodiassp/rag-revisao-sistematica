@@ -9,6 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from backend.app.golden_set import (
     add_golden_query,
     add_golden_relevance,
+    add_visual_golden_relevance,
     delete_golden_query,
     delete_golden_relevance,
     list_golden_queries,
@@ -21,6 +22,7 @@ from backend.app.rag_benchmark import (
     validate_golden_set,
 )
 from backend.app.background_jobs import JOB_RAG_BENCHMARK
+from backend.app.visual_rag import get_visual_rag_setting, list_eligible_visual_evidence
 from frontend.project_selector import selecionar_projeto_ativo
 from frontend.background_jobs_ui import job_is_active, render_job_status, start_job
 
@@ -39,6 +41,8 @@ st.markdown(
 try:
     golden = list_golden_queries(project_id)
     indexed_papers = list_indexed_papers(project_id)
+    visual_setting = get_visual_rag_setting(project_id)
+    eligible_visuals = list_eligible_visual_evidence(project_id)
 except Exception as exc:
     st.error(f"Não foi possível carregar a avaliação quantitativa: {exc}")
     st.stop()
@@ -108,6 +112,8 @@ with golden_tab:
                                 {
                                     "Artigo": item["paper_title"],
                                     "Página": item["page_number"] or "Qualquer página",
+                                    "Fonte": "Figura/tabela revisada" if item.get("artifact_id") else "Texto do PDF",
+                                    "ID visual": item.get("artifact_id"),
                                     "Grau": grade_labels[item["relevance_grade"]],
                                     "Observação": item.get("notes") or "",
                                 }
@@ -187,6 +193,28 @@ with golden_tab:
                         except Exception as exc:
                             st.error(f"Não foi possível adicionar a fonte: {exc}")
 
+                if eligible_visuals:
+                    st.markdown("**Adicionar figura/tabela revisada ao gabarito**")
+                    visual_by_id = {item["artifact_id"]: item for item in eligible_visuals}
+                    selected_visual = st.selectbox(
+                        "Evidência visual elegível", options=list(visual_by_id),
+                        format_func=lambda artifact_id: (
+                            f"{visual_by_id[artifact_id]['paper_title']} · p. {visual_by_id[artifact_id]['page_number']} · "
+                            f"{visual_by_id[artifact_id]['artifact_type']} · {artifact_id[:8]}"
+                        ), key=f"visual_{query['id']}",
+                    )
+                    visual_grade = st.selectbox(
+                        "Grau da evidência visual", options=[3, 2, 1],
+                        format_func=lambda grade: grade_labels[grade], key=f"visual_grade_{query['id']}",
+                    )
+                    if st.button("Adicionar fonte visual ao gabarito", key=f"add_visual_{query['id']}"):
+                        try:
+                            add_visual_golden_relevance(project_id, query["id"], selected_visual, visual_grade)
+                            st.success("Fonte visual adicionada e Golden Set versionado.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Não foi possível adicionar a fonte visual: {exc}")
+
             confirm_delete = st.checkbox(
                 "Confirmo a remoção desta pergunta e de seus julgamentos",
                 key=f"confirm_delete_query_{query['id']}",
@@ -219,8 +247,13 @@ with benchmark_tab:
     info_col, button_col = st.columns([2, 1])
     with info_col:
         st.write(
-            "Cada pergunta executa o RAG completo uma vez. A mesma recuperação é usada "
-            "para avaliar RRF, reranking, recusa e conformidade das citações."
+            "No modo padrão, cada pergunta executa o RAG completo uma vez. A comparação "
+            "visual executa duas variantes pareadas para avaliar o impacto e a regressão."
+        )
+        compare_visual = st.checkbox(
+            "Comparar somente texto × texto + interpretações visuais",
+            disabled=not visual_setting["enabled"],
+            help="Executa cada pergunta duas vezes; consome aproximadamente o dobro das chamadas de geração e reranking.",
         )
     with button_col:
         execute = st.button(
@@ -231,7 +264,7 @@ with benchmark_tab:
         )
     if execute:
         try:
-            start_job(project_id, JOB_RAG_BENCHMARK)
+            start_job(project_id, JOB_RAG_BENCHMARK, {"compare_visual": compare_visual})
             st.rerun()
         except Exception as exc:
             st.error(f"Não foi possível iniciar o benchmark: {exc}")
@@ -292,6 +325,36 @@ with benchmark_tab:
             "Recusas indevidas",
             "N/A" if summary.get("false_refusal_rate") is None else f"{summary['false_refusal_rate'] * 100:.1f}%",
         )
+        visual_comparison = summary.get("visual_comparison")
+        if visual_comparison:
+            st.subheader("Impacto das interpretações visuais")
+            if visual_comparison.get("status") == "comparable":
+                rows = []
+                for key, label in (("recall_at_5", "Recall@5"), ("ndcg_at_5", "nDCG@5"),
+                                   ("reciprocal_rank", "MRR")):
+                    rows.append({"Métrica": label,
+                                 "Somente texto": (visual_comparison["text_only"] or {}).get(key, 0),
+                                 "Texto + visual": (visual_comparison["text_plus_visual"] or {}).get(key, 0),
+                                 "Diferença": (visual_comparison["delta"] or {}).get(key, 0)})
+                st.dataframe(rows, hide_index=True, use_container_width=True)
+                st.caption(f"Comparação pareada em {visual_comparison['query_count']} pergunta(s).")
+                if visual_comparison.get("excluded_answerable_query_count"):
+                    st.warning(
+                        f"{visual_comparison['excluded_answerable_query_count']} pergunta(s) "
+                        "respondível(is) foram excluídas por não concluírem os dois modos."
+                    )
+                cohort_rows = []
+                for code, label in (("textual_regression", "Regressão textual"),
+                                    ("visual_retrieval", "Recuperação visual")):
+                    cohort = (visual_comparison.get("cohorts") or {}).get(code) or {}
+                    cohort_rows.append({
+                        "Coorte": label, "Perguntas": cohort.get("query_count", 0),
+                        "Recall@5 · somente texto": (cohort.get("text_only") or {}).get("recall_at_5"),
+                        "Recall@5 · texto + visual": (cohort.get("text_plus_visual") or {}).get("recall_at_5"),
+                    })
+                st.dataframe(cohort_rows, hide_index=True, use_container_width=True)
+            else:
+                st.warning("A execução não produziu uma amostra pareada comparável.")
 
         comparison_rows = []
         comparison = summary.get("comparison_cohort") or {}
