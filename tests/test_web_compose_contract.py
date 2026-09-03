@@ -35,6 +35,14 @@ def test_web_app_and_worker_have_independent_healthchecks():
     assert "      - frontend" in worker
 
 
+def test_web_services_use_the_repository_release_image():
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    expected = f"    image: rag-revisao-sistematica-app:{version}"
+
+    for service in ("preflight", "app", "worker", "backup-scheduler"):
+        assert expected in _service_block(service).splitlines()
+
+
 def test_backup_scheduler_has_no_public_port_and_shares_protected_volumes():
     scheduler = _service_block("backup-scheduler")
 

@@ -12,7 +12,7 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: versão estável publicada, atualmente `v2.2.0`.
+- `main`: integração das próximas entregas; última tag estável publicada `v2.2.0`.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 
@@ -140,6 +140,7 @@ endurecimento operacional da Web privada de usuário único.
 3. `v2.2.x`: provedores adicionais de IA — concluído e validado nos perfis local e
    Web privado, com Gemini e OpenAI selecionáveis por função.
 4. `v2.3.x`: conteúdo visual dos PDFs — catálogo rastreável e primeira revisão
-   humana concluídos; interpretação multimodal controlada, consentimento por recorte
-   e segunda revisão humana em desenvolvimento, ainda sem inclusão automática no RAG.
+   humana, interpretação multimodal controlada, consentimento por recorte e segunda
+   revisão humana implementados e validados localmente. A candidata `v2.3.0-rc.1`
+   aguarda o piloto Web; continua sem inclusão automática no RAG ou relatório final.
 5. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.

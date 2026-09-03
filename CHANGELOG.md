@@ -6,6 +6,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.3.0-rc.1] — 2026-09-03
+
 ### Catálogo visual rastreável
 
 - Adicionada detecção local de figuras, estruturas tabulares e legendas nos PDFs
@@ -25,6 +27,9 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   atualização da página, junto ao formulário e com o estado registrado.
 - Mesmo depois de revisada, a interpretação não entra automaticamente no índice RAG
   nem no relatório final nesta fase.
+- Preparada a primeira candidata do catálogo visual, com roteiro de validação na
+  VPS e promoção estável condicionada ao piloto. Migração `017`, backup v1 e pacote
+  de reprodutibilidade v1 preservados.
 
 ## [2.2.0] — 2026-08-30
 
@@ -211,7 +216,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.3.0-rc.1...HEAD
+[2.3.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...v2.3.0-rc.1
 [2.2.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...v2.2.0
 [2.2.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.1.0...v2.2.0-rc.1
 [2.1.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.0.1...v2.1.0
