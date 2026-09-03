@@ -12,8 +12,8 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: integração das próximas entregas; última tag estável publicada `v2.2.0`,
-  com promoção para `v2.3.0` preparada após o piloto da candidata.
+- `main`: integração das próximas entregas; última tag estável publicada `v2.3.0`,
+  com a candidata `v2.4.0-rc.1` em preparação.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 

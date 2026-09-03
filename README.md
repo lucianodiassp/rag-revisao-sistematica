@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.4.0--dev-blue.svg)
+![Version](https://img.shields.io/badge/version-2.4.0--rc.1-orange.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -72,7 +72,7 @@ o relatório automaticamente. O fluxo foi validado localmente, na Web privada e 
 um ensaio de restauração isolado. A tag estável `v2.3.0` está publicada;
 a pré-release `v2.3.0-rc.1` permanece imutável.
 
-A linha **2.4.0-dev**, ainda em validação, acrescenta uso **opcional por projeto**
+A candidata **2.4.0-rc.1**, ainda sem promoção estável, acrescenta uso **opcional por projeto**
 de interpretações visuais com duas revisões no Assistente. O padrão continua
 desativado. Citações identificam artigo, página e figura/tabela; PDFs substituídos
 ou revisões revogadas deixam de ser elegíveis. O Golden Set aceita fontes visuais
@@ -82,8 +82,8 @@ O Relatório Final não muda. Consulte [RAG visual e roteiro de validação](doc
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
 Os critérios de validação e o roteiro do piloto na VPS estão no
-[Checklist da candidata v2.3](docs/CHECKLIST_RELEASE_V2_3.md), com evidências em
-[Validação v2.3.0-rc.1](docs/VALIDACAO_V2_3_RC1.md).
+[Checklist da candidata v2.4](docs/CHECKLIST_RELEASE_V2_4.md), com evidências em
+[Validação v2.4.0-rc.1](docs/VALIDACAO_V2_4_RC1.md).
 
 ### Autenticação da Web privada
 

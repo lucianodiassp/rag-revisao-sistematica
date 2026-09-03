@@ -6,8 +6,8 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.3.0` | Funcionalidades e compatibilidade do produto |
-| Migração do banco | `017` | Evolução progressiva do schema PostgreSQL |
+| Aplicação | `2.4.0-rc.1` | Funcionalidades e compatibilidade do produto |
+| Migração do banco | `018` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
 | Protocolo científico | `v3` | Histórico metodológico dentro de cada projeto |
@@ -48,9 +48,11 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
   no RAG; aprovada no piloto Web.
 - `2.3.0`: identidade estável preparada após validação local, piloto Web,
   portabilidade e restauração isolada; publicação após o merge da promoção.
+- `2.4.0-rc.1`: candidata com uso opcional no Assistente das interpretações visuais
+  atuais e revisadas, citações por artefato e comparação pareada no benchmark.
 
-O sufixo `-rc.N` identificou as candidatas e impediu que fossem confundidas com
-releases estáveis. A versão estável atual é `v2.2.0`; as candidatas permanecem no
+O sufixo `-rc.N` identifica as candidatas e impede que sejam confundidas com
+releases estáveis. A versão estável atual é `v2.3.0`; as candidatas permanecem no
 histórico como pré-releases imutáveis usadas nos pilotos operacionais.
 
 A implementação multiprovedor foi incorporada à `main` pelo PR #51, validada na
@@ -62,6 +64,11 @@ PRs #54 e #55. O PR #56 preparou a candidata `v2.3.0-rc.1`, publicada como
 pré-release imutável. O piloto Web e o ensaio isolado de recuperação aprovaram a
 promoção em `release/v2.3.0`. A tag estável deve ser criada somente depois do merge
 e dos checks, sem mover a tag da candidata.
+
+O RAG visual revisado foi incorporado à `main` pelo PR #58. A candidata
+`v2.4.0-rc.1` preserva o padrão desligado por projeto, o Relatório Final textual e
+os formatos v1 de backup e pacote acadêmico. O piloto Web deve partir da tag da
+candidata, nunca da branch de desenvolvimento.
 
 ## Fluxo concluído da v1.0.0
 
@@ -102,7 +109,7 @@ candidatas (`rc.2`, `rc.3`), sem mover ou reutilizar tags já publicadas.
 O planejamento incremental, os critérios de aceite e os itens fora do primeiro
 ciclo estão detalhados em [ROADMAP_V2_WEB.md](ROADMAP_V2_WEB.md).
 O gate de promoção está detalhado em
-[CHECKLIST_RELEASE_V2_3.md](CHECKLIST_RELEASE_V2_3.md).
+[CHECKLIST_RELEASE_V2_4.md](CHECKLIST_RELEASE_V2_4.md).
 
 ## Compatibilidade e retorno
 

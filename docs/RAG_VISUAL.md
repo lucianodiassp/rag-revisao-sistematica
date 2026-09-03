@@ -1,6 +1,7 @@
-# RAG visual revisado — 2.4.0-dev
+# RAG visual revisado — 2.4.0-rc.1
 
-Estado: implementação em validação local. A VPS continua na versão estável 2.3.0.
+Estado: candidata preparada após validação automatizada, isolada e funcional local.
+A VPS continua na versão estável 2.3.0 até a publicação da tag da candidata.
 
 ## Escopo
 
@@ -64,7 +65,7 @@ fontes atuais e só então ative o recurso.
 
 ## Validação manual local
 
-1. Confirme `2.4.0-dev`, navegação e diagnóstico operacional.
+1. Confirme `2.4.0-rc.1`, navegação e diagnóstico operacional.
 2. No Assistente, confira que o uso visual começa desligado. Faça uma pergunta textual.
 3. Em um projeto com PDF incluído, aprove/corrija um candidato no Catálogo Visual,
    autorize sua interpretação e registre a segunda revisão.
@@ -81,4 +82,5 @@ fontes atuais e só então ative o recurso.
 8. Gere e valide backup. Valide importação/restore somente em ambiente isolado.
    O Relatório Final deve continuar usando seu fluxo textual já validado.
 
-Não fazer deploy na VPS nem publicar uma candidata antes de concluir esses testes.
+Os testes funcionais locais foram concluídos em 2026-09-03. O piloto na VPS deve
+usar somente a tag imutável publicada após o merge da branch de release.
