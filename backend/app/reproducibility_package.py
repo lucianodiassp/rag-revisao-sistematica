@@ -472,6 +472,38 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
                 """,
                 (project_id,),
             )
+            visual_artifacts = _fetch_all(
+                cursor,
+                """
+                SELECT a.id, a.project_id, a.paper_id, p.title AS paper_title,
+                       a.detection_key, a.file_sha256, a.page_number,
+                       a.artifact_type, a.artifact_order, a.caption,
+                       a.context_text, a.bbox_jsonb, a.detection_method,
+                       a.detection_metadata_jsonb, a.extracted_content_jsonb,
+                       a.review_status, a.human_description, a.human_notes,
+                       a.reviewer_name, a.is_current, a.detected_at,
+                       a.reviewed_at, a.updated_at
+                FROM visual_artifacts a
+                JOIN deduplicated_papers p ON p.id = a.paper_id
+                WHERE a.project_id = %s
+                ORDER BY p.title, a.page_number, a.artifact_type,
+                         a.artifact_order, a.id
+                """,
+                (project_id,),
+            )
+            visual_artifact_review_events = _fetch_all(
+                cursor,
+                """
+                SELECT e.id, e.project_id, e.artifact_id, e.action,
+                       e.previous_jsonb, e.current_jsonb, e.reviewer_name,
+                       e.created_at
+                FROM visual_artifact_review_events e
+                JOIN visual_artifacts a ON a.id = e.artifact_id
+                WHERE e.project_id = %s AND a.project_id = %s
+                ORDER BY e.created_at, e.id
+                """,
+                (project_id, project_id),
+            )
         if hasattr(connection, "rollback"):
             connection.rollback()
     finally:
@@ -523,6 +555,8 @@ def _collect_project_data(project_id, connection_factory=None) -> dict:
             "review_limitations": review_limitations,
             "review_limitation_events": review_limitation_events,
             "synthesis_confidence_snapshots": synthesis_confidence_snapshots,
+            "visual_artifacts": visual_artifacts,
+            "visual_artifact_review_events": visual_artifact_review_events,
         }
     )
 
@@ -612,6 +646,15 @@ def _counts(dataset: dict) -> dict:
             for item in dataset.get("document_index") or []
             if int(item.get("full_text_chunks") or 0) > 0
         ),
+        "visual_artifacts": len(dataset.get("visual_artifacts") or []),
+        "current_visual_artifacts": sum(
+            1 for item in dataset.get("visual_artifacts") or [] if item.get("is_current")
+        ),
+        "reviewed_visual_artifacts": sum(
+            1
+            for item in dataset.get("visual_artifacts") or []
+            if item.get("review_status") in {"approved", "corrected", "rejected"}
+        ),
         "agent_interactions": len(dataset.get("interactions") or []),
         "evaluation_runs": len(dataset.get("evaluations") or []),
         "golden_set_queries": len(dataset.get("golden_queries") or []),
@@ -666,6 +709,8 @@ literais já usados como evidência permanecem presentes para permitir a auditor
 - Extrações de evidências: {counts['evidence_extractions']}
 - Fontes literais: {counts['literal_evidence_sources']}
 - Avaliações metodológicas revisadas: {counts['reviewed_methodological_assessments']}
+- Candidatos visuais atuais: {counts['current_visual_artifacts']}
+- Candidatos visuais revisados: {counts['reviewed_visual_artifacts']}
 - Limitações registradas: {counts['review_limitations']}
 - Limitações atuais confirmadas ou mitigadas: {counts['confirmed_or_mitigated_limitations']}
 - Snapshots de confiança da síntese: {counts['synthesis_confidence_snapshots']}
@@ -678,7 +723,7 @@ literais já usados como evidência permanecem presentes para permitir a auditor
 - `01_projeto/`: projeto, protocolo atual e histórico imutável.
 - `02_buscas/`: consultas, parâmetros públicos e registros recuperados.
 - `03_selecao/`: artigos, deduplicação, triagem e reavaliações.
-- `04_documentos/`: inventário de indexação, sem PDFs, chunks ou vetores.
+- `04_documentos/`: inventário de indexação e catálogo visual rastreável, sem PDFs, imagens, chunks ou vetores.
 - `05_evidencias/`: matriz, extrações e fontes literais rastreáveis.
 - `06_avaliacao/`: instrumentos, avaliações metodológicas, limitações, confiança, PRISMA, Golden Set e benchmarks.
 - `07_agentes/`: interações JSONB e configurações de modelos registradas.
@@ -751,6 +796,11 @@ def build_reproducibility_package(dataset: dict, generated_at: str | None = None
         "03_selecao/reavaliacoes.csv": _csv_bytes(dataset.get("reassessments") or []),
         "04_documentos/inventario_indexacao.json": _json_bytes(dataset.get("document_index") or []),
         "04_documentos/inventario_indexacao.csv": _csv_bytes(dataset.get("document_index") or []),
+        "04_documentos/catalogo_visual.json": _json_bytes(dataset.get("visual_artifacts") or []),
+        "04_documentos/catalogo_visual.csv": _csv_bytes(dataset.get("visual_artifacts") or []),
+        "04_documentos/revisoes_catalogo_visual.json": _json_bytes(
+            dataset.get("visual_artifact_review_events") or []
+        ),
         "05_evidencias/matriz_evidencias.csv": _csv_bytes(matrix),
         "05_evidencias/extracoes_rastreaveis.json": _json_bytes(dataset.get("extractions") or []),
         "05_evidencias/fontes_literais.csv": _csv_bytes(dataset.get("evidence_sources") or []),

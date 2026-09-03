@@ -54,6 +54,8 @@ OPTIONAL_JSON_FILES = {
     "06_avaliacao/limitacoes_sintese.json": "review_limitations",
     "06_avaliacao/eventos_limitacoes.json": "review_limitation_events",
     "06_avaliacao/confianca_sintese.json": "synthesis_confidence_snapshots",
+    "04_documentos/catalogo_visual.json": "visual_artifacts",
+    "04_documentos/revisoes_catalogo_visual.json": "visual_artifact_review_events",
 }
 
 LIST_DATASETS = (set(REQUIRED_JSON_FILES.values()) | set(OPTIONAL_JSON_FILES.values())) - {"project"}
@@ -254,6 +256,7 @@ def validate_reproducibility_package(data: bytes) -> dict:
     _validate_counts(dataset, manifest)
     warnings = [
         "PDFs, texto integral e embeddings não fazem parte do pacote; os artigos incluídos voltarão a aguardar seus PDFs.",
+        "O catálogo visual importado permanece como histórico de auditoria até que os PDFs sejam novamente associados e catalogados.",
         "Fontes literais serão preservadas como trechos de auditoria e não participarão da busca do RAG.",
         "Credenciais e configurações secretas permanecem as da instalação de destino.",
     ]
@@ -350,6 +353,14 @@ def _prepare_import(dataset: dict, title: str | None = None) -> dict:
         ),
         "confidence_snapshot": _new_id_map(
             dataset["synthesis_confidence_snapshots"], "snapshots de confiança", False
+        ),
+        "visual_artifact": _new_id_map(
+            dataset["visual_artifacts"], "candidatos visuais", False
+        ),
+        "visual_review_event": _new_id_map(
+            dataset["visual_artifact_review_events"],
+            "revisões do catálogo visual",
+            False,
         ),
     }
 
@@ -581,6 +592,81 @@ def _insert_import(cursor, dataset: dict, prepared: dict) -> None:
                 maps["paper"][_source_id(row, "paper")], project_id, row.get("canonical_doi"),
                 row.get("title") or "Artigo sem título", row.get("abstract"),
                 Json(_remap_json(row.get("merged_sources_jsonb") or {}, remap)), row.get("created_at"),
+            ),
+        )
+
+    for row in dataset["visual_artifacts"]:
+        source_id = _source_id(row, "visual_artifact")
+        detection_key = str(row.get("detection_key") or "").strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", detection_key):
+            detection_key = hashlib.sha256(source_id.encode("utf-8")).hexdigest()
+        file_sha256 = str(row.get("file_sha256") or "").strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", file_sha256):
+            file_sha256 = "0" * 64
+        cursor.execute(
+            """
+            INSERT INTO visual_artifacts
+                (id, project_id, paper_id, detection_key, file_sha256,
+                 page_number, artifact_type, artifact_order, caption,
+                 context_text, bbox_jsonb, detection_method,
+                 detection_metadata_jsonb, extracted_content_jsonb,
+                 review_status, human_description, human_notes, reviewer_name,
+                 is_current, detected_at, reviewed_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, FALSE,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP),
+                    %s::timestamptz,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["visual_artifact"][source_id],
+                project_id,
+                _mapped(maps["paper"], row.get("paper_id"), "artigo do catálogo visual"),
+                detection_key,
+                file_sha256,
+                max(1, int(row.get("page_number") or 1)),
+                row.get("artifact_type") or "figure",
+                max(1, int(row.get("artifact_order") or 1)),
+                row.get("caption"),
+                row.get("context_text"),
+                Json(row.get("bbox_jsonb")) if row.get("bbox_jsonb") is not None else None,
+                row.get("detection_method") or "caption_only",
+                Json(_remap_json(row.get("detection_metadata_jsonb") or {}, remap)),
+                Json(_remap_json(row.get("extracted_content_jsonb"), remap))
+                if row.get("extracted_content_jsonb") is not None
+                else None,
+                row.get("review_status") or "pending",
+                row.get("human_description"),
+                row.get("human_notes"),
+                row.get("reviewer_name"),
+                row.get("detected_at"),
+                row.get("reviewed_at"),
+                row.get("updated_at"),
+            ),
+        )
+
+    for row in dataset["visual_artifact_review_events"]:
+        cursor.execute(
+            """
+            INSERT INTO visual_artifact_review_events
+                (id, project_id, artifact_id, action, previous_jsonb,
+                 current_jsonb, reviewer_name, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s,
+                    COALESCE(%s::timestamptz, CURRENT_TIMESTAMP))
+            """,
+            (
+                maps["visual_review_event"][_source_id(row, "visual_review_event")],
+                project_id,
+                _mapped(
+                    maps["visual_artifact"],
+                    row.get("artifact_id"),
+                    "candidato visual da revisão",
+                ),
+                row.get("action") or "approved",
+                Json(_remap_json(row.get("previous_jsonb") or {}, remap)),
+                Json(_remap_json(row.get("current_jsonb") or {}, remap)),
+                row.get("reviewer_name") or "Importação do pacote",
+                row.get("created_at"),
             ),
         )
 

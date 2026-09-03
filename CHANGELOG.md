@@ -6,6 +6,19 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Catálogo visual rastreável
+
+- Adicionada detecção local de figuras, estruturas tabulares e legendas nos PDFs
+  dos artigos incluídos, preservando artigo, página, região e hash do arquivo.
+- Criada revisão humana explícita para aprovar, corrigir ou rejeitar candidatos,
+  com descrição, responsável e histórico imutável de cada decisão.
+- A catalogação passa pela fila persistente e pode continuar após atualização ou
+  fechamento do navegador.
+- Metadados e revisões do catálogo entram no pacote de reprodutibilidade; PDFs e
+  imagens continuam excluídos do ZIP.
+- Nesta primeira etapa nenhum conteúdo visual é interpretado por IA nem inserido
+  no índice RAG.
+
 ## [2.2.0] — 2026-08-30
 
 ### Geração multiprovedor estável

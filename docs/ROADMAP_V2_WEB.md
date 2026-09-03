@@ -12,7 +12,7 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: versão estável publicada, atualmente `v2.1.0`.
+- `main`: versão estável publicada, atualmente `v2.2.0`.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 
@@ -139,6 +139,7 @@ endurecimento operacional da Web privada de usuário único.
    validado em destino S3 real, incluindo execução automática diária.
 3. `v2.2.x`: provedores adicionais de IA — concluído e validado nos perfis local e
    Web privado, com Gemini e OpenAI selecionáveis por função.
-4. ciclo posterior: instrumentos científicos adicionais e interpretação de tabelas
-   e figuras dos PDFs.
+4. `v2.3.x`: conteúdo visual dos PDFs — catálogo rastreável e revisão humana em
+   desenvolvimento; interpretação semântica multimodal virá somente após validar
+   a qualidade desta base.
 5. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.

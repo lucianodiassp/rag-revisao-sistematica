@@ -42,8 +42,8 @@ Este checklist registra os critérios objetivos usados para publicar
 - [x] Confirmar diagnóstico operacional sem erros e logs sem segredos.
 - [x] Gerar e validar um backup após o piloto.
 - [x] Promover a identidade para `2.2.0` em branch de release própria.
-- [ ] Aprovar o CI e mesclar a branch de release na `main`.
-- [ ] Criar a tag `v2.2.0` e publicar a GitHub Release como versão estável.
+- [x] Aprovar o CI e mesclar a branch de release na `main`.
+- [x] Criar a tag `v2.2.0` e publicar a GitHub Release como versão estável.
 
 Não reutilize nem mova a tag de uma candidata publicada. Uma correção posterior
 deve produzir `2.2.0-rc.2`.

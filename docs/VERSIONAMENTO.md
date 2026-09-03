@@ -6,8 +6,8 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.2.0` | Funcionalidades e compatibilidade do produto |
-| Migração do banco | `013` | Evolução progressiva do schema PostgreSQL |
+| Aplicação | `2.3.0-dev` | Funcionalidades e compatibilidade do produto |
+| Migração do banco | `016` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
 | Protocolo científico | `v3` | Histórico metodológico dentro de cada projeto |
@@ -43,6 +43,8 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 - `2.2.0-rc.1`: primeira candidata multiprovedor, validada localmente com Gemini
   e OpenAI antes do piloto Web.
 - `2.2.0`: geração multiprovedor por função validada nos perfis local e Web privado.
+- `2.3.0-dev`: catálogo rastreável de figuras e tabelas com revisão humana, ainda
+  sem interpretação semântica por IA ou inclusão automática no RAG.
 
 O sufixo `-rc.N` identificou as candidatas e impediu que fossem confundidas com
 releases estáveis. A versão estável atual é `v2.2.0`; as candidatas permanecem no

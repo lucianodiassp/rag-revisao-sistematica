@@ -1,7 +1,19 @@
 import json
 from unittest.mock import patch
 
-from backend.app.operational_health import HealthCheck, build_health_report, main
+from backend.app.operational_health import (
+    LATEST_REQUIRED_MIGRATION,
+    REQUIRED_TABLES,
+    HealthCheck,
+    build_health_report,
+    main,
+)
+
+
+def test_visual_catalog_schema_is_required_by_operational_health():
+    assert LATEST_REQUIRED_MIGRATION == "016_visual_artifacts.sql"
+    assert "visual_artifacts" in REQUIRED_TABLES
+    assert "visual_artifact_review_events" in REQUIRED_TABLES
 
 
 def _check(code, status):

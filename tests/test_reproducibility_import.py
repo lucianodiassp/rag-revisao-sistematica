@@ -20,6 +20,8 @@ PAPER_ID = "81000000-0000-4000-8000-000000000005"
 SCREENING_ID = "81000000-0000-4000-8000-000000000006"
 EXTRACTION_ID = "81000000-0000-4000-8000-000000000007"
 CHUNK_ID = "81000000-0000-4000-8000-000000000008"
+VISUAL_ID = "81000000-0000-4000-8000-000000000010"
+VISUAL_EVENT_ID = "81000000-0000-4000-8000-000000000011"
 
 
 def _dataset():
@@ -127,6 +129,38 @@ def _dataset():
                 "embedding_dimensions": [768],
             }
         ],
+        "visual_artifacts": [
+            {
+                "id": VISUAL_ID,
+                "project_id": PROJECT_ID,
+                "paper_id": PAPER_ID,
+                "detection_key": "a" * 64,
+                "file_sha256": "b" * 64,
+                "page_number": 2,
+                "artifact_type": "table",
+                "artifact_order": 1,
+                "caption": "Tabela 1. Resultados",
+                "bbox_jsonb": [72, 100, 500, 300],
+                "detection_method": "table_structure",
+                "detection_metadata_jsonb": {"semantic_interpretation": False},
+                "extracted_content_jsonb": {"rows": [["A", "B"]]},
+                "review_status": "approved",
+                "human_description": "Tabela de resultados revisada.",
+                "reviewer_name": "Pessoa revisora",
+                "is_current": True,
+            }
+        ],
+        "visual_artifact_review_events": [
+            {
+                "id": VISUAL_EVENT_ID,
+                "project_id": PROJECT_ID,
+                "artifact_id": VISUAL_ID,
+                "action": "approved",
+                "previous_jsonb": {"review_status": "pending"},
+                "current_jsonb": {"review_status": "approved"},
+                "reviewer_name": "Pessoa revisora",
+            }
+        ],
         "interactions": [],
         "evaluations": [],
         "golden_queries": [],
@@ -198,6 +232,7 @@ def test_validation_confirms_integrity_and_reports_operational_limits():
     assert preview["manifest"]["project"]["title"] == "Projeto portável"
     assert preview["manifest"]["counts"]["unique_papers"] == 1
     assert preview["dataset"]["evidence_sources"][0]["chunk_id"] == CHUNK_ID
+    assert preview["dataset"]["visual_artifacts"][0]["id"] == VISUAL_ID
     assert any("PDFs" in warning for warning in preview["warnings"])
 
 
@@ -241,6 +276,8 @@ def test_import_remaps_ids_preserves_audit_quotes_and_commits_once():
     assert "INSERT INTO paper_chunks" in statements
     assert "imported_evidence_quote" in statements
     assert "INSERT INTO evidence_field_sources" in statements
+    assert "INSERT INTO visual_artifacts" in statements
+    assert "INSERT INTO visual_artifact_review_events" in statements
     assert "_demo" not in imported_criteria
     assert imported_criteria["_import"]["source_project_id"] == PROJECT_ID
     assert imported_criteria["_import"]["package_sha256"] == result["sha256"]

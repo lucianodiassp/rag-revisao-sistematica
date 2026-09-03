@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.3.0--dev-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -61,6 +61,10 @@ compatível privado.
 A versão **2.2.0** acrescenta geração multiprovedor por função com Google Gemini e
 OpenAI, sem alterar os embeddings existentes nem exigir nova indexação. O fluxo
 foi validado nos perfis local e Web privado com credenciais cifradas.
+
+A linha **2.3.0-dev** inicia o tratamento rastreável de conteúdo visual: figuras,
+tabelas e legendas são catalogadas com página e recorte de origem e aguardam uma
+decisão humana. Esta etapa ainda não atribui significado científico por IA.
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
@@ -161,6 +165,8 @@ atualização, investigação de falhas e retorno seguro de versão.
 - Reconstrução transacional com novos UUIDs e remapeamento das referências internas.
 - Protocolo atual e histórico, buscas, registros recuperados, deduplicação, triagem e reavaliações.
 - Inventário da indexação sem copiar PDFs, texto integral dos chunks ou vetores de embedding.
+- Catálogo de figuras e tabelas com página, região, hash e histórico de revisão humana,
+  sem copiar os arquivos visuais.
 - Matriz de evidências em CSV, extrações com fontes literais e avaliações metodológicas.
 - Snapshots PRISMA, Golden Set, benchmarks, auditorias e interações dos agentes.
 - Limitações revisadas, histórico de decisões e snapshots humanos de confiança da síntese.
@@ -970,8 +976,9 @@ docker compose --profile tools down -v
   pela aplicação; ele não substitui a avaliação metodológica nem a conferência do
   checklist PRISMA 2020 pelo pesquisador.
 - O OCR permite indexar texto presente em imagens, mas pode introduzir erros de
-  reconhecimento e exige conferência humana; figuras, diagramas e relações visuais
-  de tabelas ainda não são interpretados semanticamente.
+  reconhecimento e exige conferência humana. O catálogo visual localiza candidatos,
+  legendas e estruturas de tabelas, mas figuras, diagramas e relações visuais ainda
+  não são interpretados semanticamente nem usados automaticamente pelo RAG.
 - Relatório e decisões produzidos com IA exigem revisão científica humana.
 - O reranking generativo acrescenta uma chamada de IA por pergunta quando está ativo e
   pode realizar uma segunda tentativa controlada quando a primeira saída falha.
