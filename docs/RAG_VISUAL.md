@@ -1,7 +1,7 @@
 # RAG visual revisado — 2.4.0
 
-Estado: versão estável preparada após validação automatizada, funcional local e
-piloto completo da candidata `2.4.0-rc.1` na Web privada.
+Estado: versão estável publicada após validação automatizada, funcional local,
+piloto completo da candidata `2.4.0-rc.1` e smoke test de `2.4.0` na Web privada.
 
 ## Escopo
 

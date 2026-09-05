@@ -12,8 +12,8 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: integração das próximas entregas; versão estável `v2.4.0` preparada após
-  a aprovação da candidata `v2.4.0-rc.1` no piloto Web.
+- `main`: integração das próximas entregas; versão estável `v2.4.0` publicada e
+  validada na VPS após a aprovação da candidata `v2.4.0-rc.1` no piloto Web.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 

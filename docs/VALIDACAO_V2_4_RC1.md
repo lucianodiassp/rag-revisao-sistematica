@@ -89,3 +89,15 @@ ou comportamento funcional. A suíte completa aprovou **291 testes** com a ident
 estável; os contratos dos Compose local e Web encerraram com código zero. A
 publicação permanece condicionada aos checks e ao merge do pull request, seguidos
 da tag anotada no commit resultante da `main`.
+
+## Fechamento pós-release
+
+O PR #60 integrou a promoção na `main`. A tag anotada `v2.4.0` foi criada no merge
+commit `8ceb7decdc2338ab8a0f4f079f1692866d8a75be` e publicada como release estável.
+
+Na VPS, a atualização partiu dessa tag: preflight e migração encerraram com código
+zero, os serviços persistentes ficaram saudáveis, HTTPS respondeu `HTTP/2 200` e o
+diagnóstico completo permaneceu saudável com `018_visual_rag.sql`. O smoke test
+confirmou a identidade `2.4.0`, autenticação e navegação, os dois projetos esperados,
+a interpretação aprovada, recuperação com citação visual e configuração do backup
+externo preservada. A tag estável não recebeu alterações posteriores.
