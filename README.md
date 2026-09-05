@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.4.0--rc.1-orange.svg)
+![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -72,12 +72,14 @@ o relatório automaticamente. O fluxo foi validado localmente, na Web privada e 
 um ensaio de restauração isolado. A tag estável `v2.3.0` está publicada;
 a pré-release `v2.3.0-rc.1` permanece imutável.
 
-A candidata **2.4.0-rc.1**, ainda sem promoção estável, acrescenta uso **opcional por projeto**
-de interpretações visuais com duas revisões no Assistente. O padrão continua
-desativado. Citações identificam artigo, página e figura/tabela; PDFs substituídos
-ou revisões revogadas deixam de ser elegíveis. O Golden Set aceita fontes visuais
-e o benchmark pode comparar texto com texto + visual, inclusive regressão textual.
-O Relatório Final não muda. Consulte [RAG visual e roteiro de validação](docs/RAG_VISUAL.md).
+A versão **2.4.0 — Local e Web privada, usuário único** promove o uso **opcional por
+projeto** de interpretações visuais com duas revisões no Assistente. O padrão
+continua desativado. Citações identificam artigo, página e figura/tabela; PDFs
+substituídos ou revisões revogadas deixam de ser elegíveis. O Golden Set aceita
+fontes visuais e o benchmark compara texto com texto + visual, inclusive regressão
+textual. O Relatório Final não muda. A candidata foi aprovada localmente e na VPS,
+incluindo backup, restauração e portabilidade do julgamento visual. Consulte
+[RAG visual e roteiro de validação](docs/RAG_VISUAL.md).
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).

@@ -16,9 +16,9 @@ Objetivo: validar `v2.4.0-rc.1` antes de promover o RAG visual revisado para
 - [x] Docker local reconstruído; migração encerrou com código zero e todos os
   serviços persistentes ficaram saudáveis.
 - [x] Diagnóstico completo reconheceu a migração `018`, sem falhas ou tarefas órfãs.
-- [ ] Commit da branch `release/v2.4.0-rc.1` enviado ao GitHub.
-- [ ] PR para `main`, checks e merge concluídos.
-- [ ] Tag anotada `v2.4.0-rc.1` publicada como pré-release.
+- [x] Commit da branch `release/v2.4.0-rc.1` enviado ao GitHub.
+- [x] PR #59 para `main`, checks e merge concluídos.
+- [x] Tag anotada `v2.4.0-rc.1` publicada como pré-release.
 
 ## 2. Piloto Web da tag
 
@@ -41,34 +41,34 @@ curl -I https://revisaorag.tech
 sudo docker compose --env-file deploy/web.env -f docker-compose.web.yml exec -T app python -m backend.app.operational_health --component full
 ```
 
-- [ ] Preflight e migração encerram com código zero.
-- [ ] Banco, aplicação, worker, agendador e proxy ficam saudáveis.
-- [ ] HTTPS retorna `200` e o menu mostra `2.4.0-rc.1` no perfil Web privado.
-- [ ] Diagnóstico operacional reconhece a migração `018` e permanece saudável.
+- [x] Preflight e migração encerram com código zero.
+- [x] Banco, aplicação, worker, agendador e proxy ficam saudáveis.
+- [x] HTTPS retorna `200` e o menu mostra `2.4.0-rc.1` no perfil Web privado.
+- [x] Diagnóstico operacional reconhece a migração `018` e permanece saudável.
 
 ## 3. Teste funcional Web
 
-- [ ] Com a opção desligada, uma consulta textual preserva o comportamento anterior.
-- [ ] Outro projeto mantém configuração independente e desligada por padrão.
-- [ ] Com a opção ligada, consulta dirigida recupera interpretação elegível e mostra
+- [x] Com a opção desligada, uma consulta textual preserva o comportamento anterior.
+- [x] Outro projeto mantém configuração independente e desligada por padrão.
+- [x] Com a opção ligada, consulta dirigida recupera interpretação elegível e mostra
   artigo, página e ID visual; o detalhe identifica a fonte como interpretação.
-- [ ] Correção ou rejeição posterior exclui o visual de novas respostas e separa o histórico antigo.
-- [ ] Golden Set aceita alvo visual específico sem conflitar com alvo textual da mesma página.
-- [ ] Comparação texto × texto+visual conclui os dois modos, mostra exclusões e exporta JSON.
-- [ ] Relatório Final continua funcionando sem incorporar automaticamente os visuais.
-- [ ] Reinício preserva configuração; credenciais e demais fluxos não apresentam regressão.
+- [x] Correção ou rejeição posterior exclui o visual de novas respostas e separa o histórico antigo.
+- [x] Golden Set aceita alvo visual específico sem conflitar com alvo textual da mesma página.
+- [x] Comparação texto × texto+visual conclui os dois modos, mostra exclusões e exporta JSON.
+- [x] Relatório Final continua funcionando sem incorporar automaticamente os visuais.
+- [x] Reinício preserva configuração; credenciais e demais fluxos não apresentam regressão.
 
 ## 4. Portabilidade e recuperação
 
-- [ ] Backup local gerado, baixado e validado.
-- [ ] Backup externo gerado e verificado no destino privado.
-- [ ] Pacote acadêmico exportado/importado em projeto separado; opt-in importado continua desligado.
-- [ ] Restauração ensaiada em instalação isolada, com textos, visuais, julgamentos e auditoria conferidos.
+- [x] Backup local gerado, baixado e validado.
+- [x] Backup externo gerado e verificado no destino privado.
+- [x] Pacote acadêmico exportado/importado em projeto separado; opt-in importado continua desligado.
+- [x] Restauração controlada concluída, com textos, visuais, julgamentos e auditoria conferidos.
 
 ## 5. Promoção
 
-- [ ] Evidências do piloto registradas, sem incluir segredos ou conteúdo de artigos.
-- [ ] Preparar `release/v2.4.0` e repetir suíte/contratos locais.
+- [x] Evidências do piloto registradas, sem incluir segredos ou conteúdo de artigos.
+- [x] Preparar `release/v2.4.0` e repetir suíte/contratos locais.
 - [ ] Integrar a promoção em `main`, criar a tag estável e atualizar a VPS.
 
 Não mova a tag da candidata. Correções produzem `v2.4.0-rc.2`. Migrações são
