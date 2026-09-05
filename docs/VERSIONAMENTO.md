@@ -6,7 +6,7 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.5.0-dev` | Funcionalidades e compatibilidade do produto em desenvolvimento |
+| Aplicação | `2.5.0-rc.1` | Candidata da gestão segura do ciclo de vida dos projetos |
 | Migração do banco | `018` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
@@ -52,10 +52,12 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
   atuais e revisadas, citações por artefato e comparação pareada no benchmark.
 - `2.4.0`: promoção estável publicada do RAG visual revisado após piloto local e
   Web, benchmark pareado, portabilidade e recuperação controlada.
+- `2.5.0-rc.1`: candidata com arquivamento reversível, restauração, exclusão
+  permanente condicionada a backup posterior e recibos imutáveis.
 
 O sufixo `-rc.N` identifica as candidatas e impede que sejam confundidas com
-releases estáveis. A versão estável atual é `v2.4.0`; a linha `2.5.0-dev` prepara a
-gestão segura do ciclo de vida dos projetos e as candidatas permanecem no
+releases estáveis. A versão estável atual é `v2.4.0`; a candidata `2.5.0-rc.1`
+prepara a gestão segura do ciclo de vida dos projetos e as candidatas permanecem no
 histórico como pré-releases imutáveis usadas nos pilotos operacionais.
 
 A implementação multiprovedor foi incorporada à `main` pelo PR #51, validada na
