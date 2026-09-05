@@ -50,8 +50,8 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
   portabilidade e restauração isolada; publicação após o merge da promoção.
 - `2.4.0-rc.1`: candidata com uso opcional no Assistente das interpretações visuais
   atuais e revisadas, citações por artefato e comparação pareada no benchmark.
-- `2.4.0`: promoção estável do RAG visual revisado após piloto local e Web,
-  benchmark pareado, portabilidade e recuperação controlada.
+- `2.4.0`: promoção estável publicada do RAG visual revisado após piloto local e
+  Web, benchmark pareado, portabilidade e recuperação controlada.
 
 O sufixo `-rc.N` identifica as candidatas e impede que sejam confundidas com
 releases estáveis. A versão estável atual é `v2.4.0`; as candidatas permanecem no
@@ -71,6 +71,7 @@ O RAG visual revisado foi incorporado à `main` pelo PR #58. A candidata
 `v2.4.0-rc.1` preserva o padrão desligado por projeto, o Relatório Final textual e
 os formatos v1 de backup e pacote acadêmico. O piloto Web partiu da tag imutável da
 candidata e aprovou a promoção em `release/v2.4.0`, sem mover ou reutilizar a tag.
+A tag estável `v2.4.0` foi publicada no merge da promoção e validada na VPS.
 
 ## Fluxo concluído da v1.0.0
 

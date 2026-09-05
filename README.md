@@ -78,7 +78,8 @@ continua desativado. Citações identificam artigo, página e figura/tabela; PDF
 substituídos ou revisões revogadas deixam de ser elegíveis. O Golden Set aceita
 fontes visuais e o benchmark compara texto com texto + visual, inclusive regressão
 textual. O Relatório Final não muda. A candidata foi aprovada localmente e na VPS,
-incluindo backup, restauração e portabilidade do julgamento visual. Consulte
+incluindo backup, restauração e portabilidade do julgamento visual. A tag estável
+`v2.4.0` foi publicada e validada na VPS em 2026-09-05. Consulte
 [RAG visual e roteiro de validação](docs/RAG_VISUAL.md).
 
 O plano incremental da nova linha está em

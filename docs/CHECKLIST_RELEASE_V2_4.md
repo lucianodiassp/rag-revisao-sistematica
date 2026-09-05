@@ -69,7 +69,7 @@ sudo docker compose --env-file deploy/web.env -f docker-compose.web.yml exec -T 
 
 - [x] Evidências do piloto registradas, sem incluir segredos ou conteúdo de artigos.
 - [x] Preparar `release/v2.4.0` e repetir suíte/contratos locais.
-- [ ] Integrar a promoção em `main`, criar a tag estável e atualizar a VPS.
+- [x] Integrar a promoção em `main`, criar a tag estável e atualizar a VPS.
 
 Não mova a tag da candidata. Correções produzem `v2.4.0-rc.2`. Migrações são
 progressivas; retornar o código não desfaz schema nem dados, portanto recuperação
