@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.5.0--dev-blue.svg)
+![Version](https://img.shields.io/badge/version-2.5.0--rc.1-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -88,7 +88,7 @@ Os critérios de validação e o roteiro do piloto na VPS estão no
 [Checklist da candidata v2.4](docs/CHECKLIST_RELEASE_V2_4.md), com evidências em
 [Validação v2.4.0-rc.1](docs/VALIDACAO_V2_4_RC1.md).
 
-A linha atual **2.5.0-dev** acrescenta a gestão segura do ciclo de vida dos projetos:
+A candidata atual **2.5.0-rc.1** acrescenta a gestão segura do ciclo de vida dos projetos:
 arquivamento reversível, restauração e exclusão permanente condicionada a uma prévia,
 ausência de tarefas ativas, backup posterior e confirmação explícita. Consulte
 [Gestão do ciclo de vida dos projetos](docs/PROJECT_LIFECYCLE.md).

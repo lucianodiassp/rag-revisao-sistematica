@@ -58,7 +58,7 @@ artigos, credenciais ou chaves.
 
 Use um projeto descartável, nunca um projeto científico necessário ao teste:
 
-1. atualize o banco pela migração e confirme `Versão 2.5.0-dev` no menu;
+1. atualize o banco pela migração e confirme `Versão 2.5.0-rc.1` no menu;
 2. crie um projeto descartável e mantenha ao menos outro projeto ativo;
 3. em **Gestão de Projetos**, confira a prévia e arquive o descartável;
 4. confirme que ele desapareceu do seletor das outras páginas;
@@ -76,7 +76,8 @@ esta funcionalidade.
 
 ## Validação local da primeira implementação
 
-Executada em 2026-09-05 com a versão `2.5.0-dev`:
+Executada em 2026-09-05 inicialmente com `2.5.0-dev`; a mesma suíte e os contratos
+foram repetidos com a identidade `2.5.0-rc.1` antes do piloto Web:
 
 - um pacote de reprodutibilidade foi importado como projeto isolado e descartável;
 - o arquivamento retirou somente esse projeto do seletor operacional;
