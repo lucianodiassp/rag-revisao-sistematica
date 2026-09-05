@@ -6,6 +6,27 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Gestão segura do ciclo de vida dos projetos
+
+- Iniciada a versão `2.5.0-dev` com arquivamento reversível e restauração de
+  projetos, sem alterar o estado científico do protocolo nem remover dados.
+- Projetos arquivados deixam de aparecer no seletor operacional, enquanto uma
+  página administrativa mantém acesso explícito aos projetos ativos e arquivados.
+- A exclusão permanente exige arquivamento prévio, ausência de tarefas em andamento,
+  backup completo posterior ao arquivamento, confirmação da validação e digitação
+  exata do título do projeto.
+- O projeto demonstrativo e o último projeto ativo são protegidos contra
+  arquivamento e exclusão acidentais.
+- A prévia apresenta contagens de artigos, buscas, interações, tarefas, conteúdo
+  visual e PDFs antes da decisão destrutiva.
+- PDFs são movidos para uma área temporária segura durante a transação e retornam
+  ao local original se a exclusão do banco falhar.
+- Recibos imutáveis de arquivamento, restauração e exclusão sobrevivem à remoção do
+  projeto sem armazenar conteúdo científico ou credenciais.
+- Fluxo completo validado localmente com projeto importado e descartável: arquivar,
+  restaurar, bloquear sem backup, reconhecer backup validado posterior, excluir e
+  preservar o recibo sem afetar os projetos originais.
+
 ## [2.4.0] — 2026-09-05
 
 ### Promoção do RAG visual revisado

@@ -11,9 +11,37 @@ CREATE TABLE review_projects (
     criteria_jsonb JSONB NOT NULL,
     status VARCHAR(50) DEFAULT 'draft_protocol',
     protocol_version INTEGER NOT NULL DEFAULT 1,
+    archived_at TIMESTAMP WITH TIME ZONE,
+    archived_reason TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CHECK (
+        (archived_at IS NULL AND archived_reason IS NULL)
+        OR
+        (archived_at IS NOT NULL AND length(btrim(archived_reason)) >= 10)
+    )
 );
+
+-- Recibos imutáveis que permanecem disponíveis após a exclusão do projeto.
+CREATE TABLE project_lifecycle_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    target_project_id UUID NOT NULL,
+    project_title VARCHAR(255) NOT NULL,
+    action VARCHAR(20) NOT NULL,
+    actor_identifier VARCHAR(200) NOT NULL,
+    details_jsonb JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (action IN ('archived', 'restored', 'deleted')),
+    CHECK (length(btrim(project_title)) >= 1),
+    CHECK (length(btrim(actor_identifier)) >= 1),
+    CHECK (jsonb_typeof(details_jsonb) = 'object')
+);
+
+CREATE INDEX idx_review_projects_active
+    ON review_projects(updated_at DESC, created_at DESC)
+    WHERE archived_at IS NULL;
+CREATE INDEX idx_project_lifecycle_events_target
+    ON project_lifecycle_events(target_project_id, created_at DESC);
 
 -- Operações demoradas executadas fora da sessão do navegador.
 CREATE TABLE project_rag_settings (
