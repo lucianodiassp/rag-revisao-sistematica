@@ -52,6 +52,40 @@ Comando reproduzível no Windows, usando pasta temporária exclusiva:
 
 ## Piloto Web
 
-Pendente de publicação da tag imutável. Registrar os resultados no
-[checklist v2.4](CHECKLIST_RELEASE_V2_4.md) sem anexar segredos, backups ou conteúdo
-dos artigos.
+Executado em 2026-09-05 a partir da tag imutável `v2.4.0-rc.1`, integrada pelo PR
+#59 e publicada como pré-release.
+
+- Preflight e migração encerraram com código zero. PostgreSQL, aplicação, worker,
+  agendador de backup e proxy permaneceram saudáveis.
+- HTTPS respondeu `HTTP/2 200`; a interface exibiu `2.4.0-rc.1` no perfil Web
+  privado e o diagnóstico completo reconheceu `018_visual_rag.sql`, fila sem falhas,
+  armazenamento suficiente, backup externo e provedores configurados.
+- O uso visual começou desligado, persistiu por projeto e não alterou outro projeto.
+  Com a opção ligada, consultas dirigidas recuperaram a mesma interpretação local e
+  Web, com artigo, página, ID visual e indicação de que não era transcrição literal.
+- Uma diferença inicial de recuperação foi rastreada a bases com estados distintos,
+  não ao código. Um backup validado com 2 projetos, 109 artigos, 21 PDFs e 529
+  interações normalizou a VPS; a consulta equivalente passou nos dois ambientes.
+- Rejeição controlada tornou a interpretação imediatamente inelegível, separou a
+  resposta histórica e suprimiu a fonte em nova consulta. A reaprovação restaurou a
+  recuperação; o backup pré-teste foi restaurado para remover os eventos artificiais.
+- Golden Set aceitou o alvo visual remapeável e o benchmark pareado concluiu os dois
+  modos, exibiu recuperação visual, regressão textual, rankings, exclusões e JSON.
+- O Relatório Final foi regenerado sem incorporar automaticamente interpretações
+  visuais. Navegação, credenciais e diagnóstico não apresentaram regressão.
+- Backup foi gerado, baixado, validado e restaurado. O pacote acadêmico foi exportado
+  na Web e importado localmente em projeto temporário: criou novo UUID, preservou o
+  julgamento visual remapeado, manteve opt-in desligado e não importou PDFs nem
+  credenciais. O projeto temporário foi removido após a conferência.
+
+O smoke test posterior à restauração confirmou dois projetos, interpretação atual
+aprovada, citação visual e diagnóstico saudável. Essas evidências aprovaram a
+promoção para `v2.4.0`.
+
+## Verificação da identidade estável
+
+A branch `release/v2.4.0` foi preparada em 2026-09-05 sem alterar schema, formatos
+ou comportamento funcional. A suíte completa aprovou **291 testes** com a identidade
+estável; os contratos dos Compose local e Web encerraram com código zero. A
+publicação permanece condicionada aos checks e ao merge do pull request, seguidos
+da tag anotada no commit resultante da `main`.

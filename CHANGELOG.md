@@ -6,6 +6,23 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.4.0] — 2026-09-05
+
+### Promoção do RAG visual revisado
+
+- Promovido o uso opcional de interpretações visuais revisadas no Assistente após
+  aprovação da candidata `v2.4.0-rc.1` nos perfis local e Web privado.
+- Validados isolamento e persistência da configuração por projeto, recuperação e
+  citação por artefato, revogação imediata e separação de respostas históricas.
+- Aprovados o Golden Set visual e o benchmark pareado, com resultados separados
+  para recuperação visual e regressão textual; o Relatório Final permaneceu textual.
+- Identificada durante o piloto uma divergência entre as bases local e Web, resolvida
+  pela restauração de um backup validado antes da repetição equivalente das consultas.
+- Confirmados backup, restauração controlada e exportação/importação acadêmica com
+  remapeamento do julgamento visual, opt-in desligado e fontes importadas históricas.
+- Preservados a migração `018`, os embeddings existentes e os formatos v1 de backup
+  e pacote de reprodutibilidade. A tag da candidata permanece imutável.
+
 ## [2.4.0-rc.1] — 2026-09-03
 
 ### Interpretações visuais revisadas no Assistente
@@ -248,7 +265,8 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Acesso: usuário único.
 - Estado: primeira versão estável documentada.
 
-[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.4.0-rc.1...HEAD
+[Não publicado]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.3.0...v2.4.0
 [2.4.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.3.0...v2.4.0-rc.1
 [2.3.0]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...v2.3.0
 [2.3.0-rc.1]: https://github.com/lucianodiassp/rag-revisao-sistematica/compare/v2.2.0...v2.3.0-rc.1
