@@ -32,3 +32,17 @@ def test_visual_catalog_is_exposed_with_explicit_human_review_scope():
     assert "Confirmo que comparei a interpretação com o recorte" in page
     assert "uso visual habilitado explicitamente no projeto" in page
     assert "Permanece fora do relatório final" in page
+
+
+def test_project_lifecycle_page_exposes_reversible_and_protected_flows():
+    navigation = (ROOT / "frontend/app.py").read_text(encoding="utf-8")
+    page = (ROOT / "frontend/views/15_Gestao_Projetos.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'title="Gestão de Projetos"' in navigation
+    assert "Arquivar é reversível" in page
+    assert "último projeto ativo" in page
+    assert "backup completo **depois deste arquivamento**" in page
+    assert "digite exatamente o título" in page
+    assert "Histórico imutável do ciclo de vida" in page

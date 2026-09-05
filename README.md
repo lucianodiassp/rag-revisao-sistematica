@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.5.0--dev-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -72,7 +72,7 @@ o relatório automaticamente. O fluxo foi validado localmente, na Web privada e 
 um ensaio de restauração isolado. A tag estável `v2.3.0` está publicada;
 a pré-release `v2.3.0-rc.1` permanece imutável.
 
-A versão **2.4.0 — Local e Web privada, usuário único** promove o uso **opcional por
+A versão estável **2.4.0 — Local e Web privada, usuário único** promove o uso **opcional por
 projeto** de interpretações visuais com duas revisões no Assistente. O padrão
 continua desativado. Citações identificam artigo, página e figura/tabela; PDFs
 substituídos ou revisões revogadas deixam de ser elegíveis. O Golden Set aceita
@@ -87,6 +87,11 @@ O plano incremental da nova linha está em
 Os critérios de validação e o roteiro do piloto na VPS estão no
 [Checklist da candidata v2.4](docs/CHECKLIST_RELEASE_V2_4.md), com evidências em
 [Validação v2.4.0-rc.1](docs/VALIDACAO_V2_4_RC1.md).
+
+A linha atual **2.5.0-dev** acrescenta a gestão segura do ciclo de vida dos projetos:
+arquivamento reversível, restauração e exclusão permanente condicionada a uma prévia,
+ausência de tarefas ativas, backup posterior e confirmação explícita. Consulte
+[Gestão do ciclo de vida dos projetos](docs/PROJECT_LIFECYCLE.md).
 
 ### Autenticação da Web privada
 
@@ -133,6 +138,8 @@ atualização, investigação de falhas e retorno seguro de versão.
 ### Projetos isolados e protocolo versionado
 
 - Criação e seleção de múltiplos projetos de pesquisa.
+- Arquivamento reversível, restauração e exclusão permanente protegida por backup,
+  confirmação textual e recibo de auditoria.
 - Isolamento do corpus e dos resultados por `project_id`.
 - Rascunho da IA separado da versão metodológica confirmada pelo pesquisador.
 - Editor de pergunta, PICO/PICOS, período, idiomas, tipos de publicação e desenhos de estudo.

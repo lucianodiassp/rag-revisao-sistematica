@@ -33,13 +33,15 @@ def get_connection():
     )
 
 
-def listar_projetos():
+def listar_projetos(incluir_arquivados=False):
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
-            """
+            f"""
             SELECT id, title, question, criteria_jsonb, status,
-                   protocol_version, created_at, updated_at
+                   protocol_version, archived_at, archived_reason,
+                   created_at, updated_at
             FROM review_projects
+            {"" if incluir_arquivados else "WHERE archived_at IS NULL"}
             ORDER BY updated_at DESC, created_at DESC
             """
         )
@@ -52,7 +54,8 @@ def obter_projeto(project_id):
         cursor.execute(
             """
             SELECT id, title, question, criteria_jsonb, status,
-                   protocol_version, created_at, updated_at
+                   protocol_version, archived_at, archived_reason,
+                   created_at, updated_at
             FROM review_projects
             WHERE id = %s
             """,

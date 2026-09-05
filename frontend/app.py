@@ -57,6 +57,11 @@ pages = [
         icon="⚙️",
     ),
     st.Page(
+        "views/15_Gestao_Projetos.py",
+        title="Gestão de Projetos",
+        icon="🗂️",
+    ),
+    st.Page(
         "views/11_Calibracao_Busca.py",
         title="Calibração da Busca",
         icon="🎯",

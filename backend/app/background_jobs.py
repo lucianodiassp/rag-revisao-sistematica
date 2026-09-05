@@ -78,9 +78,15 @@ def enqueue_job(project_id, job_type, parameters=None, max_attempts=None):
     connection = get_connection()
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute("SELECT 1 FROM review_projects WHERE id = %s", (project_id,))
-            if not cursor.fetchone():
-                raise ValueError("Projeto não encontrado para iniciar o processamento.")
+            cursor.execute(
+                "SELECT archived_at FROM review_projects WHERE id = %s FOR UPDATE",
+                (project_id,),
+            )
+            project = cursor.fetchone()
+            if not project or project["archived_at"] is not None:
+                raise ValueError(
+                    "Projeto ativo não encontrado para iniciar o processamento."
+                )
             try:
                 cursor.execute(
                     """

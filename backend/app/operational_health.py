@@ -20,7 +20,7 @@ from backend.app.observability import classify_error, sanitize_fields
 from backend.app.version import APP_VERSION, application_metadata
 
 
-LATEST_REQUIRED_MIGRATION = "018_visual_rag.sql"
+LATEST_REQUIRED_MIGRATION = "019_project_lifecycle.sql"
 REQUIRED_TABLES = (
     "review_projects",
     "background_jobs",
@@ -32,6 +32,7 @@ REQUIRED_TABLES = (
     "visual_interpretations",
     "visual_interpretation_review_events",
     "project_rag_settings",
+    "project_lifecycle_events",
 )
 
 

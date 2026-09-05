@@ -145,7 +145,12 @@ endurecimento operacional da Web privada de usuário único.
    e validados nos perfis local e Web privado, incluindo portabilidade e restauração
    isolada. Continua sem inclusão automática no RAG ou relatório final.
 5. `v2.4.x`: uso opt-in de interpretações visuais revisadas no Assistente, citações
-   específicas e benchmark comparativo com regressão textual — em desenvolvimento.
-   [Escopo e critérios de aceite](RAG_VISUAL.md). Relatório final visual fica para
-   uma etapa posterior, condicionada à validação desta recuperação.
-6. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.
+   específicas e benchmark comparativo com regressão textual — concluído, promovido
+   para `v2.4.0` e validado nos perfis local e Web privado.
+   [Escopo e critérios de aceite](RAG_VISUAL.md). O Relatório Final permanece textual.
+6. `v2.5.x`: gestão segura do ciclo de vida dos projetos — em desenvolvimento, com
+   arquivamento reversível, restauração, exclusão permanente protegida, limpeza de
+   PDFs e recibos imutáveis. [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
+7. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
+   modelos e isolamento operacional; não faz parte da `v2.5.x`.
+8. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.
