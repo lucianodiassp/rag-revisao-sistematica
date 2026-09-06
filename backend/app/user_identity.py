@@ -17,6 +17,7 @@ from psycopg2.extras import RealDictCursor
 LOCAL_IDENTITY_PROVIDER = "local"
 LOCAL_IDENTITY_SUBJECT = "single-user-installation"
 PROJECT_ROLES = ("owner", "editor", "viewer")
+PROJECT_ROLE_LEVELS = {"viewer": 10, "editor": 20, "owner": 30}
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,13 @@ class ApplicationUser:
     email: str | None
     display_name: str
     status: str = "active"
+
+
+@dataclass(frozen=True)
+class ProjectAccess:
+    project_id: str
+    user: ApplicationUser
+    role: str
 
 
 _CURRENT_USER: ContextVar[ApplicationUser | None] = ContextVar(
@@ -182,3 +190,65 @@ def ensure_project_owner(project_id, *, connection_factory=None) -> bool:
             (str(project_id), user_id),
         )
     return True
+
+
+def require_project_access(
+    project_id,
+    minimum_role="viewer",
+    *,
+    user_id=None,
+    bind=False,
+    connection_factory=None,
+) -> ProjectAccess:
+    """Autoriza uma operação no projeto usando uma associação ativa.
+
+    O identificador explícito é reservado a processos internos, como o worker.
+    Chamadas da interface usam sempre a identidade vinculada à execução atual.
+    """
+
+    minimum_role = str(minimum_role).strip().lower()
+    if minimum_role not in PROJECT_ROLE_LEVELS:
+        raise ValueError(f"Papel mínimo inválido: {minimum_role}")
+    actor_id = str(user_id or current_user_id() or "").strip()
+    if not actor_id:
+        raise PermissionError("Não há identidade ativa para acessar este projeto.")
+    if connection_factory is None:
+        from backend.app.database import get_connection
+
+        connection_factory = get_connection
+    with connection_factory() as connection, connection.cursor(
+        cursor_factory=RealDictCursor
+    ) as cursor:
+        cursor.execute(
+            """
+            SELECT application_user.id, application_user.identity_provider,
+                   application_user.subject, application_user.email,
+                   application_user.display_name, application_user.status,
+                   membership.role
+            FROM project_memberships AS membership
+            JOIN application_users AS application_user
+              ON application_user.id = membership.user_id
+            WHERE membership.project_id = %s
+              AND membership.user_id = %s
+              AND membership.is_active = TRUE
+              AND application_user.status = 'active'
+            """,
+            (str(project_id), actor_id),
+        )
+        row = cursor.fetchone()
+    role = str((row or {}).get("role") or "")
+    if not row or PROJECT_ROLE_LEVELS.get(role, 0) < PROJECT_ROLE_LEVELS[minimum_role]:
+        raise PermissionError(
+            "A identidade atual não possui permissão suficiente para este projeto."
+        )
+    user = ApplicationUser(
+        id=str(row["id"]),
+        identity_provider=str(row["identity_provider"]),
+        subject=str(row["subject"]),
+        email=str(row["email"]) if row.get("email") else None,
+        display_name=str(row["display_name"]),
+        status=str(row["status"]),
+    )
+    if bind:
+        bind_current_user(user)
+    return ProjectAccess(project_id=str(project_id), user=user, role=role)

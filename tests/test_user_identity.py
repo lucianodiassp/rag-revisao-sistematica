@@ -8,6 +8,7 @@ from backend.app.user_identity import (
     current_user_id,
     ensure_application_user,
     ensure_project_owner,
+    require_project_access,
 )
 
 
@@ -175,3 +176,77 @@ def test_project_lookup_fails_closed_for_current_user_without_membership():
     sql, params = cursor.execute.call_args.args
     assert "project_memberships" in sql
     assert params == (PROJECT_ID, USER_ID)
+
+
+def _authorized_row(role="owner"):
+    return {
+        "id": USER_ID,
+        "identity_provider": "local",
+        "subject": "single-user",
+        "email": None,
+        "display_name": "Usuário local",
+        "status": "active",
+        "role": role,
+    }
+
+
+def test_owner_is_authorized_for_editor_operation():
+    bind_current_user(
+        ApplicationUser(USER_ID, "local", "single-user", None, "Usuário local")
+    )
+    factory, cursor = _connection(fetchone=_authorized_row("owner"))
+
+    access = require_project_access(
+        PROJECT_ID,
+        "editor",
+        connection_factory=factory,
+    )
+
+    assert access.role == "owner"
+    assert access.user.id == USER_ID
+    sql, params = cursor.execute.call_args.args
+    assert "membership.is_active = TRUE" in sql
+    assert "application_user.status = 'active'" in sql
+    assert params == (PROJECT_ID, USER_ID)
+
+
+def test_viewer_cannot_execute_editor_operation():
+    bind_current_user(
+        ApplicationUser(USER_ID, "local", "single-user", None, "Usuário local")
+    )
+    factory, _cursor = _connection(fetchone=_authorized_row("viewer"))
+
+    try:
+        require_project_access(PROJECT_ID, "editor", connection_factory=factory)
+    except PermissionError as error:
+        assert "permissão suficiente" in str(error)
+    else:
+        raise AssertionError("Um leitor não deveria executar uma mutação.")
+
+
+def test_access_fails_closed_without_active_identity():
+    factory, cursor = _connection(fetchone=_authorized_row())
+
+    try:
+        require_project_access(PROJECT_ID, connection_factory=factory)
+    except PermissionError as error:
+        assert "identidade ativa" in str(error)
+    else:
+        raise AssertionError("O acesso sem identidade deveria ser negado.")
+
+    cursor.execute.assert_not_called()
+
+
+def test_worker_can_bind_explicit_authorized_requester():
+    factory, _cursor = _connection(fetchone=_authorized_row("editor"))
+
+    access = require_project_access(
+        PROJECT_ID,
+        "editor",
+        user_id=USER_ID,
+        bind=True,
+        connection_factory=factory,
+    )
+
+    assert access.role == "editor"
+    assert current_user_id() == USER_ID

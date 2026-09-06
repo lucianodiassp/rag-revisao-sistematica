@@ -16,6 +16,12 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   projetos novos, demonstrativos ou importados recebem o proprietário ativo.
 - Recibos do ciclo de vida preservam o proprietário mesmo após a exclusão do
   projeto, sem armazenar tokens OIDC.
+- Adicionada autorização central por papel, com hierarquia `viewer`, `editor` e
+  `owner`, associação ativa e usuário ativo verificados no PostgreSQL.
+- Tarefas em segundo plano registram a identidade solicitante; o worker revalida
+  o papel de edição imediatamente antes de executar e recusa acessos revogados.
+- A migração `021` vincula tarefas anteriores ao proprietário ativo quando
+  possível, preservando histórico e compatibilidade dos backups completos.
 - O modo `multi_user` permanece bloqueado no preflight até que todas as operações
   internas e tarefas em segundo plano adotem autorização obrigatória.
 

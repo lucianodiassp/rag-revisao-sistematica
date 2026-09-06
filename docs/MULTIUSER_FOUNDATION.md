@@ -25,23 +25,35 @@ operacional; esta evolução começa em `2.6.0-dev`.
 - recibos de arquivamento, restauração e exclusão ficam vinculados ao proprietário
   para continuarem privados após a remoção do projeto.
 
-## Limite de segurança desta etapa
+## Segunda entrega: autorização da fila
+
+- uma única função central verifica usuário ativo, associação ativa e papel mínimo;
+- `viewer` pode consultar o andamento, enquanto iniciar ou repetir tarefas exige
+  `editor` ou `owner`;
+- cada nova tarefa guarda `requested_by_user_id`, sem copiar e-mail ou token;
+- antes da execução, o worker recupera e vincula novamente a identidade solicitante;
+- uma associação revogada ou usuário desativado impede a execução da tarefa;
+- a migração `021_background_job_requester.sql` associa tarefas históricas ao
+  proprietário ativo quando essa relação já existe.
+
+## Limite de segurança atual
 
 Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
-rejeitando esse valor porque várias operações especializadas e o worker ainda
-recebem apenas `project_id`. Antes da ativação serão necessários:
+rejeitando esse valor. A fila já propaga e revalida o solicitante, mas várias
+operações síncronas especializadas ainda recebem apenas `project_id`. Antes da
+ativação serão necessários:
 
-1. autorização central por papel em todas as leituras e mutações de projeto;
-2. propagação segura do usuário que originou cada tarefa para o worker;
-3. escopo por usuário para credenciais e configurações sensíveis;
-4. administração de convites, desativação e transferência de propriedade;
-5. testes negativos de isolamento para todas as áreas e arquivos;
-6. revisão dos contratos de backup, restauração e suporte operacional.
+1. aplicar a autorização central às demais leituras, mutações e arquivos;
+2. escopo por usuário para credenciais e configurações sensíveis;
+3. administração de convites, desativação e transferência de propriedade;
+4. testes negativos de isolamento para todas as áreas e arquivos;
+5. revisão dos contratos de backup, restauração e suporte operacional.
 
 ## Compatibilidade e recuperação
 
 A migração `020_user_project_ownership.sql` é progressiva e não modifica conteúdo
-científico. Backups completos incluem as novas tabelas. Pacotes acadêmicos não
+científico; a `021_background_job_requester.sql` acrescenta a autoria das tarefas.
+Backups completos incluem as novas estruturas. Pacotes acadêmicos não
 transportam identidade pessoal: ao serem importados, pertencem ao usuário que
 executou a importação. O modo local e a Web privada de usuário único devem manter
 os mesmos projetos e funcionalidades após a atualização.
@@ -56,3 +68,13 @@ os mesmos projetos e funcionalidades após a atualização.
 6. reiniciar a aplicação e confirmar que identidade e associações persistem;
 7. gerar e validar um backup completo;
 8. manter o preflight Web rejeitando `multi_user` até a conclusão do escopo.
+
+## Validação da autorização da fila
+
+1. aplicar a migração `021` duas vezes e confirmar idempotência;
+2. confirmar que tarefas anteriores receberam o proprietário atual;
+3. iniciar uma tarefa e verificar que ela registra o solicitante;
+4. confirmar que a tarefa conclui normalmente com associação de proprietário;
+5. simular `viewer`, associação revogada e usuário desativado nos testes negativos;
+6. executar a suíte completa e o diagnóstico operacional;
+7. repetir uma tarefa funcional e validar um novo backup completo.
