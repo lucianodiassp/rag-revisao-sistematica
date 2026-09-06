@@ -77,7 +77,11 @@ trabalho preservados na instalação.
 
 - [x] Evidências do piloto registradas sem incluir segredos ou conteúdo de artigos.
 - [x] Preparar `release/v2.5.0` e repetir suíte/contratos locais.
-- [ ] Integrar a promoção em `main`, criar a tag estável e atualizar a VPS.
+- [x] Integrar a promoção em `main`, criar a tag estável e atualizar a VPS.
+
+Promoção concluída em 2026-09-06: a tag estável `v2.5.0` aponta para o merge
+`2319309`, a VPS reporta a versão correta, todos os componentes estão saudáveis e
+o endpoint público responde com `HTTP/2 200`.
 
 Não mova a tag da candidata. Correções produzem `v2.5.0-rc.2`. A restauração de
 dados depende de backup compatível; trocar somente o código não desfaz migrações.
