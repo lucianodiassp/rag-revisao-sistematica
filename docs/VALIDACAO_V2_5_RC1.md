@@ -42,5 +42,39 @@ Comando reproduzível no Windows, usando pasta temporária exclusiva:
 
 ## Piloto Web
 
-Aguardando integração da candidata, publicação da tag imutável e atualização da
-VPS conforme [CHECKLIST_RELEASE_V2_5.md](CHECKLIST_RELEASE_V2_5.md).
+A tag imutável `v2.5.0-rc.1`, no commit
+`782e1fe071b03206cd05afe0db9a79f9bd5f0d47`, foi publicada como pré-release e
+instalada na VPS em 2026-09-05.
+
+- preflight e migração terminaram com sucesso;
+- aplicação, PostgreSQL, worker, agendador e proxy permaneceram saudáveis;
+- HTTPS e a identidade `2.5.0-rc.1 · Web privada · Usuário único` foram confirmados;
+- o diagnóstico completo reconheceu `019_project_lifecycle.sql`, fila vazia,
+  armazenamento saudável, backup externo, dois provedores de IA e três fontes
+  bibliográficas, com estado geral saudável;
+- um pacote acadêmico descartável foi importado, arquivado, restaurado, novamente
+  arquivado e excluído somente após a validação de um backup posterior;
+- os dois projetos preservados, o recibo imutável e os fluxos de navegação, RAG,
+  relatórios, credenciais e diagnóstico permaneceram íntegros.
+
+## Backup e restauração isolada
+
+Depois do piloto, um backup completo foi criado, baixado e validado. O backup
+externo também foi confirmado no Cloudflare R2 privado.
+
+O backup anterior à exclusão foi restaurado pelo Compose isolado na porta `18501`,
+sem substituir a aplicação local principal nem a VPS. A restauração recompôs os
+dois projetos ativos, o projeto descartável arquivado fora do seletor, seu histórico
+de ciclo de vida e os dados dos projetos originais. O ambiente isolado foi encerrado
+preservando seus volumes para eventual conferência.
+
+Todos os critérios da candidata foram aprovados; não foi necessária uma
+`v2.5.0-rc.2`. A promoção estável pode prosseguir em `release/v2.5.0` sem mover a
+tag da candidata.
+
+## Preparação da promoção estável
+
+A branch `release/v2.5.0` atualiza somente a identidade e a documentação da
+promoção. A suíte completa permaneceu com **302 testes aprovados**, e os contratos
+de implantação incluídos na suíte continuaram válidos. A tag estável deve apontar
+para o merge dessa branch em `main`, nunca para o commit da candidata.

@@ -10,7 +10,7 @@ from backend.app.version import (
 
 
 def test_repository_version_is_valid_semver_and_single_source():
-    assert APP_VERSION == "2.5.0-rc.1"
+    assert APP_VERSION == "2.5.0"
     assert read_application_version() == APP_VERSION
     assert version_file_path().name == "VERSION"
 
@@ -18,11 +18,11 @@ def test_repository_version_is_valid_semver_and_single_source():
 def test_application_metadata_identifies_local_single_user_profile():
     metadata = application_metadata({})
 
-    assert metadata["version"] == "2.5.0-rc.1"
+    assert metadata["version"] == "2.5.0"
     assert metadata["deployment_profile"] == "local"
     assert metadata["deployment_label"] == "Local"
     assert metadata["user_mode"] == "single_user"
-    assert application_caption({}) == "Versão 2.5.0-rc.1 · Local · Usuário único"
+    assert application_caption({}) == "Versão 2.5.0 · Local · Usuário único"
 
 
 def test_web_private_profile_is_ready_for_v2_configuration():

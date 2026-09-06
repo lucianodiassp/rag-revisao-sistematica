@@ -6,6 +6,18 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.5.0] — 2026-09-05
+
+### Promoção da gestão segura do ciclo de vida dos projetos
+
+- Promovidos arquivamento reversível, restauração e exclusão permanente protegida
+  após aprovação da candidata `v2.5.0-rc.1` nos perfis local e Web privado.
+- O piloto confirmou proteção dos projetos preservados, recibos imutáveis,
+  bloqueio sem backup posterior e ausência de regressões no fluxo científico.
+- Backup local e externo no Cloudflare R2 foram verificados após o piloto; uma
+  restauração isolada recompôs o projeto arquivado, seu histórico e os dados dos
+  projetos originais sem alterar a instalação principal.
+
 ## [2.5.0-rc.1] — 2026-09-05
 
 ### Gestão segura do ciclo de vida dos projetos

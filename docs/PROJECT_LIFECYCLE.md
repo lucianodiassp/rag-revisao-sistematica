@@ -58,7 +58,7 @@ artigos, credenciais ou chaves.
 
 Use um projeto descartável, nunca um projeto científico necessário ao teste:
 
-1. atualize o banco pela migração e confirme `Versão 2.5.0-rc.1` no menu;
+1. atualize o banco pela migração e confirme `Versão 2.5.0` no menu;
 2. crie um projeto descartável e mantenha ao menos outro projeto ativo;
 3. em **Gestão de Projetos**, confira a prévia e arquive o descartável;
 4. confirme que ele desapareceu do seletor das outras páginas;
@@ -88,6 +88,18 @@ foram repetidos com a identidade `2.5.0-rc.1` antes do piloto Web:
 - a confirmação exata e as duas declarações habilitaram a exclusão permanente;
 - o projeto importado foi removido, os projetos originais permaneceram disponíveis
   e o recibo de exclusão continuou no histórico imutável.
+
+## Validação Web e recuperação
+
+A candidata `v2.5.0-rc.1` foi aprovada na Web privada em 2026-09-05. O piloto
+confirmou o ciclo completo com projeto acadêmico descartável, as proteções dos dois
+projetos preservados e a ausência de regressões em navegação, RAG, relatórios,
+credenciais e diagnóstico. Backups local e externo foram verificados após o teste.
+
+Uma restauração controlada, executada pelo Compose isolado na porta `18501`,
+recompôs o estado anterior à exclusão: dois projetos ativos, o projeto descartável
+arquivado fora do seletor, histórico de ciclo de vida e dados dos projetos
+originais. A instalação principal e a VPS não foram substituídas durante o ensaio.
 
 O pacote ensaiado não possuía PDFs físicos. A remoção e a devolução automática dos
 arquivos em caso de falha transacional permanecem cobertas por testes automatizados.
