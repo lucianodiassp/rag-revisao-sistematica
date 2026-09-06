@@ -40,6 +40,8 @@ def test_local_profile_remains_accessible_without_auth_configuration():
     assert decision.authorized is True
     assert decision.required is False
     assert decision.code == "local_access"
+    assert decision.identity_provider == "local"
+    assert decision.subject == "single-user-installation"
 
 
 def test_web_profile_fails_closed_without_allowlist():
@@ -103,6 +105,8 @@ def test_web_profile_authorizes_configured_email_case_insensitively():
             "email": "Pesquisador@Example.ORG",
             "email_verified": True,
             "name": "Pessoa Pesquisadora",
+            "iss": "https://accounts.example.org",
+            "sub": "subject-123",
         }
     )
 
@@ -110,13 +114,30 @@ def test_web_profile_authorizes_configured_email_case_insensitively():
     assert decision.code == "access_granted"
     assert decision.email == "pesquisador@example.org"
     assert decision.display_name == "Pessoa Pesquisadora"
+    assert decision.identity_provider == "https://accounts.example.org"
+    assert decision.subject == "subject-123"
 
 
 def test_multi_user_policy_can_receive_more_than_one_explicit_email():
+    decision = _web_access(
+        {
+            "is_logged_in": True,
+            "email": "segundo@example.org",
+            "sub": "segundo-123",
+        },
+        emails="primeiro@example.org,segundo@example.org",
+        user_mode="multi_user",
+    )
+
+    assert decision.authorized is True
+
+
+def test_multi_user_policy_requires_stable_subject_from_provider():
     decision = _web_access(
         {"is_logged_in": True, "email": "segundo@example.org"},
         emails="primeiro@example.org,segundo@example.org",
         user_mode="multi_user",
     )
 
-    assert decision.authorized is True
+    assert decision.authorized is False
+    assert decision.code == "identity_subject_missing"

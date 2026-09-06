@@ -27,6 +27,8 @@ class AccessDecision:
     code: str
     email: str | None = None
     display_name: str | None = None
+    identity_provider: str | None = None
+    subject: str | None = None
 
 
 def normalize_email(value) -> str:
@@ -79,6 +81,9 @@ def evaluate_access(
             authenticated=False,
             authorized=True,
             code="local_access",
+            display_name="Usuário local",
+            identity_provider="local",
+            subject="single-user-installation",
         )
     if deployment_profile != "web_private":
         raise AuthConfigurationError(
@@ -132,6 +137,21 @@ def evaluate_access(
             email=email,
             display_name=display_name,
         )
+    identity_provider = str(_identity_value(identity, "iss") or "oidc").strip()
+    subject = str(_identity_value(identity, "sub") or "").strip()
+    if not subject and user_mode == "multi_user":
+        return AccessDecision(
+            required=True,
+            authenticated=True,
+            authorized=False,
+            code="identity_subject_missing",
+            email=email,
+            display_name=display_name,
+            identity_provider=identity_provider,
+        )
+    if not subject:
+        # Compatibilidade com provedores já configurados no perfil de usuário único.
+        subject = f"email:{email}"
     return AccessDecision(
         required=True,
         authenticated=True,
@@ -139,4 +159,6 @@ def evaluate_access(
         code="access_granted",
         email=email,
         display_name=display_name,
+        identity_provider=identity_provider,
+        subject=subject,
     )

@@ -6,6 +6,19 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Fundação multiusuário
+
+- Iniciada a identidade `2.6.0-dev` com usuários persistentes derivados do sujeito
+  estável do provedor OIDC ou do perfil local.
+- Projetos passam a possuir associação explícita de proprietário; instalações de
+  usuário único adotam somente projetos ainda sem associação durante a migração.
+- Seletor e gestão do ciclo de vida limitam a listagem ao usuário corrente, e
+  projetos novos, demonstrativos ou importados recebem o proprietário ativo.
+- Recibos do ciclo de vida preservam o proprietário mesmo após a exclusão do
+  projeto, sem armazenar tokens OIDC.
+- O modo `multi_user` permanece bloqueado no preflight até que todas as operações
+  internas e tarefas em segundo plano adotem autorização obrigatória.
+
 ## [2.5.0] — 2026-09-05
 
 ### Promoção da gestão segura do ciclo de vida dos projetos

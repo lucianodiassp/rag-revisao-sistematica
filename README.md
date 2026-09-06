@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.6.0--dev-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -93,6 +93,12 @@ arquivamento reversível, restauração e exclusão permanente condicionada a um
 ausência de tarefas ativas, backup posterior e confirmação explícita. O fluxo foi
 validado localmente, na Web privada e em uma restauração isolada. Consulte
 [Gestão do ciclo de vida dos projetos](docs/PROJECT_LIFECYCLE.md).
+
+A linha em desenvolvimento **2.6.0-dev** inicia a fundação multiusuário sem liberar
+cadastro público: identidades OIDC persistentes, propriedade explícita de projetos
+e migração compatível das instalações atuais. O modo Web continua deliberadamente
+restrito a um usuário enquanto as demais barreiras de autorização são concluídas.
+Consulte [Fundação multiusuário](docs/MULTIUSER_FOUNDATION.md).
 
 ### Autenticação da Web privada
 

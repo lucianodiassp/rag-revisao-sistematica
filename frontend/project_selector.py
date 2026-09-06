@@ -4,6 +4,11 @@ from backend.app.database import listar_projetos
 
 
 CHAVE_PROJETO_ATIVO = "active_project_id"
+ACCESS_ROLE_LABELS = {
+    "owner": "Proprietário",
+    "editor": "Editor",
+    "viewer": "Leitor",
+}
 
 
 def selecionar_projeto_ativo(obrigatorio=True):
@@ -34,8 +39,11 @@ def selecionar_projeto_ativo(obrigatorio=True):
         st.session_state.pop("relatorio_compilado", None)
 
     projeto = projetos_por_id[selecionado]
+    access_label = ACCESS_ROLE_LABELS.get(projeto.get("access_role"))
+    access_suffix = f" · acesso: {access_label}" if access_label else ""
     st.sidebar.caption(
         f"Protocolo v{projeto['protocol_version']} · status: {projeto['status']}"
+        f"{access_suffix}"
     )
     demo = ((projeto.get("criteria_jsonb") or {}).get("_demo") or {})
     if demo.get("seed_id"):

@@ -29,6 +29,7 @@ from backend.app.reproducibility_import import (  # noqa: E402
     import_reproducibility_package,
     validate_reproducibility_package,
 )
+from backend.app.user_identity import ensure_project_owner  # noqa: E402
 from backend.coleta.importador_bibtex import (  # noqa: E402
     ErroBibTeX,
     analisar_bibtex,
@@ -77,6 +78,7 @@ with st.sidebar.expander("🧪 Projeto demonstrativo", expanded=False):
             st.error(f"Não foi possível preparar a demonstração: {erro}")
         else:
             demo_id = str(resultado_demo["project_id"])
+            ensure_project_owner(demo_id)
             st.session_state[CHAVE_PROJETO_ATIVO] = demo_id
             st.session_state["project_selector_widget"] = demo_id
             if resultado_demo.get("restored"):
@@ -166,6 +168,7 @@ with st.sidebar.expander("📦 Importar projeto", expanded=False):
                     st.error(f"Não foi possível importar o projeto: {erro}")
                 else:
                     novo_id = str(resultado_importacao["project_id"])
+                    ensure_project_owner(novo_id)
                     st.session_state[CHAVE_PROJETO_ATIVO] = novo_id
                     st.session_state["project_selector_widget"] = novo_id
                     st.session_state["imported_project_message"] = (
