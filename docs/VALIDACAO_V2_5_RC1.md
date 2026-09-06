@@ -78,3 +78,16 @@ A branch `release/v2.5.0` atualiza somente a identidade e a documentação da
 promoção. A suíte completa permaneceu com **302 testes aprovados**, e os contratos
 de implantação incluídos na suíte continuaram válidos. A tag estável deve apontar
 para o merge dessa branch em `main`, nunca para o commit da candidata.
+
+## Fechamento da versão estável
+
+A promoção foi integrada à `main` pelo PR #64. A tag anotada `v2.5.0` aponta para
+o merge `2319309` e foi publicada como release estável e mais recente.
+
+Na VPS, o preflight reconheceu a identidade `2.5.0` e a atualização preservou os
+volumes e as configurações privadas. O diagnóstico final, gerado em
+`2026-09-06T01:45:31Z`, apresentou estado geral saudável, migração
+`019_project_lifecycle.sql` atualizada, armazenamento gravável, worker ativo, fila
+vazia, backup externo em estado de sucesso e credenciais dos dois provedores de IA
+disponíveis. O endpoint público retornou `HTTP/2 200`, e a interface confirmou
+`Versão 2.5.0 · Web privada · Usuário único`, com projetos e navegação preservados.
