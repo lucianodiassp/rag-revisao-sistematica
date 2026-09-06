@@ -31,6 +31,7 @@ from backend.app.observability import (
     sanitize_text,
 )
 from backend.app.operational_health import ServiceHeartbeatThread
+from backend.app.user_identity import bind_current_user, require_project_access
 
 
 TRANSIENT_MARKERS = (
@@ -214,6 +215,12 @@ class JobWorker:
         heartbeat = HeartbeatThread(job["id"], self.heartbeat_seconds)
         heartbeat.start()
         try:
+            require_project_access(
+                job["project_id"],
+                "editor",
+                user_id=job.get("requested_by_user_id"),
+                bind=True,
+            )
             reload_job_runtime_configuration()
             with suppress_raw_job_output():
                 result = execute_job(job)
@@ -253,6 +260,7 @@ class JobWorker:
                 retryable=transient,
             )
         finally:
+            bind_current_user(None)
             heartbeat.stop()
             heartbeat.join(timeout=2)
         return True

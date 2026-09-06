@@ -98,6 +98,7 @@ CREATE TABLE project_rag_settings (
 CREATE TABLE background_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    requested_by_user_id UUID REFERENCES application_users(id) ON DELETE SET NULL,
     job_type VARCHAR(50) NOT NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'queued',
     parameters_jsonb JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -149,6 +150,9 @@ CREATE INDEX idx_background_jobs_claim
     ON background_jobs(status, available_at, created_at);
 CREATE INDEX idx_background_jobs_project
     ON background_jobs(project_id, job_type, created_at DESC);
+CREATE INDEX idx_background_jobs_requester
+    ON background_jobs(requested_by_user_id, created_at DESC)
+    WHERE requested_by_user_id IS NOT NULL;
 CREATE INDEX idx_background_job_events_job
     ON background_job_events(job_id, created_at);
 

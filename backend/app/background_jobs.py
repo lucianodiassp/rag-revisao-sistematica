@@ -10,6 +10,7 @@ from psycopg2 import IntegrityError
 from psycopg2.extras import Json, RealDictCursor
 
 from backend.app.database import get_connection
+from backend.app.user_identity import require_project_access
 
 
 JOB_BIBLIOGRAPHIC_SEARCH = "bibliographic_search"
@@ -74,6 +75,11 @@ def enqueue_job(project_id, job_type, parameters=None, max_attempts=None):
     else:
         attempts = max(1, min(int(max_attempts), 10))
     parameters = _json_safe(parameters or {})
+    access = require_project_access(
+        project_id,
+        "editor",
+        connection_factory=get_connection,
+    )
 
     connection = get_connection()
     try:
@@ -91,12 +97,18 @@ def enqueue_job(project_id, job_type, parameters=None, max_attempts=None):
                 cursor.execute(
                     """
                     INSERT INTO background_jobs
-                        (project_id, job_type, parameters_jsonb, max_attempts,
-                         progress_message)
-                    VALUES (%s, %s, %s, %s, 'Aguardando início')
+                        (project_id, requested_by_user_id, job_type,
+                         parameters_jsonb, max_attempts, progress_message)
+                    VALUES (%s, %s, %s, %s, %s, 'Aguardando início')
                     RETURNING *
                     """,
-                    (project_id, job_type, Json(parameters), attempts),
+                    (
+                        project_id,
+                        access.user.id,
+                        job_type,
+                        Json(parameters),
+                        attempts,
+                    ),
                 )
                 row = cursor.fetchone()
                 _record_event(cursor, row["id"], "queued", {"parameters": parameters})
@@ -122,6 +134,12 @@ def enqueue_job(project_id, job_type, parameters=None, max_attempts=None):
 
 
 def get_job(job_id, project_id=None):
+    if project_id is not None:
+        require_project_access(
+            project_id,
+            "viewer",
+            connection_factory=get_connection,
+        )
     with get_connection() as connection, connection.cursor(
         cursor_factory=RealDictCursor
     ) as cursor:
@@ -131,10 +149,22 @@ def get_job(job_id, project_id=None):
             query += " AND project_id = %s"
             params.append(project_id)
         cursor.execute(query, params)
-        return _row_to_dict(cursor.fetchone())
+        row = _row_to_dict(cursor.fetchone())
+    if row and project_id is None:
+        require_project_access(
+            row["project_id"],
+            "viewer",
+            connection_factory=get_connection,
+        )
+    return row
 
 
 def get_latest_job(project_id, job_type, parameters=None):
+    require_project_access(
+        project_id,
+        "viewer",
+        connection_factory=get_connection,
+    )
     with get_connection() as connection, connection.cursor(
         cursor_factory=RealDictCursor
     ) as cursor:
@@ -155,6 +185,11 @@ def get_latest_job(project_id, job_type, parameters=None):
 
 
 def get_latest_successful_job(project_id, job_type):
+    require_project_access(
+        project_id,
+        "viewer",
+        connection_factory=get_connection,
+    )
     with get_connection() as connection, connection.cursor(
         cursor_factory=RealDictCursor
     ) as cursor:
@@ -170,6 +205,8 @@ def get_latest_successful_job(project_id, job_type):
 
 
 def list_job_events(job_id):
+    # A leitura do trabalho valida o escopo antes de expor seu histórico.
+    get_job(job_id)
     with get_connection() as connection, connection.cursor(
         cursor_factory=RealDictCursor
     ) as cursor:
@@ -349,6 +386,11 @@ def fail_job(job_id, error, *, retryable=False, error_code=None):
 
 def retry_job(project_id, job_id):
     """Reabre manualmente uma falha, preservando seu histórico auditável."""
+    require_project_access(
+        project_id,
+        "editor",
+        connection_factory=get_connection,
+    )
     connection = get_connection()
     try:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:

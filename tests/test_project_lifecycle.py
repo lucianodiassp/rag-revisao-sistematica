@@ -292,14 +292,20 @@ def test_permanent_delete_requires_archived_project_exact_title_and_backup_confi
         connection.rollback.assert_called_once()
 
 
+@patch("backend.app.background_jobs.require_project_access")
 @patch("backend.app.background_jobs.get_connection")
-def test_background_job_rejects_archived_project_under_row_lock(get_connection):
+def test_background_job_rejects_archived_project_under_row_lock(
+    get_connection, require_project_access
+):
     connection = Mock()
     cursor = Mock()
     cursor.__enter__ = Mock(return_value=cursor)
     cursor.__exit__ = Mock(return_value=False)
     connection.cursor.return_value = cursor
     get_connection.return_value = connection
+    require_project_access.return_value.user.id = (
+        "30000000-0000-0000-0000-000000000003"
+    )
     cursor.fetchone.return_value = {"archived_at": NOW}
 
     with pytest.raises(ValueError, match="Projeto ativo"):

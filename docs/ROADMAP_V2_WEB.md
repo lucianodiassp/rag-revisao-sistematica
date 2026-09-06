@@ -12,8 +12,8 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: integração das próximas entregas; versão estável `v2.4.0` publicada e
-  validada na VPS após a aprovação da candidata `v2.4.0-rc.1` no piloto Web.
+- `main`: integração das próximas entregas; versão estável `v2.5.0` publicada e
+  validada na VPS após a aprovação da candidata `v2.5.0-rc.1` no piloto Web.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 
@@ -154,8 +154,9 @@ endurecimento operacional da Web privada de usuário único.
    permanente protegida, limpeza de PDFs e recibos imutáveis.
    [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
 7. `v2.6.x`: fundação multiusuário — em desenvolvimento, começando por identidade
-   OIDC persistente, propriedade explícita e migração segura dos projetos atuais,
-   ainda sem cadastro público ou compartilhamento.
+   OIDC persistente, propriedade explícita, migração segura dos projetos atuais e
+   propagação do solicitante para tarefas em segundo plano. O modo multiusuário
+   continua bloqueado, ainda sem cadastro público ou compartilhamento.
    [Escopo incremental](MULTIUSER_FOUNDATION.md).
 8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.5.x`.
