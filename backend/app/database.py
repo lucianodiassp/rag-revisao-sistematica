@@ -17,6 +17,7 @@ from backend.app.project_utils import (
     normalizar_titulo,
 )
 from backend.app.protocol_service import protocol_fingerprint
+from backend.app.user_identity import current_user_id
 
 
 load_dotenv()
@@ -34,36 +35,72 @@ def get_connection():
 
 
 def listar_projetos(incluir_arquivados=False):
+    user_id = current_user_id()
+    joins = ""
+    role_select = "NULL::text AS access_role"
+    filters = []
+    params = []
+    if user_id:
+        joins = """
+            JOIN project_memberships AS membership
+              ON membership.project_id = project.id
+             AND membership.user_id = %s
+             AND membership.is_active = TRUE
+        """
+        params.append(user_id)
+        role_select = "membership.role AS access_role"
+    if not incluir_arquivados:
+        filters.append("project.archived_at IS NULL")
+    where = f"WHERE {' AND '.join(filters)}" if filters else ""
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             f"""
-            SELECT id, title, question, criteria_jsonb, status,
-                   protocol_version, archived_at, archived_reason,
-                   created_at, updated_at
-            FROM review_projects
-            {"" if incluir_arquivados else "WHERE archived_at IS NULL"}
-            ORDER BY updated_at DESC, created_at DESC
-            """
+            SELECT project.id, project.title, project.question,
+                   project.criteria_jsonb, project.status,
+                   project.protocol_version, project.archived_at,
+                   project.archived_reason, project.created_at, project.updated_at,
+                   {role_select}
+            FROM review_projects AS project
+            {joins}
+            {where}
+            ORDER BY project.updated_at DESC, project.created_at DESC
+            """,
+            tuple(params),
         )
         colunas = [descricao[0] for descricao in cursor.description]
         return [dict(zip(colunas, linha)) for linha in cursor.fetchall()]
 
 
 def obter_projeto(project_id):
+    user_id = current_user_id()
+    access_filter = ""
+    params = [project_id]
+    if user_id:
+        access_filter = """
+            AND EXISTS (
+                SELECT 1 FROM project_memberships AS membership
+                WHERE membership.project_id = project.id
+                  AND membership.user_id = %s
+                  AND membership.is_active = TRUE
+            )
+        """
+        params.append(user_id)
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
-            """
-            SELECT id, title, question, criteria_jsonb, status,
-                   protocol_version, archived_at, archived_reason,
-                   created_at, updated_at
-            FROM review_projects
-            WHERE id = %s
+            f"""
+            SELECT project.id, project.title, project.question,
+                   project.criteria_jsonb, project.status,
+                   project.protocol_version, project.archived_at,
+                   project.archived_reason, project.created_at, project.updated_at
+            FROM review_projects AS project
+            WHERE project.id = %s
+            {access_filter}
             """,
-            (project_id,),
+            tuple(params),
         )
         linha = cursor.fetchone()
         if not linha:
-            raise ValueError(f"Projeto não encontrado: {project_id}")
+            raise ValueError(f"Projeto não encontrado ou sem acesso: {project_id}")
         colunas = [descricao[0] for descricao in cursor.description]
         return dict(zip(colunas, linha))
 
@@ -94,6 +131,14 @@ def criar_projeto(titulo, pergunta):
             """,
             (projeto_id, pergunta.strip(), Json(protocolo_inicial)),
         )
+        if user_id := current_user_id():
+            cursor.execute(
+                """
+                INSERT INTO project_memberships (project_id, user_id, role, is_active)
+                VALUES (%s, %s, 'owner', TRUE)
+                """,
+                (projeto_id, user_id),
+            )
     return projeto_id
 
 

@@ -20,9 +20,11 @@ from backend.app.observability import classify_error, sanitize_fields
 from backend.app.version import APP_VERSION, application_metadata
 
 
-LATEST_REQUIRED_MIGRATION = "019_project_lifecycle.sql"
+LATEST_REQUIRED_MIGRATION = "020_user_project_ownership.sql"
 REQUIRED_TABLES = (
+    "application_users",
     "review_projects",
+    "project_memberships",
     "background_jobs",
     "background_job_events",
     "schema_migrations",

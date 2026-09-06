@@ -8,6 +8,8 @@ from backend.app.demo_project import DEMO_SEED_ID
 from backend.app.project_lifecycle import (
     archive_project,
     deletion_preview,
+    list_lifecycle_events,
+    list_projects_for_lifecycle,
     permanently_delete_project,
     restore_project,
 )
@@ -152,6 +154,52 @@ def test_deletion_preview_counts_only_regular_project_pdfs_and_requires_new_back
     assert preview["pdf_count"] == 1
     assert preview["pdf_bytes"] == len(b"%PDF-project")
     assert preview["backup_after_archive"] is True
+
+
+def test_lifecycle_project_listing_is_scoped_to_current_user():
+    factory, _connection, cursor = _context_connection(
+        [],
+        fetchall_values=[_project()],
+    )
+
+    with patch(
+        "backend.app.project_lifecycle.current_user_id",
+        return_value="user-1",
+    ):
+        projects = list_projects_for_lifecycle(connection_factory=factory)
+
+    sql, params = cursor.execute.call_args.args
+    assert "JOIN project_memberships" in sql
+    assert "membership.user_id = %s" in sql
+    assert params == ("user-1",)
+    assert projects[0]["id"] == PROJECT_ID
+
+
+def test_lifecycle_receipts_are_scoped_to_owner_after_project_deletion():
+    event = {
+        "id": "event-1",
+        "target_project_id": PROJECT_ID,
+        "project_title": "Revisão a arquivar",
+        "action": "deleted",
+        "actor_identifier": "pesquisador@example.test",
+        "details_jsonb": {},
+        "created_at": NOW,
+    }
+    factory, _connection, cursor = _context_connection(
+        [],
+        fetchall_values=[event],
+    )
+
+    with patch(
+        "backend.app.project_lifecycle.current_user_id",
+        return_value="user-1",
+    ):
+        events = list_lifecycle_events(connection_factory=factory)
+
+    sql, params = cursor.execute.call_args.args
+    assert "WHERE owner_user_id = %s" in sql
+    assert params == ("user-1", 100)
+    assert events[0]["target_project_id"] == PROJECT_ID
 
 
 def test_permanent_delete_removes_database_and_pdf_after_post_archive_backup(tmp_path):

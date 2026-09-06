@@ -6,6 +6,10 @@ import streamlit as st
 
 from backend.app.auth import AuthConfigurationError, evaluate_access
 from backend.app.observability import log_event
+from backend.app.user_identity import (
+    bind_current_user,
+    ensure_application_user,
+)
 
 
 def _oidc_is_configured() -> bool:
@@ -43,18 +47,20 @@ def _render_configuration_error(message: str) -> None:
 def enforce_access(metadata: dict):
     """Interrompe a execução antes das páginas quando o acesso não for permitido."""
 
-    if metadata["deployment_profile"] != "web_private":
-        return None
-    if not _oidc_is_configured():
+    # Nunca reutilizar a identidade vinculada por uma execução anterior da thread.
+    bind_current_user(None)
+    is_web = metadata["deployment_profile"] == "web_private"
+    if is_web and not _oidc_is_configured():
         _render_configuration_error(
             "Arquivo .streamlit/secrets.toml sem a seção [auth]."
         )
 
+    identity = _current_identity() if is_web else None
     try:
         decision = evaluate_access(
             deployment_profile=metadata["deployment_profile"],
             user_mode=metadata["user_mode"],
-            identity=_current_identity(),
+            identity=identity,
         )
     except AuthConfigurationError as error:
         _render_configuration_error(str(error))
@@ -87,6 +93,8 @@ def enforce_access(metadata: dict):
             st.error("O provedor não confirmou a verificação do e-mail desta conta.")
         elif decision.code == "email_missing":
             st.error("O provedor não informou um e-mail para esta conta.")
+        elif decision.code == "identity_subject_missing":
+            st.error("O provedor não informou uma identidade estável para esta conta.")
         else:
             st.error("Esta conta não está autorizada a acessar a aplicação.")
         if decision.email:
@@ -95,6 +103,48 @@ def enforce_access(metadata: dict):
             st.logout()
         st.stop()
 
+    identity_key = (
+        decision.identity_provider,
+        decision.subject,
+        decision.email,
+    )
+    cached = st.session_state.get("application_user")
+    if cached and tuple(cached.get("identity_key") or ()) != identity_key:
+        for key in (
+            "active_project_id",
+            "project_selector_widget",
+            "mensagens_por_projeto",
+            "relatorio_compilado",
+        ):
+            st.session_state.pop(key, None)
+    try:
+        # A consulta em cada rerun é intencional: uma identidade desativada não
+        # pode continuar autorizada apenas por estar presente na sessão do navegador.
+        user = ensure_application_user(
+            decision,
+            user_mode=metadata["user_mode"],
+        )
+    except Exception:
+        log_event(
+            "user_scope_activation_failed",
+            component="app",
+            level="error",
+            category="authentication",
+        )
+        st.error("Não foi possível preparar o escopo seguro dos projetos.")
+        st.stop()
+    st.session_state["application_user"] = {
+        "identity_key": identity_key,
+        "user": {
+            "id": user.id,
+            "identity_provider": user.identity_provider,
+            "subject": user.subject,
+            "email": user.email,
+            "display_name": user.display_name,
+            "status": user.status,
+        }
+    }
+
     if not st.session_state.get("authentication_success_logged"):
         log_event(
             "authentication_succeeded",
@@ -102,8 +152,11 @@ def enforce_access(metadata: dict):
             category="authentication",
         )
         st.session_state["authentication_success_logged"] = True
-    st.sidebar.caption(f"Conectado como **{decision.display_name}**")
-    st.sidebar.caption(decision.email)
-    if st.sidebar.button("Sair", use_container_width=True):
-        st.logout()
+    if is_web:
+        st.sidebar.caption(f"Conectado como **{decision.display_name}**")
+        st.sidebar.caption(decision.email)
+        if st.sidebar.button("Sair", use_container_width=True):
+            st.session_state.pop("application_user", None)
+            bind_current_user(None)
+            st.logout()
     return decision

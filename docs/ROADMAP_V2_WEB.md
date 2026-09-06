@@ -153,6 +153,10 @@ endurecimento operacional da Web privada de usuário único.
    isolada e backup externo. Contém arquivamento reversível, restauração, exclusão
    permanente protegida, limpeza de PDFs e recibos imutáveis.
    [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
-7. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
+7. `v2.6.x`: fundação multiusuário — em desenvolvimento, começando por identidade
+   OIDC persistente, propriedade explícita e migração segura dos projetos atuais,
+   ainda sem cadastro público ou compartilhamento.
+   [Escopo incremental](MULTIUSER_FOUNDATION.md).
+8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.5.x`.
-8. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.
+9. `v3.x`: compartilhamento de projetos, cadastro público, cotas e escalabilidade.

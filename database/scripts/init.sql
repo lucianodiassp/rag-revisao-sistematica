@@ -3,6 +3,26 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 2. Criação das Tabelas Mínimas Exigidas
 
+-- Identidades da aplicação. O modo multiusuário ainda depende das barreiras de
+-- autorização do backend e permanece desabilitado no preflight Web.
+CREATE TABLE application_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identity_provider VARCHAR(255) NOT NULL,
+    subject VARCHAR(512) NOT NULL,
+    email VARCHAR(320),
+    display_name VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (identity_provider, subject),
+    CHECK (status IN ('active', 'disabled')),
+    CHECK (email IS NULL OR email = lower(email)),
+    CHECK (length(btrim(identity_provider)) >= 1),
+    CHECK (length(btrim(subject)) >= 1),
+    CHECK (length(btrim(display_name)) >= 1)
+);
+
 -- Projetos de revisão
 CREATE TABLE review_projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -22,6 +42,26 @@ CREATE TABLE review_projects (
     )
 );
 
+CREATE TABLE project_memberships (
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES application_users(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (project_id, user_id),
+    CHECK (role IN ('owner', 'editor', 'viewer'))
+);
+
+CREATE UNIQUE INDEX uq_project_memberships_active_owner
+    ON project_memberships(project_id)
+    WHERE role = 'owner' AND is_active = TRUE;
+CREATE INDEX idx_project_memberships_user
+    ON project_memberships(user_id, is_active, role, project_id);
+CREATE INDEX idx_application_users_email
+    ON application_users(lower(email))
+    WHERE email IS NOT NULL;
+
 -- Recibos imutáveis que permanecem disponíveis após a exclusão do projeto.
 CREATE TABLE project_lifecycle_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -29,6 +69,7 @@ CREATE TABLE project_lifecycle_events (
     project_title VARCHAR(255) NOT NULL,
     action VARCHAR(20) NOT NULL,
     actor_identifier VARCHAR(200) NOT NULL,
+    owner_user_id UUID REFERENCES application_users(id) ON DELETE SET NULL,
     details_jsonb JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (action IN ('archived', 'restored', 'deleted')),
@@ -42,6 +83,8 @@ CREATE INDEX idx_review_projects_active
     WHERE archived_at IS NULL;
 CREATE INDEX idx_project_lifecycle_events_target
     ON project_lifecycle_events(target_project_id, created_at DESC);
+CREATE INDEX idx_project_lifecycle_events_owner
+    ON project_lifecycle_events(owner_user_id, created_at DESC);
 
 -- Operações demoradas executadas fora da sessão do navegador.
 CREATE TABLE project_rag_settings (

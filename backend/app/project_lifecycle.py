@@ -13,6 +13,7 @@ from backend.app.backup_service import BACKUP_EXTENSION, default_backup_director
 from backend.app.database import get_connection
 from backend.app.demo_project import is_demo_project
 from backend.app.storage_service import pdf_directory
+from backend.app.user_identity import current_user_id
 
 
 ACTIVE_JOB_STATUSES = ("queued", "running", "retry_wait")
@@ -34,15 +35,29 @@ def _safe_actor(actor):
 
 
 def _load_project(cursor, project_id, *, lock=False):
+    user_id = current_user_id()
+    access_filter = ""
+    params = [str(project_id)]
+    if user_id:
+        access_filter = """
+        AND EXISTS (
+            SELECT 1 FROM project_memberships AS membership
+            WHERE membership.project_id = review_projects.id
+              AND membership.user_id = %s
+              AND membership.is_active = TRUE
+        )
+        """
+        params.append(user_id)
     cursor.execute(
         f"""
         SELECT id, title, question, criteria_jsonb, status, protocol_version,
                archived_at, archived_reason, created_at, updated_at
         FROM review_projects
         WHERE id = %s
+        {access_filter}
         {"FOR UPDATE" if lock else ""}
         """,
-        (str(project_id),),
+        tuple(params),
     )
     project = _row_to_dict(cursor.fetchone())
     if not project:
@@ -99,14 +114,32 @@ def _latest_backup(directory: Path):
 
 def list_projects_for_lifecycle(*, connection_factory=None):
     factory = connection_factory or get_connection
+    user_id = current_user_id()
+    joins = ""
+    role_select = "NULL::text AS access_role"
+    params = []
+    if user_id:
+        joins = """
+            JOIN project_memberships AS membership
+              ON membership.project_id = project.id
+             AND membership.user_id = %s
+             AND membership.is_active = TRUE
+        """
+        params.append(user_id)
+        role_select = "membership.role AS access_role"
     with factory() as connection, connection.cursor(cursor_factory=RealDictCursor) as cursor:
         cursor.execute(
-            """
-            SELECT id, title, question, criteria_jsonb, status, protocol_version,
-                   archived_at, archived_reason, created_at, updated_at
-            FROM review_projects
-            ORDER BY archived_at NULLS FIRST, updated_at DESC, created_at DESC
-            """
+            f"""
+            SELECT project.id, project.title, project.question,
+                   project.criteria_jsonb, project.status, project.protocol_version,
+                   project.archived_at, project.archived_reason,
+                   project.created_at, project.updated_at, {role_select}
+            FROM review_projects AS project
+            {joins}
+            ORDER BY project.archived_at NULLS FIRST,
+                     project.updated_at DESC, project.created_at DESC
+            """,
+            tuple(params),
         )
         return [_row_to_dict(row) for row in cursor.fetchall()]
 
@@ -175,9 +208,24 @@ def archive_project(project_id, reason, *, actor=None, connection_factory=None):
             raise ValueError(
                 "Aguarde a conclusão ou falha das tarefas em andamento antes de arquivar."
             )
-        cursor.execute(
-            "SELECT COUNT(*) AS active_projects FROM review_projects WHERE archived_at IS NULL"
-        )
+        user_id = current_user_id()
+        if user_id:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS active_projects
+                FROM review_projects AS project
+                JOIN project_memberships AS membership
+                  ON membership.project_id = project.id
+                 AND membership.user_id = %s
+                 AND membership.is_active = TRUE
+                WHERE project.archived_at IS NULL
+                """,
+                (user_id,),
+            )
+        else:
+            cursor.execute(
+                "SELECT COUNT(*) AS active_projects FROM review_projects WHERE archived_at IS NULL"
+            )
         if int(cursor.fetchone()["active_projects"]) <= 1:
             raise ValueError("O último projeto ativo da instalação não pode ser arquivado.")
         cursor.execute(
@@ -194,14 +242,16 @@ def archive_project(project_id, reason, *, actor=None, connection_factory=None):
         cursor.execute(
             """
             INSERT INTO project_lifecycle_events
-                (target_project_id, project_title, action, actor_identifier, details_jsonb)
-            VALUES (%s, %s, 'archived', %s, %s)
+                (target_project_id, project_title, action, actor_identifier,
+                 owner_user_id, details_jsonb)
+            VALUES (%s, %s, 'archived', %s, %s, %s)
             RETURNING id, created_at
             """,
             (
                 str(project_id),
                 project["title"],
                 _safe_actor(actor),
+                current_user_id(),
                 Json({"reason": reason, "counts": counts}),
             ),
         )
@@ -233,14 +283,16 @@ def restore_project(project_id, *, actor=None, connection_factory=None):
         cursor.execute(
             """
             INSERT INTO project_lifecycle_events
-                (target_project_id, project_title, action, actor_identifier, details_jsonb)
-            VALUES (%s, %s, 'restored', %s, %s)
+                (target_project_id, project_title, action, actor_identifier,
+                 owner_user_id, details_jsonb)
+            VALUES (%s, %s, 'restored', %s, %s, %s)
             RETURNING id, created_at
             """,
             (
                 str(project_id),
                 project["title"],
                 _safe_actor(actor),
+                current_user_id(),
                 Json({"previous_archived_at": project["archived_at"].isoformat()}),
             ),
         )
@@ -356,8 +408,9 @@ def permanently_delete_project(
             cursor.execute(
                 """
                 INSERT INTO project_lifecycle_events
-                    (id, target_project_id, project_title, action, actor_identifier, details_jsonb)
-                VALUES (%s, %s, %s, 'deleted', %s, %s)
+                    (id, target_project_id, project_title, action, actor_identifier,
+                     owner_user_id, details_jsonb)
+                VALUES (%s, %s, %s, 'deleted', %s, %s, %s)
                 RETURNING created_at
                 """,
                 (
@@ -365,6 +418,7 @@ def permanently_delete_project(
                     str(project_id),
                     project["title"],
                     _safe_actor(actor),
+                    current_user_id(),
                     Json(
                         {
                             "archived_at": project["archived_at"].isoformat(),
@@ -410,16 +464,21 @@ def permanently_delete_project(
 def list_lifecycle_events(limit=100, *, connection_factory=None):
     factory = connection_factory or get_connection
     safe_limit = max(1, min(int(limit), 500))
+    user_id = current_user_id()
+    where = "WHERE owner_user_id = %s" if user_id else ""
+    params = [user_id] if user_id else []
+    params.append(safe_limit)
     with factory() as connection, connection.cursor(cursor_factory=RealDictCursor) as cursor:
         cursor.execute(
-            """
+            f"""
             SELECT id, target_project_id, project_title, action,
                    actor_identifier, details_jsonb, created_at
             FROM project_lifecycle_events
+            {where}
             ORDER BY created_at DESC, id DESC
             LIMIT %s
             """,
-            (safe_limit,),
+            tuple(params),
         )
         result = []
         for row in cursor.fetchall():
