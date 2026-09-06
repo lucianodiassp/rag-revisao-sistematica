@@ -148,10 +148,11 @@ endurecimento operacional da Web privada de usuário único.
    específicas e benchmark comparativo com regressão textual — concluído, promovido
    para `v2.4.0` e validado nos perfis local e Web privado.
    [Escopo e critérios de aceite](RAG_VISUAL.md). O Relatório Final permanece textual.
-6. `v2.5.x`: gestão segura do ciclo de vida dos projetos — candidata `2.5.0-rc.1`
-   em preparação, com
-   arquivamento reversível, restauração, exclusão permanente protegida, limpeza de
-   PDFs e recibos imutáveis. [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
+6. `v2.5.x`: gestão segura do ciclo de vida dos projetos — concluída, promovida
+   para `v2.5.0` e validada nos perfis local e Web privado, incluindo restauração
+   isolada e backup externo. Contém arquivamento reversível, restauração, exclusão
+   permanente protegida, limpeza de PDFs e recibos imutáveis.
+   [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
 7. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.5.x`.
 8. `v3.x`: propriedade por usuário, compartilhamento de projetos e escalabilidade.
