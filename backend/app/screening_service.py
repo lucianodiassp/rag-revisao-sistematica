@@ -1,5 +1,7 @@
 """Decisões humanas de triagem com motivo estruturado e isolamento por projeto."""
 
+from backend.app.user_identity import enforce_project_access
+
 DECISION_INCLUDE = "Incluir"
 DECISION_EXCLUDE = "Excluir"
 DECISION_MAYBE = "Talvez"
@@ -37,6 +39,7 @@ def get_screening_summary(project_id, connection_factory=None):
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
 
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(
@@ -124,6 +127,7 @@ def get_next_pending_human_screening(project_id, connection_factory=None):
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
 
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(
@@ -183,6 +187,7 @@ def save_human_screening_decision(
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "editor", connection_factory=connection_factory)
 
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(

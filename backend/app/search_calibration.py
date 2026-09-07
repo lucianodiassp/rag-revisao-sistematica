@@ -20,6 +20,7 @@ from backend.app.bibliographic_config import (
 )
 from backend.app.project_utils import normalizar_doi, normalizar_titulo
 from backend.app.protocol_service import normalize_protocol, protocol_fingerprint
+from backend.app.user_identity import enforce_project_access
 
 
 TITLE_SIMILARITY_THRESHOLD = 0.93
@@ -99,6 +100,7 @@ def _title_similarity(first, second):
 
 def list_sentinels(project_id, active_only=False, connection_factory=None):
     factory = _connection_factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -120,6 +122,7 @@ def save_sentinel(project_id, title, doi=None, notes=None, sentinel_id=None, con
     if len(title) < 5:
         raise ValueError("Informe um título com pelo menos 5 caracteres.")
     factory = _connection_factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     try:
         with factory() as connection, connection.cursor() as cursor:
             if sentinel_id:
@@ -153,6 +156,7 @@ def save_sentinel(project_id, title, doi=None, notes=None, sentinel_id=None, con
 
 def set_sentinel_active(project_id, sentinel_id, is_active, connection_factory=None):
     factory = _connection_factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -233,6 +237,7 @@ def run_calibration(project_id, max_results_per_source=100, collectors=None, con
         raise ValueError("O limite por fonte deve estar entre 10 e 100.")
 
     factory = _connection_factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -351,6 +356,7 @@ def run_calibration(project_id, max_results_per_source=100, collectors=None, con
 
 def list_calibration_runs(project_id, connection_factory=None):
     factory = _connection_factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -404,6 +410,7 @@ def save_press_review(project_id, protocol_version, checklist, overall_decision,
             }
         )
     factory = _connection_factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -443,6 +450,7 @@ def save_press_review(project_id, protocol_version, checklist, overall_decision,
 
 def list_press_reviews(project_id, connection_factory=None):
     factory = _connection_factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
