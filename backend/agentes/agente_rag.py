@@ -19,6 +19,7 @@ from backend.app.visual_rag import (
     SOURCE_TYPE, POLICY_VERSION, combine_candidates, ensure_visual_evidence_current,
     evidence_metadata, get_visual_rag_setting, retrieve_visual_evidence,
 )
+from backend.app.user_identity import enforce_project_access
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E MODELOS
@@ -66,6 +67,7 @@ def _buscar_contexto_hibrido_detalhado(pergunta, project_id=None, limite=3):
     utilizando a fusão matemática RRF para mitigar falhas de recall.
     """
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     print("   [1/2] A converter pergunta em matemática...")
     # Transforma a pergunta num vetor usando o Gemini com compressão Matryoshka (768d)
     embedding_config = get_embedding_config()
@@ -158,6 +160,7 @@ def buscar_contexto_hibrido(pergunta, project_id=None, limite=3):
 def buscar_contexto_reranqueado(pergunta, project_id=None, *, visual_mode=None):
     """Recupera candidatos pelo RRF e aplica o reranking configurado."""
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     config = get_reranking_config()
     candidatos = _buscar_contexto_hibrido_detalhado(
         pergunta,
@@ -189,6 +192,7 @@ def buscar_contexto_reranqueado(pergunta, project_id=None, *, visual_mode=None):
 # ==========================================
 def responder_com_rag(pergunta, project_id=None, return_details=False, *, visual_mode=None):
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     print("\n🔍 INÍCIO DA RECUPERAÇÃO DE EVIDÊNCIAS")
     mode_kwargs = {"visual_mode": visual_mode} if visual_mode is not None else {}
     evidencias, trace_reranking = buscar_contexto_reranqueado(

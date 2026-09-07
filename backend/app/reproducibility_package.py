@@ -14,6 +14,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from backend.app.version import application_metadata
+from backend.app.user_identity import enforce_project_access
 
 
 PACKAGE_FORMAT = "rag-systematic-review-reproducibility-package"
@@ -915,5 +916,10 @@ def build_reproducibility_package(dataset: dict, generated_at: str | None = None
 
 
 def generate_reproducibility_package(project_id, connection_factory=None) -> dict:
+    if connection_factory is None:
+        from backend.app.database import get_connection
+
+        connection_factory = get_connection
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
     dataset = _collect_project_data(project_id, connection_factory=connection_factory)
     return build_reproducibility_package(dataset)

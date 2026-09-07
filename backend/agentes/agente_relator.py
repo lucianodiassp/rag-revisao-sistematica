@@ -8,6 +8,7 @@ from backend.app.database import log_interacao_agente, resolver_project_id
 from backend.app.methodological_quality import methodological_summary
 from backend.app.prisma import calcular_fluxo_prisma, salvar_snapshot_prisma
 from backend.app.synthesis_confidence import confidence_summary
+from backend.app.user_identity import enforce_project_access
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
@@ -25,10 +26,12 @@ def get_conexao():
 
 def coletar_metricas_prisma(project_id):
     """Compatibilidade para consumidores antigos das métricas do fluxo."""
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     return calcular_fluxo_prisma(project_id)["metrics"]
 
 def coletar_evidencias(project_id):
     """Recolhe somente a versão humana aprovada e suas fontes literais."""
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     conexao = get_conexao()
     cursor = conexao.cursor()
     
@@ -84,6 +87,7 @@ def coletar_evidencias(project_id):
 def gerar_relatorio_final(project_id=None, progress_callback=None):
     """Orquestra a coleta de dados e a geração pelo provedor configurado."""
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     if progress_callback:
         progress_callback(0, 4, "Calculando e registrando o fluxo PRISMA")
     print("📊 A recolher métricas PRISMA...")

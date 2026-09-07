@@ -10,6 +10,7 @@ from datetime import date, datetime
 from psycopg2.extras import Json
 
 from backend.app.screening_service import EXCLUSION_REASON_LABELS
+from backend.app.user_identity import enforce_project_access
 
 
 METRIC_LABELS = {
@@ -56,6 +57,7 @@ def calcular_fluxo_prisma(project_id, connection_factory=None):
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
 
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(
@@ -291,11 +293,12 @@ def calcular_fluxo_prisma(project_id, connection_factory=None):
 
 def salvar_snapshot_prisma(project_id, connection_factory=None):
     """Registra uma versão imutável do fluxo, vinculada à versão do protocolo."""
-    snapshot = calcular_fluxo_prisma(project_id, connection_factory=connection_factory)
     if connection_factory is None:
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "editor", connection_factory=connection_factory)
+    snapshot = calcular_fluxo_prisma(project_id, connection_factory=connection_factory)
 
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(
@@ -351,6 +354,7 @@ def carregar_ultimo_snapshot_prisma(project_id, connection_factory=None):
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """

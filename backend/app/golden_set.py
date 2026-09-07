@@ -2,6 +2,8 @@
 
 from psycopg2.extras import Json
 
+from backend.app.user_identity import enforce_project_access
+
 
 def _get_connection_factory(connection_factory=None):
     if connection_factory is not None:
@@ -98,6 +100,7 @@ def _record_version(cursor, project_id, reason):
 
 def list_golden_queries(project_id, connection_factory=None):
     factory = _get_connection_factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         snapshot = _snapshot_from_cursor(cursor, project_id)
         cursor.execute(
@@ -124,11 +127,12 @@ def add_golden_query(
     notes=None,
     connection_factory=None,
 ):
+    factory = _get_connection_factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     question = " ".join(str(question or "").split()).strip()
     notes = " ".join(str(notes or "").split()).strip() or None
     if len(question) < 5:
         raise ValueError("A pergunta deve possuir pelo menos 5 caracteres.")
-    factory = _get_connection_factory(connection_factory)
     with factory() as connection, connection.cursor() as cursor:
         _lock_project(cursor, project_id)
         cursor.execute(
@@ -156,6 +160,7 @@ def add_golden_query(
 
 def delete_golden_query(project_id, query_id, connection_factory=None):
     factory = _get_connection_factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         _lock_project(cursor, project_id)
         cursor.execute(
@@ -181,6 +186,8 @@ def add_golden_relevance(
     notes=None,
     connection_factory=None,
 ):
+    factory = _get_connection_factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     try:
         relevance_grade = int(relevance_grade)
     except (TypeError, ValueError) as exc:
@@ -195,7 +202,6 @@ def add_golden_relevance(
             raise ValueError("A página deve ser maior que zero.")
     notes = " ".join(str(notes or "").split()).strip() or None
 
-    factory = _get_connection_factory(connection_factory)
     with factory() as connection, connection.cursor() as cursor:
         _lock_project(cursor, project_id)
         cursor.execute(
@@ -275,13 +281,15 @@ def add_golden_relevance(
 def add_visual_golden_relevance(project_id, query_id, artifact_id, relevance_grade=2, notes=None):
     from backend.app.visual_rag import list_eligible_visual_evidence
 
+    factory = _get_connection_factory()
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     if int(relevance_grade) not in {1, 2, 3}:
         raise ValueError("O grau de relevância deve estar entre 1 e 3.")
     artifact = next((item for item in list_eligible_visual_evidence(project_id)
                      if item["artifact_id"] == str(artifact_id)), None)
     if not artifact:
         raise ValueError("A fonte visual não está elegível: confira o PDF e as duas revisões.")
-    with _get_connection_factory()() as connection, connection.cursor() as cursor:
+    with factory() as connection, connection.cursor() as cursor:
         _lock_project(cursor, project_id)
         cursor.execute("SELECT expected_refusal FROM rag_golden_queries WHERE id = %s AND project_id = %s",
                        (str(query_id), str(project_id)))
@@ -306,6 +314,7 @@ def add_visual_golden_relevance(project_id, query_id, artifact_id, relevance_gra
 
 def delete_golden_relevance(project_id, relevance_id, connection_factory=None):
     factory = _get_connection_factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         _lock_project(cursor, project_id)
         cursor.execute(
@@ -327,6 +336,7 @@ def delete_golden_relevance(project_id, relevance_id, connection_factory=None):
 
 def list_indexed_papers(project_id, connection_factory=None):
     factory = _get_connection_factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """

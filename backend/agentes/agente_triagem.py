@@ -10,6 +10,7 @@ from backend.app.ai_service import generate_content
 from backend.app.database import obter_projeto, resolver_project_id
 from backend.app.protocol_service import normalize_protocol, protocol_fingerprint
 from backend.app.screening_service import UNUSABLE_ABSTRACTS
+from backend.app.user_identity import enforce_project_access
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE E CONEXÃO
@@ -28,6 +29,7 @@ def get_conexao():
 
 def buscar_artigos_sem_analise(project_id, connection_factory=None):
     connection_factory = connection_factory or get_conexao
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute("""
             SELECT d.id, d.title, d.abstract
@@ -44,6 +46,7 @@ def buscar_artigos_sem_analise(project_id, connection_factory=None):
 
 def carregar_criterios_dinamicos(project_id, protocol=None):
     """Lê os critérios versionados do projeto no PostgreSQL."""
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     dados = normalize_protocol(
         protocol or obter_projeto(project_id).get("criteria_jsonb") or {}
     )
@@ -81,6 +84,7 @@ def carregar_criterios_dinamicos(project_id, protocol=None):
 
 def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1, protocol=None):
     """Submete o artigo ao provedor configurado com critérios rastreáveis."""
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     
     # Busca os critérios do JSON
     escopo_elegibilidade, criterios_inclusao, criterios_exclusao = carregar_criterios_dinamicos(
@@ -143,6 +147,7 @@ def triar_artigo_com_ia(project_id, titulo, resumo, tentativa=1, protocol=None):
 def executar_pipeline_triagem_ui(project_id=None):
     """Executa a triagem emitindo atualizações de estado (yield) para a interface gráfica."""
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     project = obter_projeto(project_id)
     protocol = normalize_protocol(project.get("criteria_jsonb") or {})
     protocol_version = int(project.get("protocol_version") or 1)
