@@ -8,7 +8,10 @@ import streamlit as st
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from backend.app.operational_health import build_health_report  # noqa: E402
+from backend.app.installation_admin_service import (  # noqa: E402
+    build_installation_health_report,
+)
+from backend.app.user_identity import require_installation_operator  # noqa: E402
 from backend.app.version import application_caption  # noqa: E402
 
 
@@ -38,8 +41,16 @@ JOB_LABELS = {
 
 
 st.set_page_config(page_title="Diagnóstico Operacional", page_icon="🩺", layout="wide")
+try:
+    require_installation_operator()
+except PermissionError:
+    st.title("🩺 Diagnóstico Operacional")
+    st.error("Esta área é restrita ao operador da instalação.")
+    st.stop()
+
 st.title("🩺 Diagnóstico Operacional")
 st.caption(application_caption())
+st.caption("Área administrativa do operador da instalação")
 st.markdown(
     "Esta página verifica os componentes da instalação sem testar chamadas pagas, "
     "mostrar chaves de API ou expor conteúdo dos projetos."
@@ -48,7 +59,7 @@ st.markdown(
 if st.button("🔄 Atualizar diagnóstico", type="primary"):
     st.rerun()
 
-report = build_health_report("full")
+report = build_installation_health_report()
 checks = report["checks"]
 counts = {
     status: sum(1 for item in checks if item["status"] == status)

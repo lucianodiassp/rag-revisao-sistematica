@@ -20,7 +20,7 @@ from backend.app.observability import classify_error, sanitize_fields
 from backend.app.version import APP_VERSION, application_metadata
 
 
-LATEST_REQUIRED_MIGRATION = "022_user_private_configuration.sql"
+LATEST_REQUIRED_MIGRATION = "023_installation_operator.sql"
 REQUIRED_TABLES = (
     "application_users",
     "review_projects",

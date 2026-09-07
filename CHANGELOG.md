@@ -47,6 +47,15 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   usuário, evitando reaproveitamento de credenciais entre sessões.
 - No futuro modo `multi_user`, variáveis privadas do servidor não são usadas como
   fallback nem podem ser importadas pelo usuário.
+- Adicionado o papel global de operador da instalação, independente dos papéis
+  `owner`, `editor` e `viewer` de cada projeto.
+- A migração `023` promove somente a identidade ativa única das instalações atuais,
+  preservando o acesso administrativo no perfil de usuário único.
+- Backup completo, validação, restauração, solicitação de backup externo e
+  diagnóstico pela interface passam por uma fachada que revalida o operador no
+  banco imediatamente antes da operação.
+- As páginas de Backup e Diagnóstico deixam de aparecer para usuários comuns; os
+  processos internos de agendamento, health check e operação por SSH são preservados.
 - O modo `multi_user` permanece bloqueado no preflight até que todas as operações
   internas e tarefas em segundo plano adotem autorização obrigatória.
 

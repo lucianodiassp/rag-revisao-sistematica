@@ -90,6 +90,21 @@ operacional; esta evolução começa em `2.6.0-dev`.
 - no futuro modo multiusuário, chaves e e-mails privados fornecidos ao processo do
   servidor não são fallback compartilhado e não podem ser importados pela tela.
 
+## Sétima entrega: operador da instalação
+
+- `application_users.is_operator` representa autorização administrativa global e
+  não concede nem substitui acesso científico a qualquer projeto;
+- a única identidade ativa de uma instalação existente é promovida pela migração
+  `023_installation_operator.sql`, mantendo a experiência atual de usuário único;
+- backup completo, validação e restauração da instalação, solicitação manual do
+  backup externo e diagnóstico na interface exigem operador revalidado no banco;
+- as páginas administrativas globais não aparecem na navegação de usuários comuns
+  e também falham fechadas se forem acessadas fora do fluxo normal;
+- o agendador automático, health checks e comandos executados pelo administrador
+  via SSH continuam sendo processos internos da implantação;
+- o `.ragbackup` continua representando a instalação inteira. Ele não é apresentado
+  como exportação individual de um usuário ou projeto.
+
 ## Limite de segurança atual
 
 Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
@@ -97,17 +112,19 @@ rejeitando esse valor. A fila já propaga e revalida o solicitante, mas várias
 operações síncronas especializadas ainda recebem apenas `project_id`. Antes da
 ativação serão necessários:
 
-1. aplicar a autorização central às operações administrativas restantes;
-2. administração de convites, desativação e transferência de propriedade;
-3. testes negativos de isolamento para todas as áreas e arquivos;
-4. revisão dos contratos de backup, restauração e suporte operacional.
+1. administração de convites, desativação e transferência de propriedade;
+2. testes negativos de isolamento para todas as áreas e arquivos;
+3. definir recuperação, auditoria e suporte para uma implantação com vários
+   operadores, mantendo o backup completo fora do autoatendimento comum.
 
 ## Compatibilidade e recuperação
 
 A migração `020_user_project_ownership.sql` é progressiva e não modifica conteúdo
 científico; a `021_background_job_requester.sql` acrescenta a autoria das tarefas;
 e a `022_user_private_configuration.sql` vincula configurações e segredos cifrados
-legados ao único usuário ativo, sem descriptografá-los.
+legados ao único usuário ativo, sem descriptografá-los. A migração
+`023_installation_operator.sql` preserva para essa identidade o acesso às rotinas
+globais de operação.
 Backups completos incluem as novas estruturas. Pacotes acadêmicos não
 transportam identidade pessoal: ao serem importados, pertencem ao usuário que
 executou a importação. O modo local e a Web privada de usuário único devem manter
@@ -175,3 +192,14 @@ os mesmos projetos e funcionalidades após a atualização.
 5. reiniciar a aplicação e confirmar persistência e ausência de troca de sessão;
 6. executar a suíte completa e confirmar a migração `022` no diagnóstico;
 7. gerar e validar um novo backup completo.
+
+## Validação do operador da instalação
+
+1. aplicar a migração `023` duas vezes e confirmar idempotência;
+2. confirmar que a identidade única existente aparece como operador;
+3. abrir Backup e Restauração, gerar e validar um backup completo;
+4. abrir o Diagnóstico Operacional e confirmar estado saudável e migração `023`;
+5. executar testes negativos que neguem todas as fachadas administrativas antes
+   de tocar em banco, arquivo, backup externo ou diagnóstico;
+6. confirmar que um usuário comum não recebe as páginas administrativas na navegação;
+7. reiniciar a aplicação e verificar que o papel de operador persiste.

@@ -11,7 +11,7 @@ from backend.app.operational_health import (
 
 
 def test_latest_schema_is_required_by_operational_health():
-    assert LATEST_REQUIRED_MIGRATION == "022_user_private_configuration.sql"
+    assert LATEST_REQUIRED_MIGRATION == "023_installation_operator.sql"
     assert "application_users" in REQUIRED_TABLES
     assert "project_memberships" in REQUIRED_TABLES
     assert "visual_artifacts" in REQUIRED_TABLES

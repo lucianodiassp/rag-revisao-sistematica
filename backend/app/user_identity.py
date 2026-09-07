@@ -29,6 +29,7 @@ class ApplicationUser:
     email: str | None
     display_name: str
     status: str = "active"
+    is_operator: bool = False
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,7 @@ def bind_current_user(user: ApplicationUser | Mapping | None) -> ApplicationUser
             email=str(user["email"]) if user.get("email") else None,
             display_name=str(user.get("display_name") or user.get("email") or "Usuário"),
             status=str(user.get("status") or "active"),
+            is_operator=bool(user.get("is_operator", False)),
         )
     _CURRENT_USER.set(user)
     return user
@@ -127,6 +129,7 @@ def ensure_application_user(
 
         connection_factory = get_connection
     provider, subject, email, display_name = _normalized_identity(decision)
+    is_operator = user_mode == "single_user"
     with connection_factory() as connection, connection.cursor(
         cursor_factory=RealDictCursor
     ) as cursor:
@@ -134,16 +137,19 @@ def ensure_application_user(
             """
             INSERT INTO application_users
                 (identity_provider, subject, email, display_name, status,
-                 last_login_at, updated_at)
-            VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                 is_operator, last_login_at, updated_at)
+            VALUES (%s, %s, %s, %s, 'active', %s,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT (identity_provider, subject) DO UPDATE
             SET email = EXCLUDED.email,
                 display_name = EXCLUDED.display_name,
+                is_operator = application_users.is_operator OR EXCLUDED.is_operator,
                 last_login_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
-            RETURNING id, identity_provider, subject, email, display_name, status
+            RETURNING id, identity_provider, subject, email, display_name, status,
+                      is_operator
             """,
-            (provider, subject, email, display_name),
+            (provider, subject, email, display_name, is_operator),
         )
         row = dict(cursor.fetchone())
         if row.get("status") != "active":
@@ -234,7 +240,55 @@ def ensure_application_user(
                 (user_id,),
             )
     row["id"] = user_id
+    row["is_operator"] = bool(row.get("is_operator", is_operator))
     return bind_current_user(row)
+
+
+def current_user_is_operator() -> bool:
+    user = current_user()
+    return bool(user and user.status == "active" and user.is_operator)
+
+
+def require_installation_operator(*, connection_factory=None) -> ApplicationUser:
+    """Revalida no banco o papel global antes de uma operação da instalação."""
+
+    user = current_user()
+    if not user or user.status != "active" or not user.is_operator:
+        raise PermissionError(
+            "Esta operação é restrita ao operador da instalação."
+        )
+    if connection_factory is None:
+        from backend.app.database import get_connection
+
+        connection_factory = get_connection
+    with connection_factory() as connection, connection.cursor(
+        cursor_factory=RealDictCursor
+    ) as cursor:
+        cursor.execute(
+            """
+            SELECT id, identity_provider, subject, email, display_name, status,
+                   is_operator
+            FROM application_users
+            WHERE id = %s
+              AND status = 'active'
+              AND is_operator = TRUE
+            """,
+            (user.id,),
+        )
+        row = cursor.fetchone()
+    if not row:
+        raise PermissionError(
+            "Esta operação é restrita ao operador da instalação."
+        )
+    return ApplicationUser(
+        id=str(row["id"]),
+        identity_provider=str(row["identity_provider"]),
+        subject=str(row["subject"]),
+        email=str(row["email"]) if row.get("email") else None,
+        display_name=str(row["display_name"]),
+        status=str(row["status"]),
+        is_operator=bool(row["is_operator"]),
+    )
 
 
 def ensure_project_owner(project_id, *, connection_factory=None) -> bool:
@@ -292,7 +346,7 @@ def require_project_access(
             SELECT application_user.id, application_user.identity_provider,
                    application_user.subject, application_user.email,
                    application_user.display_name, application_user.status,
-                   membership.role
+                   application_user.is_operator, membership.role
             FROM project_memberships AS membership
             JOIN application_users AS application_user
               ON application_user.id = membership.user_id
@@ -316,6 +370,7 @@ def require_project_access(
         email=str(row["email"]) if row.get("email") else None,
         display_name=str(row["display_name"]),
         status=str(row["status"]),
+        is_operator=bool(row.get("is_operator", False)),
     )
     if bind:
         bind_current_user(user)

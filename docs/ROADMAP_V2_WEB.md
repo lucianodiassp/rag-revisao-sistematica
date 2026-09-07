@@ -156,7 +156,9 @@ endurecimento operacional da Web privada de usuário único.
 7. `v2.6.x`: fundação multiusuário — em desenvolvimento, com identidade OIDC
    persistente, propriedade explícita, migração segura dos projetos atuais,
    propagação do solicitante para tarefas em segundo plano e credenciais e
-   preferências privadas de IA/fontes bibliográficas por usuário. Protocolo, coleta e
+   preferências privadas de IA/fontes bibliográficas por usuário. Operações globais
+   de backup, restauração e diagnóstico agora exigem operador da instalação,
+   separado dos papéis por projeto. Protocolo, coleta e
    PDFs, além de triagem, deduplicação, calibração, qualidade metodológica,
    confiança, fluxo visual, agentes, Golden Set, PRISMA e exportação acadêmica já
    adotam papéis de leitura/edição no backend. O modo multiusuário continua

@@ -11,7 +11,8 @@ entre `docker compose` e o restante do comando.
 
 ## Diagnóstico rápido
 
-A página **Diagnóstico Operacional** apresenta uma visão segura de:
+A página **Diagnóstico Operacional**, restrita ao operador da instalação, apresenta
+uma visão segura de:
 
 - versão, perfil e modo de usuário;
 - conexão com PostgreSQL e migração mais recente;
