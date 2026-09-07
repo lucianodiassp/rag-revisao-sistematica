@@ -104,10 +104,29 @@ def get_environment_bibliographic_settings():
             timeout_seconds=timeout,
             max_retries=tentativas,
         )
-    return configuracoes
+    return _without_environment_private_values(configuracoes)
+
+
+def _multi_user_mode():
+    return os.getenv("RAG_USER_MODE", "single_user").strip().lower() == "multi_user"
+
+
+def _without_environment_private_values(configuracoes):
+    if not _multi_user_mode():
+        return configuracoes
+    return {
+        source_code: replace(
+            config,
+            api_key=None,
+            contact_email=None,
+            credential_source="not_configured",
+        )
+        for source_code, config in configuracoes.items()
+    }
 
 
 def _apply_database_overrides(configuracoes):
+    configuracoes = _without_environment_private_values(configuracoes)
     try:
         from backend.app.bibliographic_config_repository import (
             bibliographic_tables_available,
@@ -119,6 +138,8 @@ def _apply_database_overrides(configuracoes):
             return configuracoes
         settings = get_installation_source_settings()
         credentials = get_installation_credentials()
+    except PermissionError:
+        raise
     except Exception:
         return configuracoes
 
@@ -148,9 +169,15 @@ def _apply_database_overrides(configuracoes):
     return resultado
 
 
-@lru_cache(maxsize=1)
-def get_bibliographic_settings():
+@lru_cache(maxsize=32)
+def _get_bibliographic_settings_for_scope(_scope_key):
     return _apply_database_overrides(get_environment_bibliographic_settings())
+
+
+def get_bibliographic_settings():
+    from backend.app.user_identity import current_configuration_cache_key
+
+    return _get_bibliographic_settings_for_scope(current_configuration_cache_key())
 
 
 def get_source_config(source_code):
@@ -161,4 +188,4 @@ def get_source_config(source_code):
 
 
 def clear_bibliographic_settings_cache():
-    get_bibliographic_settings.cache_clear()
+    _get_bibliographic_settings_for_scope.cache_clear()

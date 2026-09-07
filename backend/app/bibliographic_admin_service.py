@@ -24,6 +24,7 @@ from backend.app.bibliographic_config_repository import (
     update_credential_validation,
 )
 from backend.app.secret_store import decrypt_secret, encrypt_secret, secret_hint
+from backend.app.user_identity import current_configuration_scope
 
 
 def _safe_error(erro, segredo=None):
@@ -120,6 +121,7 @@ def save_source_settings(
     timeout_seconds,
     max_retries,
 ):
+    current_configuration_scope()
     _validar_fonte(source_code)
     valores = _validar_configuracao(
         contact_email,
@@ -132,6 +134,7 @@ def save_source_settings(
 
 
 def save_validated_source_key(source_code, api_key, label=None):
+    current_configuration_scope()
     _validar_fonte(source_code)
     api_key = str(api_key or "").strip()
     if not api_key:
@@ -150,7 +153,12 @@ def save_validated_source_key(source_code, api_key, label=None):
 
 
 def import_environment_source_key(source_code):
+    current_configuration_scope()
     _validar_fonte(source_code)
+    if os.getenv("RAG_USER_MODE", "single_user").strip().lower() == "multi_user":
+        raise PermissionError(
+            "Credenciais do servidor não podem ser importadas por usuários."
+        )
     nome_variavel = SOURCE_KEY_ENV[source_code]
     api_key = os.getenv(nome_variavel)
     if not api_key:
@@ -163,9 +171,10 @@ def import_environment_source_key(source_code):
 
 
 def inspect_saved_source_key(source_code):
+    current_configuration_scope()
     credencial = get_installation_credential(source_code)
     if not credencial:
-        raise RuntimeError("Nenhuma credencial cifrada foi salva para esta fonte.")
+        raise RuntimeError("Nenhuma credencial cifrada foi salva para este usuário e fonte.")
     segredo = decrypt_secret(credencial["encrypted_secret"])
     try:
         resultado = inspect_source_access(source_code, api_key=segredo)
@@ -183,16 +192,19 @@ def inspect_saved_source_key(source_code):
 
 
 def inspect_effective_source_access(source_code):
+    current_configuration_scope()
     return inspect_source_access(source_code)
 
 
 def remove_saved_source_key(source_code):
+    current_configuration_scope()
     removida = deactivate_installation_credential(source_code)
     clear_bibliographic_settings_cache()
     return removida
 
 
 def get_bibliographic_admin_state():
+    current_configuration_scope()
     credentials = get_installation_credentials()
     saved_settings = get_installation_source_settings()
     configuration_error = None
@@ -218,7 +230,10 @@ def get_bibliographic_admin_state():
                 }
                 if credential else None
             ),
-            "environment_key_available": bool(os.getenv(SOURCE_KEY_ENV[source_code])),
+            "environment_key_available": (
+                bool(os.getenv(SOURCE_KEY_ENV[source_code]))
+                and os.getenv("RAG_USER_MODE", "single_user").strip().lower() != "multi_user"
+            ),
             "saved_settings": saved_settings.get(source_code),
         }
     return {"sources": fontes, "configuration_error": configuration_error}

@@ -38,6 +38,15 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   explícito ao projeto.
 - A leitura de chunks para extração confirma simultaneamente artigo e projeto,
   impedindo que um identificador de PDF contorne o isolamento autorizado.
+- Credenciais e preferências de IA e das fontes bibliográficas passam a usar o
+  usuário autenticado como escopo; consultas, alterações e auditorias não
+  compartilham mais configuração privada entre identidades.
+- A migração `022` vincula a configuração privada legada ao único usuário ativo
+  sem descriptografar os segredos e adiciona integridade referencial ao escopo.
+- Caches de configuração e clientes Gemini/OpenAI agora incluem a identidade do
+  usuário, evitando reaproveitamento de credenciais entre sessões.
+- No futuro modo `multi_user`, variáveis privadas do servidor não são usadas como
+  fallback nem podem ser importadas pelo usuário.
 - O modo `multi_user` permanece bloqueado no preflight até que todas as operações
   internas e tarefas em segundo plano adotem autorização obrigatória.
 

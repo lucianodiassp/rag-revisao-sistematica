@@ -6,6 +6,7 @@ from functools import lru_cache
 import requests
 
 from backend.app.ai_config import PROVIDER_OPENAI, get_provider_api_key
+from backend.app.user_identity import current_configuration_cache_key
 
 
 OPENAI_API_BASE = "https://api.openai.com/v1"
@@ -156,16 +157,20 @@ class OpenAIResponsesClient:
         return self._parse_text_response(data, model)
 
 
-@lru_cache(maxsize=1)
-def get_openai_client():
+@lru_cache(maxsize=32)
+def _get_openai_client_for_scope(_scope_key):
     api_key = get_provider_api_key(PROVIDER_OPENAI)
     if not api_key:
         raise RuntimeError(
-            "OPENAI_API_KEY não configurada. Cadastre a chave na Configuração de IA "
-            "ou defina-a no ambiente do sistema."
+            "Credencial OpenAI não configurada para o usuário atual. "
+            "Cadastre a chave na Configuração de IA."
         )
     return OpenAIResponsesClient(api_key)
 
 
+def get_openai_client():
+    return _get_openai_client_for_scope(current_configuration_cache_key())
+
+
 def clear_openai_client_cache():
-    get_openai_client.cache_clear()
+    _get_openai_client_for_scope.cache_clear()

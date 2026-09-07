@@ -2,6 +2,7 @@ from psycopg2.extras import Json
 
 from backend.app.bibliographic_config import SUPPORTED_SOURCES
 from backend.app.database import get_connection
+from backend.app.user_identity import current_configuration_scope
 
 
 def _validar_fonte(source_code):
@@ -24,17 +25,19 @@ def bibliographic_tables_available():
 
 
 def get_installation_source_settings():
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
             SELECT source_code, is_enabled, contact_email, tool_name,
                    request_timeout_seconds, max_retries, created_at, updated_at
             FROM bibliographic_source_settings
-            WHERE scope_type = 'installation'
+            WHERE scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
             ORDER BY source_code
-            """
+            """,
+            (scope_type, owner_user_id),
         )
         colunas = [item[0] for item in cursor.description]
         return {linha[0]: dict(zip(colunas, linha)) for linha in cursor.fetchall()}
@@ -49,18 +52,19 @@ def save_installation_source_setting(
     max_retries,
 ):
     _validar_fonte(source_code)
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
             SELECT id
             FROM bibliographic_source_settings
             WHERE source_code = %s
-              AND scope_type = 'installation'
+              AND scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
             FOR UPDATE
             """,
-            (source_code,),
+            (source_code, scope_type, owner_user_id),
         )
         existente = cursor.fetchone()
         valores = (
@@ -89,19 +93,22 @@ def save_installation_source_setting(
                 """
                 INSERT INTO bibliographic_source_settings
                     (source_code, is_enabled, contact_email, tool_name,
-                     request_timeout_seconds, max_retries)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                     request_timeout_seconds, max_retries, scope_type,
+                     owner_user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (source_code, *valores),
+                (source_code, *valores, scope_type, owner_user_id),
             )
         cursor.execute(
             """
             INSERT INTO bibliographic_configuration_audit
-                (action, source_code, changes_jsonb)
-            VALUES ('source_settings_saved', %s, %s)
+                (action, source_code, scope_type, owner_user_id, changes_jsonb)
+            VALUES ('source_settings_saved', %s, %s, %s, %s)
             """,
             (
                 source_code,
+                scope_type,
+                owner_user_id,
                 Json({
                     "is_enabled": bool(is_enabled),
                     "contact_email": contact_email,
@@ -114,6 +121,7 @@ def save_installation_source_setting(
 
 
 def get_installation_credentials():
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -121,12 +129,13 @@ def get_installation_credentials():
                    validation_status, last_validated_at, validation_error,
                    created_at, updated_at
             FROM bibliographic_source_credentials
-            WHERE scope_type = 'installation'
+            WHERE scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
               AND is_active = TRUE
             ORDER BY source_code, updated_at DESC
-            """
+            """,
+            (scope_type, owner_user_id),
         )
         colunas = [item[0] for item in cursor.description]
         return {linha[1]: dict(zip(colunas, linha)) for linha in cursor.fetchall()}
@@ -146,19 +155,20 @@ def save_installation_credential(
     validation_error=None,
 ):
     _validar_fonte(source_code)
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
             SELECT id
             FROM bibliographic_source_credentials
             WHERE source_code = %s
-              AND scope_type = 'installation'
+              AND scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
               AND is_active = TRUE
             FOR UPDATE
             """,
-            (source_code,),
+            (source_code, scope_type, owner_user_id),
         )
         existente = cursor.fetchone()
         if existente:
@@ -194,10 +204,11 @@ def save_installation_credential(
                 """
                 INSERT INTO bibliographic_source_credentials
                     (source_code, label, encrypted_secret, secret_hint,
-                     validation_status, last_validated_at, validation_error)
+                     validation_status, last_validated_at, validation_error,
+                     scope_type, owner_user_id)
                 VALUES (%s, %s, %s, %s, %s,
                         CASE WHEN %s IN ('valid', 'invalid') THEN CURRENT_TIMESTAMP END,
-                        %s)
+                        %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -208,6 +219,8 @@ def save_installation_credential(
                     validation_status,
                     validation_status,
                     validation_error,
+                    scope_type,
+                    owner_user_id,
                 ),
             )
             credential_id = str(cursor.fetchone()[0])
@@ -216,12 +229,14 @@ def save_installation_credential(
         cursor.execute(
             """
             INSERT INTO bibliographic_configuration_audit
-                (action, source_code, changes_jsonb)
-            VALUES (%s, %s, %s)
+                (action, source_code, scope_type, owner_user_id, changes_jsonb)
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (
                 action,
                 source_code,
+                scope_type,
+                owner_user_id,
                 Json({
                     "label": label,
                     "secret_hint": secret_hint_value,
@@ -235,6 +250,7 @@ def save_installation_credential(
 def update_credential_validation(credential_id, status, error=None):
     if status not in {"valid", "invalid", "untested"}:
         raise ValueError("Status de validação inválido.")
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -243,10 +259,14 @@ def update_credential_validation(credential_id, status, error=None):
                 last_validated_at = CURRENT_TIMESTAMP,
                 validation_error = %s,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s AND scope_type = 'installation' AND is_active = TRUE
+            WHERE id = %s
+              AND scope_type = %s
+              AND scope_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
+              AND is_active = TRUE
             RETURNING source_code
             """,
-            (status, error, str(credential_id)),
+            (status, error, str(credential_id), scope_type, owner_user_id),
         )
         linha = cursor.fetchone()
         if not linha:
@@ -254,52 +274,67 @@ def update_credential_validation(credential_id, status, error=None):
         cursor.execute(
             """
             INSERT INTO bibliographic_configuration_audit
-                (action, source_code, changes_jsonb)
-            VALUES ('credential_validated', %s, %s)
+                (action, source_code, scope_type, owner_user_id, changes_jsonb)
+            VALUES ('credential_validated', %s, %s, %s, %s)
             """,
-            (linha[0], Json({"credential_id": str(credential_id), "status": status})),
+            (
+                linha[0],
+                scope_type,
+                owner_user_id,
+                Json({"credential_id": str(credential_id), "status": status}),
+            ),
         )
 
 
 def deactivate_installation_credential(source_code):
     _validar_fonte(source_code)
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
             UPDATE bibliographic_source_credentials
             SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
             WHERE source_code = %s
-              AND scope_type = 'installation'
+              AND scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
               AND is_active = TRUE
             RETURNING id
             """,
-            (source_code,),
+            (source_code, scope_type, owner_user_id),
         )
         removida = cursor.fetchone()
         if removida:
             cursor.execute(
                 """
                 INSERT INTO bibliographic_configuration_audit
-                    (action, source_code, changes_jsonb)
-                VALUES ('credential_deactivated', %s, %s)
+                    (action, source_code, scope_type, owner_user_id, changes_jsonb)
+                VALUES ('credential_deactivated', %s, %s, %s, %s)
                 """,
-                (source_code, Json({"credential_id": str(removida[0])})),
+                (
+                    source_code,
+                    scope_type,
+                    owner_user_id,
+                    Json({"credential_id": str(removida[0])}),
+                ),
             )
         return bool(removida)
 
 
 def list_configuration_audit(limit=30):
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
             SELECT action, source_code, changes_jsonb, created_at
             FROM bibliographic_configuration_audit
+            WHERE scope_type = %s
+              AND scope_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
             ORDER BY created_at DESC
             LIMIT %s
             """,
-            (int(limit),),
+            (scope_type, owner_user_id, int(limit)),
         )
         return [
             {

@@ -53,6 +53,25 @@ def current_user_id() -> str | None:
     return user.id if user else None
 
 
+def current_configuration_scope() -> tuple[str, str | None]:
+    """Resolve o escopo privado sem escolher outro usuário implicitamente."""
+
+    user = current_user()
+    if user:
+        if user.status != "active":
+            raise PermissionError("A identidade da aplicação está desativada.")
+        return "user", user.id
+    user_mode = os.getenv("RAG_USER_MODE", "single_user").strip().lower()
+    if user_mode == "multi_user":
+        raise PermissionError("A configuração privada exige uma identidade autenticada.")
+    return "installation", None
+
+
+def current_configuration_cache_key() -> str:
+    user_mode = os.getenv("RAG_USER_MODE", "single_user").strip().lower()
+    return f"{user_mode}:{current_user_id() or 'installation'}"
+
+
 def bind_current_user(user: ApplicationUser | Mapping | None) -> ApplicationUser | None:
     if user is None:
         _CURRENT_USER.set(None)
@@ -165,6 +184,54 @@ def ensure_application_user(
                   )
                 """,
                 (user_id, user_id),
+            )
+            for table, identity_column, active_filter in (
+                ("ai_provider_credentials", "provider_code", "AND legacy.is_active = TRUE"),
+                ("ai_model_settings", "task_type", "AND legacy.is_active = TRUE"),
+                ("bibliographic_source_settings", "source_code", ""),
+                ("bibliographic_source_credentials", "source_code", "AND legacy.is_active = TRUE"),
+            ):
+                cursor.execute(
+                    f"""
+                    UPDATE {table} AS legacy
+                    SET scope_type = 'user',
+                        owner_user_id = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE legacy.scope_type = 'installation'
+                      AND legacy.scope_id IS NULL
+                      AND legacy.owner_user_id IS NULL
+                      {active_filter}
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM {table} AS personal
+                          WHERE personal.{identity_column} = legacy.{identity_column}
+                            AND personal.scope_type = 'user'
+                            AND personal.scope_id IS NULL
+                            AND personal.owner_user_id = %s
+                            {active_filter.replace('legacy.', 'personal.')}
+                      )
+                    """,
+                    (user_id, user_id),
+                )
+            cursor.execute(
+                """
+                UPDATE ai_configuration_audit
+                SET scope_type = 'user', owner_user_id = %s
+                WHERE scope_type = 'installation'
+                  AND scope_id IS NULL
+                  AND owner_user_id IS NULL
+                """,
+                (user_id,),
+            )
+            cursor.execute(
+                """
+                UPDATE bibliographic_configuration_audit
+                SET scope_type = 'user', owner_user_id = %s
+                WHERE scope_type = 'installation'
+                  AND scope_id IS NULL
+                  AND owner_user_id IS NULL
+                """,
+                (user_id,),
             )
     row["id"] = user_id
     return bind_current_user(row)

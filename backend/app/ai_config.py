@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -271,8 +271,19 @@ def _database_configuration_enabled():
     }
 
 
+def _multi_user_mode():
+    return os.getenv("RAG_USER_MODE", "single_user").strip().lower() == "multi_user"
+
+
+def _without_environment_credential(settings):
+    if not _multi_user_mode():
+        return settings
+    return replace(settings, api_key=None, credential_source="not_configured")
+
+
 def _apply_database_overrides(settings):
     """Aplica o escopo local da instalação, mantendo .env como fallback seguro."""
+    settings = _without_environment_credential(settings)
     if not _database_configuration_enabled():
         return settings
 
@@ -287,6 +298,8 @@ def _apply_database_overrides(settings):
             return settings
         modelos_banco = get_installation_model_settings()
         credencial = get_installation_credential(settings.provider)
+    except PermissionError:
+        raise
     except Exception:
         # O aplicativo continua inicializável antes da migração ou se o banco estiver offline.
         return settings
@@ -373,13 +386,9 @@ def _apply_database_overrides(settings):
     )
 
 
-@lru_cache(maxsize=None)
-def get_provider_api_key(provider):
+@lru_cache(maxsize=32)
+def _get_provider_api_key_for_scope(provider, _scope_key):
     """Obtém a credencial efetiva de um provedor sem expô-la na configuração."""
-    provider = _normalizar_provider(provider)
-    if provider not in SUPPORTED_GENERATION_PROVIDERS:
-        raise RuntimeError(f"Provedor de IA não suportado: {provider}.")
-
     if _database_configuration_enabled():
         try:
             from backend.app.ai_config_repository import (
@@ -393,14 +402,27 @@ def get_provider_api_key(provider):
                     from backend.app.secret_store import decrypt_secret
 
                     return decrypt_secret(credencial["encrypted_secret"])
-        except RuntimeError:
+        except (RuntimeError, PermissionError):
             raise
         except Exception:
             # O ambiente continua sendo um fallback durante inicialização/migração.
             pass
 
+    if _multi_user_mode():
+        return None
     nome_variavel = PROVIDER_ENV_KEYS[provider]
     return os.getenv(nome_variavel)
+
+
+def get_provider_api_key(provider):
+    provider = _normalizar_provider(provider)
+    if provider not in SUPPORTED_GENERATION_PROVIDERS:
+        raise RuntimeError(f"Provedor de IA não suportado: {provider}.")
+    from backend.app.user_identity import current_configuration_cache_key
+
+    return _get_provider_api_key_for_scope(
+        provider, current_configuration_cache_key()
+    )
 
 
 def get_environment_ai_settings():
@@ -465,17 +487,25 @@ def get_environment_ai_settings():
     if not embedding.model:
         raise RuntimeError("AI_EMBEDDING_MODEL não pode ficar vazio.")
 
-    return AISettings(
-        provider=provider,
-        api_key=os.getenv(PROVIDER_ENV_KEYS[provider]),
-        generation=geracao,
-        embedding=embedding,
+    return _without_environment_credential(
+        AISettings(
+            provider=provider,
+            api_key=os.getenv(PROVIDER_ENV_KEYS[provider]),
+            generation=geracao,
+            embedding=embedding,
+        )
     )
 
 
-@lru_cache(maxsize=1)
-def get_ai_settings():
+@lru_cache(maxsize=32)
+def _get_ai_settings_for_scope(_scope_key):
     return _apply_database_overrides(get_environment_ai_settings())
+
+
+def get_ai_settings():
+    from backend.app.user_identity import current_configuration_cache_key
+
+    return _get_ai_settings_for_scope(current_configuration_cache_key())
 
 
 def get_generation_config(task):
@@ -495,5 +525,5 @@ def get_reranking_config():
 
 def clear_ai_settings_cache():
     """Permite recarregar a configuração após mudanças futuras pela interface."""
-    get_ai_settings.cache_clear()
-    get_provider_api_key.cache_clear()
+    _get_ai_settings_for_scope.cache_clear()
+    _get_provider_api_key_for_scope.cache_clear()
