@@ -24,6 +24,7 @@ from backend.app.visual_rag import (
     evidence_metadata, get_visual_rag_setting, list_eligible_visual_evidence,
     ensure_visual_evidence_current,
 )
+from backend.app.user_identity import enforce_project_access
 from backend.app.retrieval_metrics import (
     DEFAULT_K_VALUES,
     aggregate_ranking_metrics,
@@ -454,6 +455,7 @@ def run_rag_benchmark(
 ):
     """Executa RAG uma vez por pergunta e avalia RRF, reranking, recusa e citações."""
     project_id = str(project_id)
+    enforce_project_access(project_id, "editor")
     golden = list_golden_queries(project_id)
     errors = validate_golden_set(golden)
     if errors:
@@ -755,6 +757,7 @@ def run_rag_benchmark(
 
 
 def get_latest_rag_benchmark(project_id):
+    enforce_project_access(project_id, "viewer")
     return carregar_ultima_execucao_avaliacao(project_id, RUN_TYPE)
 
 

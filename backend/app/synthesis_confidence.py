@@ -11,6 +11,7 @@ import uuid
 from psycopg2.extras import Json
 
 from backend.app.protocol_service import protocol_fingerprint
+from backend.app.user_identity import enforce_project_access
 
 
 CATEGORIES = {
@@ -96,6 +97,7 @@ def _json_safe(value):
 def collect_limitation_facts(project_id, connection_factory=None):
     """Coleta fatos objetivos; nenhuma classificação humana é inferida aqui."""
     factory = _factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT protocol_version, criteria_jsonb FROM review_projects WHERE id = %s",
@@ -427,6 +429,7 @@ def derive_limitation_signals(facts):
 
 def synchronize_limitations(project_id, connection_factory=None):
     factory = _factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     facts = collect_limitation_facts(project_id, connection_factory=factory)
     signals = derive_limitation_signals(facts)
     with factory() as connection, connection.cursor() as cursor:
@@ -532,6 +535,7 @@ def synchronize_limitations(project_id, connection_factory=None):
 
 def list_limitations(project_id, include_historical=True, connection_factory=None):
     factory = _factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -561,6 +565,7 @@ def create_manual_limitation(project_id, category, title, description, impact, m
     if len(title) < 5 or len(description) < 10:
         raise ValueError("Informe um título e uma descrição suficientemente detalhados.")
     factory = _factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     signal_code = f"manual:{uuid.uuid4()}"
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute("SELECT protocol_version FROM review_projects WHERE id = %s", (str(project_id),))
@@ -607,6 +612,7 @@ def review_limitation(project_id, limitation_id, status, impact, mitigation=None
     if status in {"dismissed", "resolved"} and (not human_notes or len(human_notes) < 5):
         raise ValueError("Justifique a decisão humana em pelo menos 5 caracteres.")
     factory = _factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -711,6 +717,7 @@ def save_confidence_snapshot(project_id, domain_ratings, overall_level, rational
             {**domain, "level": level, "rationale": " ".join(str(item.get("rationale") or "").split()).strip()}
         )
     factory = _factory(connection_factory)
+    enforce_project_access(project_id, "editor", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT protocol_version, criteria_jsonb FROM review_projects WHERE id = %s FOR UPDATE",
@@ -778,6 +785,7 @@ def save_confidence_snapshot(project_id, domain_ratings, overall_level, rational
 
 def list_confidence_snapshots(project_id, connection_factory=None):
     factory = _factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -794,6 +802,7 @@ def list_confidence_snapshots(project_id, connection_factory=None):
 
 def confidence_summary(project_id, connection_factory=None):
     factory = _factory(connection_factory)
+    enforce_project_access(project_id, "viewer", connection_factory=factory)
     limitations = list_limitations(project_id, include_historical=False, connection_factory=factory)
     snapshots = list_confidence_snapshots(project_id, connection_factory=factory)
     with factory() as connection, connection.cursor() as cursor:

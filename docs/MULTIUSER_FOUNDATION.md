@@ -48,6 +48,19 @@ operacional; esta evolução começa em `2.6.0-dev`.
 - scripts locais de usuário único permanecem compatíveis, enquanto uma execução
   futura em `multi_user` sem identidade falha fechada.
 
+## Quarta entrega: fluxo científico
+
+- consultas de triagem, deduplicação, calibração, limitações, qualidade
+  metodológica e evidências visuais exigem ao menos o papel `viewer`;
+- decisões humanas, recalibração, revisões, geração de interpretações e execução
+  do benchmark exigem `editor` ou `owner`;
+- a preferência de uso das interpretações visuais também é isolada por projeto;
+- a criação automática do instrumento metodológico padrão exige edição quando o
+  projeto ainda não possui instrumento, sem transformar uma leitura em mutação
+  autorizada implicitamente;
+- testes de contrato interrompem cada grupo antes do acesso ao banco quando a
+  autorização central recusa a operação.
+
 ## Limite de segurança atual
 
 Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
@@ -55,7 +68,7 @@ rejeitando esse valor. A fila já propaga e revalida o solicitante, mas várias
 operações síncronas especializadas ainda recebem apenas `project_id`. Antes da
 ativação serão necessários:
 
-1. aplicar a autorização central às demais leituras, mutações e arquivos;
+1. aplicar a autorização central aos agentes e às operações restantes;
 2. escopo por usuário para credenciais e configurações sensíveis;
 3. administração de convites, desativação e transferência de propriedade;
 4. testes negativos de isolamento para todas as áreas e arquivos;
@@ -100,3 +113,13 @@ os mesmos projetos e funcionalidades após a atualização.
 5. confirmar que a indexação continua passando pela fila autorizada;
 6. validar que um PDF só pode ser relacionado a artigo incluído no mesmo projeto;
 7. executar diagnóstico e gerar um novo backup completo.
+
+## Validação do fluxo científico
+
+1. executar os testes negativos de leitura (`viewer`) e mutação (`editor`);
+2. abrir triagem e deduplicação e salvar uma decisão humana existente;
+3. conferir calibração da busca, limitações e qualidade metodológica;
+4. abrir o catálogo visual, revisar uma interpretação e confirmar o opt-in do RAG;
+5. consultar ou executar o benchmark de um projeto autorizado;
+6. confirmar que o modo local e a Web privada de usuário único não regrediram;
+7. executar a suíte completa, o diagnóstico e validar um novo backup completo.

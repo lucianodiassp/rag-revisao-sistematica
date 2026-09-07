@@ -16,6 +16,7 @@ from backend.app.ai_config import TASK_METHOD_QUALITY, get_generation_config
 from backend.app.ai_service import generate_content
 from backend.app.database import get_connection, log_interacao_agente
 from backend.app.evidence_utils import normalizar_trecho
+from backend.app.user_identity import enforce_project_access
 
 
 INSTRUMENT_SCHEMA_VERSION = "generic-methodological-v1"
@@ -193,6 +194,7 @@ def validate_ai_suggestion(raw_response, chunks, domains, context_truncated=Fals
 
 def ensure_default_instrument(project_id):
     project_id = str(project_id)
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     with get_connection() as connection, connection.cursor() as cursor:
         cursor.execute("SELECT id FROM review_projects WHERE id = %s FOR UPDATE", (project_id,))
         if not cursor.fetchone():
@@ -209,6 +211,7 @@ def ensure_default_instrument(project_id):
         current = _row_as_dict(cursor, cursor.fetchone())
         if current:
             return current
+        enforce_project_access(project_id, "editor", connection_factory=get_connection)
         cursor.execute(
             """
             INSERT INTO methodological_assessment_instruments
@@ -224,6 +227,7 @@ def ensure_default_instrument(project_id):
 
 def create_instrument_version(project_id, name, description, domains, change_reason):
     project_id = str(project_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     name, description, change_reason = (str(value or "").strip() for value in (name, description, change_reason))
     if len(name) < 5 or len(description) < 10 or len(change_reason) < 5:
         raise ValueError("Informe nome, descrição e motivo da nova versão.")
@@ -254,6 +258,7 @@ def create_instrument_version(project_id, name, description, domains, change_rea
 
 
 def list_instrument_versions(project_id):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     with get_connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -269,6 +274,7 @@ def list_instrument_versions(project_id):
 
 
 def list_eligible_assessments(project_id, instrument_id=None):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     instrument = ensure_default_instrument(project_id)
     instrument_id = str(instrument_id or instrument["id"])
     with get_connection() as connection, connection.cursor() as cursor:
@@ -373,6 +379,7 @@ def _persist_ai_suggestion(project_id, paper_id, instrument, suggestion):
 def create_manual_assessment(project_id, paper_id):
     """Abre uma avaliação sem consumir IA, preservando o mesmo instrumento ativo."""
     project_id, paper_id = str(project_id), str(paper_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     instrument = ensure_default_instrument(project_id)
     with get_connection() as connection, connection.cursor() as cursor:
         cursor.execute(
@@ -406,6 +413,7 @@ def create_manual_assessment(project_id, paper_id):
 
 def analyze_paper_with_ai(project_id, paper_id):
     project_id, paper_id = str(project_id), str(paper_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     instrument = ensure_default_instrument(project_id)
     chunks, truncated = _load_pdf_chunks(project_id, paper_id)
     if not chunks:
@@ -490,6 +498,7 @@ TRECHOS DO PDF:
 
 
 def load_assessment_sources(assessment_id, project_id):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     with get_connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -510,6 +519,7 @@ def save_human_assessment(
     project_id, assessment_id, domain_answers, overall_rating, review_notes, confirmed_source_ids=None
 ):
     project_id, assessment_id = str(project_id), str(assessment_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     overall_rating = str(overall_rating or "").strip().lower()
     review_notes = str(review_notes or "").strip()
     if overall_rating not in RATINGS:
@@ -571,6 +581,7 @@ def save_human_assessment(
 
 
 def methodological_summary(project_id, active_only=True):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     where_active = "AND i.is_active = TRUE" if active_only else ""
     with get_connection() as connection, connection.cursor() as cursor:
         cursor.execute(

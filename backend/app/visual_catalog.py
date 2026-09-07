@@ -12,6 +12,7 @@ from psycopg2.extras import Json, RealDictCursor
 
 from backend.app.database import get_connection
 from backend.app.storage_service import pdf_directory
+from backend.app.user_identity import enforce_project_access
 
 
 ARTIFACT_TYPES = {"figure", "table"}
@@ -301,6 +302,7 @@ def detect_visual_artifacts(path) -> dict:
 def catalog_project_visuals(project_id, progress_callback=None) -> dict:
     """Cataloga PDFs incluídos e preserva revisões de detecções ainda idênticas."""
     project_id = str(project_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     root = pdf_directory()
     summary = {
         "papers_eligible": 0,
@@ -432,6 +434,7 @@ def catalog_project_visuals(project_id, progress_callback=None) -> dict:
 
 
 def list_visual_artifacts(project_id, *, current_only=True, review_status=None):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     params = [str(project_id)]
     filters = ["a.project_id = %s"]
     if current_only:
@@ -490,6 +493,7 @@ def review_visual_artifact(
     human_description=None,
     human_notes=None,
 ):
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     if action not in {"approved", "corrected", "rejected"}:
         raise ValueError("Decisão de revisão visual inválida.")
     reviewer = _sanitize(reviewer_name, 200)
@@ -571,6 +575,7 @@ def review_visual_artifact(
 
 
 def render_visual_artifact_preview(project_id, artifact_id, dpi=130) -> bytes:
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     """Renderiza somente a página/região registrada, sem persistir cópias do PDF."""
     dpi = max(72, min(int(dpi), 180))
     with get_connection() as connection, connection.cursor(

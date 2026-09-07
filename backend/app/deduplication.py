@@ -8,6 +8,7 @@ import uuid
 from psycopg2.extras import Json
 
 from backend.app.project_utils import mesclar_proveniencia, normalizar_doi, normalizar_titulo
+from backend.app.user_identity import enforce_project_access
 
 
 RULE_DOI_EXACT = "doi_exact"
@@ -214,6 +215,7 @@ def listar_resumo_deduplicacao(project_id, connection_factory=None):
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
 
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(
@@ -237,6 +239,7 @@ def listar_decisoes_deduplicacao(project_id, apenas_pendentes=False, limite=250,
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
 
     filtro = "AND dd.review_status = 'pending'" if apenas_pendentes else ""
     with connection_factory() as connection, connection.cursor() as cursor:
@@ -286,6 +289,7 @@ def revisar_decisao_deduplicacao(
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    enforce_project_access(project_id, "editor", connection_factory=connection_factory)
 
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(

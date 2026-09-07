@@ -14,6 +14,7 @@ from psycopg2.extras import Json, RealDictCursor
 
 from backend.app.database import get_connection
 from backend.app.storage_service import pdf_directory
+from backend.app.user_identity import enforce_project_access
 
 
 SOURCE_TYPE = "visual_interpretation"
@@ -33,6 +34,7 @@ figura figuras tabela tabelas figure figures table tables mostre descreva""".spl
 
 
 def get_visual_rag_setting(project_id):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     with get_connection() as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT visual_enabled, revision FROM project_rag_settings WHERE project_id = %s",
@@ -45,6 +47,7 @@ def get_visual_rag_setting(project_id):
 
 
 def set_visual_rag_setting(project_id, enabled):
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     if not isinstance(enabled, bool):
         raise ValueError("A opção visual deve ser verdadeira ou falsa.")
     with get_connection() as connection, connection.cursor() as cursor:
@@ -114,6 +117,7 @@ def _pdf_hash(paper_id):
 
 
 def list_eligible_visual_evidence(project_id, *, setting=None):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     """Também usado na seleção humana do Golden Set; não ativa o recurso."""
     with get_connection() as connection, connection.cursor(cursor_factory=RealDictCursor) as cursor:
         cursor.execute(

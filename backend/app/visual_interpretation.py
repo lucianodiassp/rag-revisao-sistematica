@@ -12,6 +12,7 @@ from backend.app.ai_config import TASK_VISUAL_INTERPRETATION, get_generation_con
 from backend.app.ai_service import generate_multimodal_content
 from backend.app.database import get_connection
 from backend.app.visual_catalog import render_visual_artifact_preview
+from backend.app.user_identity import enforce_project_access
 
 
 PROMPT_VERSION = "visual-interpretation-v1"
@@ -128,6 +129,7 @@ def _get_eligible_artifact(project_id, artifact_id):
 
 def interpret_visual_artifact(project_id, artifact_id, progress_callback=None):
     """Interpreta um candidato por chamada e registra uma saída pendente de revisão."""
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     artifact = _get_eligible_artifact(project_id, artifact_id)
     if progress_callback:
         progress_callback(0, 3, "Preparando recorte visual aprovado")
@@ -211,6 +213,7 @@ def interpret_visual_artifact(project_id, artifact_id, progress_callback=None):
 
 
 def get_current_visual_interpretation(project_id, artifact_id):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     with get_connection() as connection, connection.cursor(
         cursor_factory=RealDictCursor
     ) as cursor:
@@ -244,6 +247,7 @@ def review_visual_interpretation(
     corrected_summary=None,
     human_notes=None,
 ):
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     if action not in {"approved", "corrected", "rejected"}:
         raise ValueError("Decisão sobre a interpretação visual inválida.")
     reviewer = _sanitize(reviewer_name, 200)

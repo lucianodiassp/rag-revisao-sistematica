@@ -26,6 +26,11 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   de agentes, avaliações, reavaliações e leitura/indexação dos PDFs.
 - Uploads de PDF agora validam no backend o papel de edição e confirmam que o
   artigo está incluído e pertence ao projeto antes de gravar o arquivo.
+- Triagem humana, deduplicação, calibração da busca, limitações e confiança,
+  qualidade metodológica, catálogo e interpretação visual, uso visual no RAG e
+  benchmark passam a exigir papel de leitura ou edição conforme a operação.
+- Testes de contrato cobrem as barreiras do fluxo científico e impedem acesso ao
+  banco quando a autorização central recusa a operação.
 - O modo `multi_user` permanece bloqueado no preflight até que todas as operações
   internas e tarefas em segundo plano adotem autorização obrigatória.
 
