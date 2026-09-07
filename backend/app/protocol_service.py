@@ -207,6 +207,9 @@ def get_protocol_history(project_id, connection_factory=None):
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    from backend.app.user_identity import enforce_project_access
+
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -235,6 +238,9 @@ def get_protocol_change_impact(project_id, connection_factory=None):
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    from backend.app.user_identity import enforce_project_access
+
+    enforce_project_access(project_id, "viewer", connection_factory=connection_factory)
     with connection_factory() as connection, connection.cursor() as cursor:
         cursor.execute(
             """

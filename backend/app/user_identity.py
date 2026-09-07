@@ -7,6 +7,7 @@ adotem autorização obrigatória no backend.
 
 from __future__ import annotations
 
+import os
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 from typing import Mapping
@@ -252,3 +253,28 @@ def require_project_access(
     if bind:
         bind_current_user(user)
     return ProjectAccess(project_id=str(project_id), user=user, role=role)
+
+
+def enforce_project_access(
+    project_id,
+    minimum_role="viewer",
+    *,
+    connection_factory=None,
+) -> ProjectAccess | None:
+    """Aplica autorização quando há sessão ou quando o perfil exige identidade.
+
+    Scripts legados de usuário único permanecem compatíveis; a barreira Web vincula
+    a identidade antes das páginas. Quando ``multi_user`` for habilitado, qualquer
+    chamada sem identidade falhará fechada também nesta camada.
+    """
+
+    if current_user_id():
+        return require_project_access(
+            project_id,
+            minimum_role,
+            connection_factory=connection_factory,
+        )
+    user_mode = os.getenv("RAG_USER_MODE", "single_user").strip().lower()
+    if user_mode == "multi_user":
+        raise PermissionError("A operação exige uma identidade autenticada.")
+    return None

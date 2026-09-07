@@ -20,7 +20,7 @@ from backend.app.storage_service import (
     StorageCapacityError,
     inspect_storage,
     pdf_directory,
-    save_upload_atomic,
+    save_project_pdf_upload,
     storage_limits,
 )
 from frontend.project_selector import selecionar_projeto_ativo
@@ -145,15 +145,16 @@ else:
             
             if arquivo_upload is not None:
                 if st.button("💾 Salvar e Relacionar PDF", type="primary", width="stretch"):
-                    caminho_salvo = os.path.join(DIRETORIO_PDFS, f"{uuid_alvo}.pdf")
                     try:
-                        save_upload_atomic(
+                        save_project_pdf_upload(
+                            project_id,
+                            uuid_alvo,
                             arquivo_upload.getbuffer(),
-                            caminho_salvo,
-                            kind="pdf",
                         )
                     except StorageCapacityError as erro:
                         st.error(f"Não foi possível armazenar o PDF: {erro}")
+                    except PermissionError as erro:
+                        st.warning(str(erro))
                     except OSError as erro:
                         st.error(f"Falha ao gravar o PDF no armazenamento persistente: {erro}")
                     else:
