@@ -31,6 +31,13 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   benchmark passam a exigir papel de leitura ou edição conforme a operação.
 - Testes de contrato cobrem as barreiras do fluxo científico e impedem acesso ao
   banco quando a autorização central recusa a operação.
+- Agentes de formulação, triagem, extração, RAG, auditoria e relatório agora
+  validam o papel do usuário antes de consultar dados ou consumir um provedor de IA.
+- Golden Set e snapshots PRISMA separam leitura (`viewer`) de alterações
+  (`editor`), enquanto a exportação do pacote de reprodutibilidade exige acesso
+  explícito ao projeto.
+- A leitura de chunks para extração confirma simultaneamente artigo e projeto,
+  impedindo que um identificador de PDF contorne o isolamento autorizado.
 - O modo `multi_user` permanece bloqueado no preflight até que todas as operações
   internas e tarefas em segundo plano adotem autorização obrigatória.
 

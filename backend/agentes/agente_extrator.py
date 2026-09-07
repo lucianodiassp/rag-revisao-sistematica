@@ -18,6 +18,7 @@ from backend.app.evidence_utils import (
     listar_fontes_extracao,
     validar_extracao_rastreavel,
 )
+from backend.app.user_identity import enforce_project_access
 
 
 load_dotenv(find_dotenv())
@@ -36,6 +37,7 @@ def get_conexao():
 
 def buscar_artigos_aprovados(project_id):
     """Seleciona artigos incluídos com PDF rastreável e extração ausente/legada."""
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     with get_conexao() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -65,6 +67,7 @@ def buscar_artigos_aprovados(project_id):
 
 
 def contar_aprovados_sem_pdf_rastreavel(project_id):
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     with get_conexao() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -86,21 +89,25 @@ def contar_aprovados_sem_pdf_rastreavel(project_id):
         return cursor.fetchone()[0]
 
 
-def buscar_chunks_pdf(paper_id, maximo_caracteres=MAXIMO_CARACTERES_CONTEXTO):
+def buscar_chunks_pdf(project_id, paper_id, maximo_caracteres=MAXIMO_CARACTERES_CONTEXTO):
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     with get_conexao() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
-            SELECT id, chunk_text, (metadata_jsonb->>'page_start')::INTEGER AS page_number
-            FROM paper_chunks
-            WHERE paper_id = %s
-              AND chunk_type LIKE 'full_text_part_%%'
-              AND metadata_jsonb->>'source_type' = 'pdf'
-              AND metadata_jsonb ? 'page_start'
-            ORDER BY (metadata_jsonb->>'page_start')::INTEGER,
-                     COALESCE((metadata_jsonb->>'page_chunk_index')::INTEGER, 1),
-                     id
+            SELECT pc.id, pc.chunk_text,
+                   (pc.metadata_jsonb->>'page_start')::INTEGER AS page_number
+            FROM paper_chunks pc
+            JOIN deduplicated_papers p ON p.id = pc.paper_id
+            WHERE pc.paper_id = %s
+              AND p.project_id = %s
+              AND pc.chunk_type LIKE 'full_text_part_%%'
+              AND pc.metadata_jsonb->>'source_type' = 'pdf'
+              AND pc.metadata_jsonb ? 'page_start'
+            ORDER BY (pc.metadata_jsonb->>'page_start')::INTEGER,
+                     COALESCE((pc.metadata_jsonb->>'page_chunk_index')::INTEGER, 1),
+                     pc.id
             """,
-            (paper_id,),
+            (paper_id, project_id),
         )
         todos = [
             {"id": str(linha[0]), "chunk_text": linha[1], "page_number": linha[2]}
@@ -125,8 +132,11 @@ def _montar_contexto(chunks):
     )
 
 
-def extrair_evidencias_com_ia(titulo, chunks, contexto_truncado=False, tentativa=1):
+def extrair_evidencias_com_ia(
+    project_id, titulo, chunks, contexto_truncado=False, tentativa=1
+):
     """Extrai campos do texto integral e aceita apenas citações verificáveis."""
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     prompt = f"""
 Você é um extrator de evidências para uma Revisão Sistemática. Analise SOMENTE os
 trechos do artigo fornecidos abaixo. Cada trecho tem um chunk_id e uma página.
@@ -166,7 +176,9 @@ TRECHOS DO PDF:
         if erro.code == 429 and tentativa <= 3:
             print("   ⏳ Cota da API atingida. A aguardar antes de tentar novamente...")
             time.sleep(60)
-            return extrair_evidencias_com_ia(titulo, chunks, contexto_truncado, tentativa + 1)
+            return extrair_evidencias_com_ia(
+                project_id, titulo, chunks, contexto_truncado, tentativa + 1
+            )
         print(f"❌ Falha na API: {erro}")
         return None
     except Exception as erro:
@@ -239,6 +251,7 @@ def _salvar_extracao(cursor, project_id, paper_id, dados_extraidos):
 
 
 def carregar_extracoes_projeto(project_id):
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     with get_conexao() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -257,6 +270,7 @@ def carregar_extracoes_projeto(project_id):
 
 
 def salvar_revisao_humana(project_id, extracao_id, dados_revisados, status, notas=""):
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     if status not in {"approved", "corrected", "rejected"}:
         raise ValueError("Status de revisão inválido.")
     dados_finais = achatar_extracao(dados_revisados)
@@ -286,6 +300,7 @@ def salvar_revisao_humana(project_id, extracao_id, dados_revisados, status, nota
 
 def executar_pipeline_extracao(project_id=None, progress_callback=None):
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     artigos = buscar_artigos_aprovados(project_id)
     sem_pdf = contar_aprovados_sem_pdf_rastreavel(project_id)
     resumo = {"extraidos": 0, "falhas": 0, "sem_pdf_rastreavel": sem_pdf}
@@ -304,8 +319,10 @@ def executar_pipeline_extracao(project_id=None, progress_callback=None):
                     f"Extraindo evidências: {titulo[:80]}",
                 )
             print(f"🧠 IA a extrair evidências do PDF: '{titulo[:50]}...'")
-            chunks, truncado = buscar_chunks_pdf(paper_id)
-            dados_extraidos = extrair_evidencias_com_ia(titulo, chunks, truncado)
+            chunks, truncado = buscar_chunks_pdf(project_id, paper_id)
+            dados_extraidos = extrair_evidencias_com_ia(
+                project_id, titulo, chunks, truncado
+            )
             if not dados_extraidos:
                 resumo["falhas"] += 1
                 if progress_callback:

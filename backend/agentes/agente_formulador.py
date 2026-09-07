@@ -2,10 +2,13 @@ import json
 from backend.app.ai_config import TASK_FORMULATION, get_generation_config
 from backend.app.ai_service import generate_content
 from backend.app.database import log_interacao_agente
+from backend.app.user_identity import enforce_project_access
 
 
 def estruturar_pergunta_pesquisa(pergunta_livre, project_id=None):
     """Transforma uma pergunta livre na estrutura PICO e gera a estratégia de busca."""
+    if project_id:
+        enforce_project_access(project_id, "editor")
     prompt = f"""
     És um metodologista especialista em Revisões Sistemáticas da Literatura.
     A tua tarefa é receber a pergunta de pesquisa inicial do utilizador e estruturá-la cientificamente.

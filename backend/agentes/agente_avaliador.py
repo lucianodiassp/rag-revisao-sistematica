@@ -15,6 +15,7 @@ from backend.app.database import (
     resolver_project_id,
     salvar_execucao_avaliacao,
 )
+from backend.app.user_identity import enforce_project_access
 
 # ==========================================
 # CONJUNTO DE TESTES (GROUND TRUTH / FALLBACK)
@@ -28,11 +29,13 @@ PERGUNTAS_PADRAO = [
 
 def carregar_perguntas_auditoria(project_id):
     """Lê as perguntas de auditoria do protocolo versionado do projeto."""
+    enforce_project_access(project_id, "viewer")
     protocolo = obter_projeto(project_id).get("criteria_jsonb") or {}
     return protocolo.get("audit_questions") or PERGUNTAS_PADRAO
 
 def obter_resposta_rag_segura(project_id, pergunta, tentativa=1):
     """Envolve a chamada do RAG num mecanismo de tolerância a falhas (Rate Limit)."""
+    enforce_project_access(project_id, "editor")
     try:
         return responder_com_rag(pergunta, project_id, return_details=True)
     except Exception as e:
@@ -47,8 +50,11 @@ def obter_resposta_rag_segura(project_id, pergunta, tentativa=1):
             "reranking": {"status": "error"},
         }
 
-def avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa=1):
+def avaliar_resposta(
+    project_id, pergunta, resposta_rag, contexto_recuperado, tentativa=1
+):
     """O LLM atua como Juiz, avaliando a resposta gerada contra o contexto original."""
+    enforce_project_access(project_id, "editor")
     prompt_juiz = f"""
     És um Juiz Académico rigoroso a avaliar um sistema de Inteligência Artificial.
     Vou fornecer-te uma Pergunta, o Contexto Científico que o sistema encontrou, e a Resposta que o sistema gerou.
@@ -89,11 +95,18 @@ def avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa=1):
         if "429" in str(e) and tentativa <= 3:
             print(f"   ⏳ Rate limit do Juiz atingido. A aguardar 45s (Tentativa {tentativa}/3)...")
             time.sleep(45)
-            return avaliar_resposta(pergunta, resposta_rag, contexto_recuperado, tentativa + 1)
+            return avaliar_resposta(
+                project_id,
+                pergunta,
+                resposta_rag,
+                contexto_recuperado,
+                tentativa + 1,
+            )
         return {"fidelidade_score": 0, "relevancia_score": 0, "justificativa": f"Erro: {e}"}
 
 def executar_auditoria(project_id=None):
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "editor")
     print("⚖️ A iniciar a Auditoria Quantitativa do Sistema RAG...\n")
     
     # --- NOVO: CARREGAR PERGUNTAS DINAMICAMENTE ---
@@ -117,7 +130,9 @@ def executar_auditoria(project_id=None):
         resposta_gerada = resultado_rag["answer"]
         
         print("   -> 👨‍⚖️ O Juiz a avaliar a precisão...")
-        avaliacao = avaliar_resposta(pergunta, resposta_gerada, contexto_texto)
+        avaliacao = avaliar_resposta(
+            project_id, pergunta, resposta_gerada, contexto_texto
+        )
         
         fidelidade = avaliacao.get("fidelidade_score", 0)
         relevancia = avaliacao.get("relevancia_score", 0)

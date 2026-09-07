@@ -157,8 +157,9 @@ endurecimento operacional da Web privada de usuário único.
    OIDC persistente, propriedade explícita, migração segura dos projetos atuais e
    propagação do solicitante para tarefas em segundo plano. Protocolo, coleta e
    PDFs, além de triagem, deduplicação, calibração, qualidade metodológica,
-   confiança e fluxo visual, já adotam papéis de leitura/edição no backend. O modo
-   multiusuário continua bloqueado, ainda sem cadastro público ou compartilhamento.
+   confiança, fluxo visual, agentes, Golden Set, PRISMA e exportação acadêmica já
+   adotam papéis de leitura/edição no backend. O modo multiusuário continua
+   bloqueado, ainda sem cadastro público ou compartilhamento.
    [Escopo incremental](MULTIUSER_FOUNDATION.md).
 8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.5.x`.

@@ -7,6 +7,7 @@ from backend.app.ai_config import TASK_RERANKING, get_ai_settings, get_reranking
 from backend.app.ai_service import generate_content
 from backend.app.database import log_interacao_agente
 from backend.app.visual_rag import evidence_metadata
+from backend.app.user_identity import enforce_project_access
 
 
 STATUS_SUCCESS = "success"
@@ -180,6 +181,7 @@ def reranquear_candidatos(
     max_attempts=DEFAULT_RERANK_MAX_ATTEMPTS,
 ):
     """Reordena candidatos e devolve seleção e trilha de auditoria."""
+    enforce_project_access(project_id, "editor")
     config = config or get_reranking_config()
     generator = generator or generate_content
     logger = logger or log_interacao_agente

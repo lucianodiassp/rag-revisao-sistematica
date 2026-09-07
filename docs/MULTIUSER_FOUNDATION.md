@@ -61,6 +61,20 @@ operacional; esta evolução começa em `2.6.0-dev`.
 - testes de contrato interrompem cada grupo antes do acesso ao banco quando a
   autorização central recusa a operação.
 
+## Quinta entrega: agentes e exportações científicas
+
+- formulação, triagem, extração, RAG, auditoria e relatório final verificam o
+  papel antes de acessar o projeto ou iniciar consumo no provedor de IA;
+- consultas internas dos agentes aceitam `viewer`, enquanto pipelines, respostas,
+  julgamentos e relatórios exigem `editor` ou `owner`;
+- a leitura dos chunks de um PDF valida também o projeto do artigo, eliminando o
+  acesso indireto somente por `paper_id`;
+- Golden Set e snapshots PRISMA diferenciam consulta de alterações versionadas;
+- a geração do pacote de reprodutibilidade exige associação ativa ao projeto,
+  mesmo permanecendo uma exportação somente de leitura e sem segredos;
+- testes de contrato bloqueiam esses fluxos antes de consultas, chamadas de IA ou
+  criação do arquivo quando a autorização é recusada.
+
 ## Limite de segurança atual
 
 Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
@@ -68,7 +82,7 @@ rejeitando esse valor. A fila já propaga e revalida o solicitante, mas várias
 operações síncronas especializadas ainda recebem apenas `project_id`. Antes da
 ativação serão necessários:
 
-1. aplicar a autorização central aos agentes e às operações restantes;
+1. aplicar a autorização central às operações administrativas restantes;
 2. escopo por usuário para credenciais e configurações sensíveis;
 3. administração de convites, desativação e transferência de propriedade;
 4. testes negativos de isolamento para todas as áreas e arquivos;
@@ -123,3 +137,13 @@ os mesmos projetos e funcionalidades após a atualização.
 5. consultar ou executar o benchmark de um projeto autorizado;
 6. confirmar que o modo local e a Web privada de usuário único não regrediram;
 7. executar a suíte completa, o diagnóstico e validar um novo backup completo.
+
+## Validação dos agentes e exportações
+
+1. executar os testes negativos de leitura e edição antes das chamadas de IA;
+2. abrir o Golden Set e consultar o último benchmark sem alterar os dados;
+3. executar uma pergunta no Assistente e confirmar resposta e citações;
+4. abrir o fluxo PRISMA e gerar ou atualizar o Relatório Final;
+5. gerar um pacote de reprodutibilidade do projeto autorizado;
+6. confirmar que triagem e extração continuam operacionais pela fila;
+7. executar diagnóstico e validar um novo backup completo.
