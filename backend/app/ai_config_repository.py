@@ -2,6 +2,7 @@ from psycopg2.extras import Json
 
 from backend.app.ai_config import GENERATION_TASKS
 from backend.app.database import get_connection
+from backend.app.user_identity import current_configuration_scope
 
 
 SCOPE_INSTALLATION = "installation"
@@ -19,6 +20,7 @@ def configuration_tables_available():
 
 
 def get_installation_credential(provider_code="google_gemini"):
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -27,14 +29,14 @@ def get_installation_credential(provider_code="google_gemini"):
                    created_at, updated_at
             FROM ai_provider_credentials
             WHERE provider_code = %s
-              AND scope_type = 'installation'
+              AND scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
               AND is_active = TRUE
             ORDER BY updated_at DESC
             LIMIT 1
             """,
-            (provider_code,),
+            (provider_code, scope_type, owner_user_id),
         )
         linha = cursor.fetchone()
         if not linha:
@@ -45,6 +47,7 @@ def get_installation_credential(provider_code="google_gemini"):
 
 def list_installation_credentials():
     """Lista metadados e segredos cifrados das credenciais ativas por provedor."""
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -52,12 +55,13 @@ def list_installation_credentials():
                    validation_status, last_validated_at, validation_error,
                    created_at, updated_at
             FROM ai_provider_credentials
-            WHERE scope_type = 'installation'
+            WHERE scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
               AND is_active = TRUE
             ORDER BY provider_code, updated_at DESC
-            """
+            """,
+            (scope_type, owner_user_id),
         )
         colunas = [item[0] for item in cursor.description]
         return {
@@ -74,19 +78,20 @@ def save_installation_credential(
     validation_status="untested",
     validation_error=None,
 ):
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
             SELECT id
             FROM ai_provider_credentials
             WHERE provider_code = %s
-              AND scope_type = 'installation'
+              AND scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
               AND is_active = TRUE
             FOR UPDATE
             """,
-            (provider_code,),
+            (provider_code, scope_type, owner_user_id),
         )
         existente = cursor.fetchone()
         if existente:
@@ -122,10 +127,11 @@ def save_installation_credential(
                 """
                 INSERT INTO ai_provider_credentials
                     (provider_code, label, encrypted_secret, secret_hint,
-                     validation_status, last_validated_at, validation_error)
+                     validation_status, last_validated_at, validation_error,
+                     scope_type, owner_user_id)
                 VALUES (%s, %s, %s, %s, %s,
                         CASE WHEN %s IN ('valid', 'invalid') THEN CURRENT_TIMESTAMP END,
-                        %s)
+                        %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -136,6 +142,8 @@ def save_installation_credential(
                     validation_status,
                     validation_status,
                     validation_error,
+                    scope_type,
+                    owner_user_id,
                 ),
             )
             credential_id = str(cursor.fetchone()[0])
@@ -143,11 +151,14 @@ def save_installation_credential(
 
         cursor.execute(
             """
-            INSERT INTO ai_configuration_audit (action, changes_jsonb)
-            VALUES (%s, %s)
+            INSERT INTO ai_configuration_audit
+                (action, scope_type, owner_user_id, changes_jsonb)
+            VALUES (%s, %s, %s, %s)
             """,
             (
                 acao,
+                scope_type,
+                owner_user_id,
                 Json({
                     "provider_code": provider_code,
                     "label": label,
@@ -162,6 +173,7 @@ def save_installation_credential(
 def update_credential_validation(credential_id, status, error=None):
     if status not in {"valid", "invalid", "untested"}:
         raise ValueError("Status de validação inválido.")
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -170,35 +182,46 @@ def update_credential_validation(credential_id, status, error=None):
                 last_validated_at = CURRENT_TIMESTAMP,
                 validation_error = %s,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s AND scope_type = 'installation' AND is_active = TRUE
+            WHERE id = %s
+              AND scope_type = %s
+              AND scope_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
+              AND is_active = TRUE
             RETURNING id
             """,
-            (status, error, str(credential_id)),
+            (status, error, str(credential_id), scope_type, owner_user_id),
         )
         if not cursor.fetchone():
             raise ValueError("Credencial ativa não encontrada.")
         cursor.execute(
             """
-            INSERT INTO ai_configuration_audit (action, changes_jsonb)
-            VALUES ('credential_validated', %s)
+            INSERT INTO ai_configuration_audit
+                (action, scope_type, owner_user_id, changes_jsonb)
+            VALUES ('credential_validated', %s, %s, %s)
             """,
-            (Json({"credential_id": str(credential_id), "status": status}),),
+            (
+                scope_type,
+                owner_user_id,
+                Json({"credential_id": str(credential_id), "status": status}),
+            ),
         )
 
 
 def get_installation_model_settings():
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
             SELECT task_type, provider_code, credential_id, model_name,
                    parameters_jsonb, embedding_dimensions, updated_at
             FROM ai_model_settings
-            WHERE scope_type = 'installation'
+            WHERE scope_type = %s
               AND scope_id IS NULL
-              AND owner_user_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
               AND is_active = TRUE
             ORDER BY task_type
-            """
+            """,
+            (scope_type, owner_user_id),
         )
         colunas = [item[0] for item in cursor.description]
         return {
@@ -214,6 +237,7 @@ def save_installation_model_settings(provider_code, credential_id, settings):
         extras = sorted(tarefas_recebidas - SUPPORTED_TASKS)
         raise ValueError(f"Configuração de tarefas incompleta. Faltantes={faltantes}; extras={extras}")
 
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         for task_type, config in settings.items():
             model_name = str(config.get("model_name") or "").strip()
@@ -231,13 +255,13 @@ def save_installation_model_settings(provider_code, credential_id, settings):
                 """
                 SELECT id FROM ai_model_settings
                 WHERE task_type = %s
-                  AND scope_type = 'installation'
+                  AND scope_type = %s
                   AND scope_id IS NULL
-                  AND owner_user_id IS NULL
+                  AND owner_user_id IS NOT DISTINCT FROM %s
                   AND is_active = TRUE
                 FOR UPDATE
                 """,
-                (task_type,),
+                (task_type, scope_type, owner_user_id),
             )
             existente = cursor.fetchone()
             if existente:
@@ -266,8 +290,9 @@ def save_installation_model_settings(provider_code, credential_id, settings):
                     """
                     INSERT INTO ai_model_settings
                         (task_type, provider_code, credential_id, model_name,
-                         parameters_jsonb, embedding_dimensions)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                         parameters_jsonb, embedding_dimensions, scope_type,
+                         owner_user_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         task_type,
@@ -276,40 +301,51 @@ def save_installation_model_settings(provider_code, credential_id, settings):
                         model_name,
                         Json(parameters),
                         dimensions,
+                        scope_type,
+                        owner_user_id,
                     ),
                 )
 
         cursor.execute(
             """
-            INSERT INTO ai_configuration_audit (action, changes_jsonb)
-            VALUES ('model_settings_saved', %s)
+            INSERT INTO ai_configuration_audit
+                (action, scope_type, owner_user_id, changes_jsonb)
+            VALUES ('model_settings_saved', %s, %s, %s)
             """,
-            (Json({
-                "provider_code": provider_code,
-                "credential_id": str(credential_id) if credential_id else None,
-                "models": {
-                    tarefa: {
-                        "provider_code": config.get("provider_code") or provider_code,
-                        "model_name": config["model_name"],
-                        "parameters": config.get("parameters") or {},
-                        "embedding_dimensions": config.get("embedding_dimensions"),
+            (
+                scope_type,
+                owner_user_id,
+                Json({
+                    "provider_code": provider_code,
+                    "credential_id": str(credential_id) if credential_id else None,
+                    "models": {
+                        tarefa: {
+                            "provider_code": config.get("provider_code") or provider_code,
+                            "model_name": config["model_name"],
+                            "parameters": config.get("parameters") or {},
+                            "embedding_dimensions": config.get("embedding_dimensions"),
+                        }
+                        for tarefa, config in settings.items()
                     }
-                    for tarefa, config in settings.items()
-                },
-            }),),
+                }),
+            ),
         )
 
 
 def list_configuration_audit(limit=20):
+    scope_type, owner_user_id = current_configuration_scope()
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
             SELECT action, changes_jsonb, created_at
             FROM ai_configuration_audit
+            WHERE scope_type = %s
+              AND scope_id IS NULL
+              AND owner_user_id IS NOT DISTINCT FROM %s
             ORDER BY created_at DESC
             LIMIT %s
             """,
-            (int(limit),),
+            (scope_type, owner_user_id, int(limit)),
         )
         return [
             {"action": linha[0], "changes": linha[1], "created_at": linha[2]}

@@ -59,7 +59,8 @@ st.caption(
 )
 st.info(
     "As chaves são cifradas antes de chegar ao PostgreSQL. Os coletores recebem apenas "
-    "a configuração efetiva em memória e nenhum segredo é salvo na proveniência das buscas."
+    "a configuração efetiva em memória; credenciais e preferências ficam vinculadas "
+    "ao seu usuário e nenhum segredo é salvo na proveniência das buscas."
 )
 
 if not bibliographic_tables_available():
@@ -78,7 +79,7 @@ except Exception as erro:
 if estado.get("configuration_error"):
     st.warning(
         "Uma credencial cifrada não pôde ser ativada. Cadastre-a novamente para esta "
-        f"instalação. Detalhe: {estado['configuration_error']}"
+        f"conta. Detalhe: {estado['configuration_error']}"
     )
 
 fontes = [SOURCE_OPENALEX, SOURCE_SEMANTIC_SCHOLAR, SOURCE_PUBMED]

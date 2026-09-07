@@ -153,9 +153,10 @@ endurecimento operacional da Web privada de usuário único.
    isolada e backup externo. Contém arquivamento reversível, restauração, exclusão
    permanente protegida, limpeza de PDFs e recibos imutáveis.
    [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
-7. `v2.6.x`: fundação multiusuário — em desenvolvimento, começando por identidade
-   OIDC persistente, propriedade explícita, migração segura dos projetos atuais e
-   propagação do solicitante para tarefas em segundo plano. Protocolo, coleta e
+7. `v2.6.x`: fundação multiusuário — em desenvolvimento, com identidade OIDC
+   persistente, propriedade explícita, migração segura dos projetos atuais,
+   propagação do solicitante para tarefas em segundo plano e credenciais e
+   preferências privadas de IA/fontes bibliográficas por usuário. Protocolo, coleta e
    PDFs, além de triagem, deduplicação, calibração, qualidade metodológica,
    confiança, fluxo visual, agentes, Golden Set, PRISMA e exportação acadêmica já
    adotam papéis de leitura/edição no backend. O modo multiusuário continua

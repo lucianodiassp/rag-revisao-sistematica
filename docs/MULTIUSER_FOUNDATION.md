@@ -75,6 +75,21 @@ operacional; esta evolução começa em `2.6.0-dev`.
 - testes de contrato bloqueiam esses fluxos antes de consultas, chamadas de IA ou
   criação do arquivo quando a autorização é recusada.
 
+## Sexta entrega: configuração privada por usuário
+
+- credenciais cifradas de Gemini, OpenAI e fontes bibliográficas pertencem à
+  identidade autenticada;
+- preferências de modelos, parâmetros e fontes também são consultadas e alteradas
+  somente no escopo do usuário corrente;
+- auditorias de configuração registram o mesmo proprietário, sem armazenar o
+  segredo em texto aberto;
+- caches de configuração e clientes de IA usam a identidade na chave, impedindo
+  que uma sessão reutilize o cliente ou as preferências de outra;
+- no modo de usuário único, a primeira identidade ativa adota com segurança os
+  registros legados ainda vinculados à instalação;
+- no futuro modo multiusuário, chaves e e-mails privados fornecidos ao processo do
+  servidor não são fallback compartilhado e não podem ser importados pela tela.
+
 ## Limite de segurança atual
 
 Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
@@ -83,15 +98,16 @@ operações síncronas especializadas ainda recebem apenas `project_id`. Antes d
 ativação serão necessários:
 
 1. aplicar a autorização central às operações administrativas restantes;
-2. escopo por usuário para credenciais e configurações sensíveis;
-3. administração de convites, desativação e transferência de propriedade;
-4. testes negativos de isolamento para todas as áreas e arquivos;
-5. revisão dos contratos de backup, restauração e suporte operacional.
+2. administração de convites, desativação e transferência de propriedade;
+3. testes negativos de isolamento para todas as áreas e arquivos;
+4. revisão dos contratos de backup, restauração e suporte operacional.
 
 ## Compatibilidade e recuperação
 
 A migração `020_user_project_ownership.sql` é progressiva e não modifica conteúdo
-científico; a `021_background_job_requester.sql` acrescenta a autoria das tarefas.
+científico; a `021_background_job_requester.sql` acrescenta a autoria das tarefas;
+e a `022_user_private_configuration.sql` vincula configurações e segredos cifrados
+legados ao único usuário ativo, sem descriptografá-los.
 Backups completos incluem as novas estruturas. Pacotes acadêmicos não
 transportam identidade pessoal: ao serem importados, pertencem ao usuário que
 executou a importação. O modo local e a Web privada de usuário único devem manter
@@ -147,3 +163,15 @@ os mesmos projetos e funcionalidades após a atualização.
 5. gerar um pacote de reprodutibilidade do projeto autorizado;
 6. confirmar que triagem e extração continuam operacionais pela fila;
 7. executar diagnóstico e validar um novo backup completo.
+
+## Validação da configuração privada
+
+1. aplicar a migração `022` duas vezes e confirmar idempotência;
+2. verificar que credenciais e configurações legadas pertencem ao usuário ativo,
+   sem consultar ou exibir seu conteúdo cifrado;
+3. confirmar na tela que Gemini, OpenAI e fontes bibliográficas mantiveram estado,
+   modelos e origem após a atualização;
+4. testar uma credencial salva de cada grupo e executar uma pergunta no Assistente;
+5. reiniciar a aplicação e confirmar persistência e ausência de troca de sessão;
+6. executar a suíte completa e confirmar a migração `022` no diagnóstico;
+7. gerar e validar um novo backup completo.

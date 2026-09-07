@@ -70,6 +70,9 @@ def test_registers_oidc_user_and_claims_only_unassigned_projects_in_single_user_
     assert "NOT EXISTS" in statements[1]
     assert "INSERT INTO project_memberships" in statements[1]
     assert "UPDATE project_lifecycle_events" in statements[2]
+    assert any("UPDATE ai_provider_credentials" in statement for statement in statements)
+    assert any("UPDATE ai_model_settings" in statement for statement in statements)
+    assert any("UPDATE bibliographic_source_credentials" in statement for statement in statements)
 
 
 def test_does_not_claim_legacy_projects_when_multi_user_mode_is_requested():

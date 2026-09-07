@@ -67,7 +67,8 @@ st.caption(
 )
 st.info(
     "A chave é cifrada antes de chegar ao PostgreSQL. A chave-mestra permanece "
-    "no armazenamento privado da instalação e nenhuma credencial é exibida ou registrada nos logs."
+    "no armazenamento privado do servidor; a credencial fica vinculada ao seu "
+    "usuário e nunca é exibida ou registrada nos logs."
 )
 
 if not configuration_tables_available():
@@ -86,7 +87,7 @@ except Exception as erro:
 if estado.get("configuration_error"):
     st.warning(
         "A configuração cifrada não pôde ser ativada. Cadastre novamente a chave "
-        f"para recuperar a instalação. Detalhe: {estado['configuration_error']}"
+        f"para recuperar seu perfil. Detalhe: {estado['configuration_error']}"
     )
 
 st.header("1. Provedor e credencial")

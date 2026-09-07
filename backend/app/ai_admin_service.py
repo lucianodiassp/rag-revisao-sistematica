@@ -23,6 +23,7 @@ from backend.app.ai_config_repository import (
 from backend.app.ai_service import reload_ai_runtime
 from backend.app.openai_client import OpenAIResponsesClient
 from backend.app.secret_store import decrypt_secret, encrypt_secret, secret_hint
+from backend.app.user_identity import current_configuration_scope
 
 
 def _safe_error(erro, segredo=None):
@@ -118,6 +119,7 @@ def inspect_provider_key(provider_code, api_key):
 
 
 def save_validated_gemini_key(api_key, label="Chave Gemini local"):
+    current_configuration_scope()
     modelos = inspect_gemini_key(api_key)
     credential_id = save_installation_credential(
         PROVIDER_GOOGLE_GEMINI,
@@ -131,6 +133,7 @@ def save_validated_gemini_key(api_key, label="Chave Gemini local"):
 
 
 def save_validated_provider_key(provider_code, api_key, label=None):
+    current_configuration_scope()
     if provider_code not in SUPPORTED_GENERATION_PROVIDERS:
         raise ValueError(f"Provedor de IA não suportado: {provider_code}.")
     modelos = inspect_provider_key(provider_code, api_key)
@@ -151,6 +154,11 @@ def save_validated_provider_key(provider_code, api_key, label=None):
 
 
 def import_environment_gemini_key(label="Chave importada do ambiente"):
+    current_configuration_scope()
+    if os.getenv("RAG_USER_MODE", "single_user").strip().lower() == "multi_user":
+        raise PermissionError(
+            "Credenciais do servidor não podem ser importadas por usuários."
+        )
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY não está disponível no ambiente atual.")
@@ -158,6 +166,11 @@ def import_environment_gemini_key(label="Chave importada do ambiente"):
 
 
 def import_environment_provider_key(provider_code, label="Chave importada do ambiente"):
+    current_configuration_scope()
+    if os.getenv("RAG_USER_MODE", "single_user").strip().lower() == "multi_user":
+        raise PermissionError(
+            "Credenciais do servidor não podem ser importadas por usuários."
+        )
     nome_variavel = PROVIDER_ENV_KEYS.get(provider_code)
     if not nome_variavel:
         raise ValueError(f"Provedor de IA não suportado: {provider_code}.")
@@ -168,9 +181,10 @@ def import_environment_provider_key(provider_code, label="Chave importada do amb
 
 
 def inspect_saved_gemini_key():
+    current_configuration_scope()
     credencial = get_installation_credential(PROVIDER_GOOGLE_GEMINI)
     if not credencial:
-        raise RuntimeError("Nenhuma credencial cifrada foi salva para esta instalação.")
+        raise RuntimeError("Nenhuma credencial cifrada foi salva para este usuário.")
     segredo = decrypt_secret(credencial["encrypted_secret"])
     try:
         modelos = inspect_gemini_key(segredo)
@@ -188,9 +202,10 @@ def inspect_saved_gemini_key():
 
 
 def inspect_saved_provider_key(provider_code):
+    current_configuration_scope()
     credencial = get_installation_credential(provider_code)
     if not credencial:
-        raise RuntimeError("Nenhuma credencial cifrada foi salva para este provedor.")
+        raise RuntimeError("Nenhuma credencial cifrada foi salva para este usuário e provedor.")
     segredo = decrypt_secret(credencial["encrypted_secret"])
     try:
         modelos = inspect_provider_key(provider_code, segredo)
@@ -208,6 +223,7 @@ def inspect_saved_provider_key(provider_code):
 
 
 def get_ai_admin_state():
+    current_configuration_scope()
     credentials = list_installation_credentials()
     credential = credentials.get(PROVIDER_GOOGLE_GEMINI)
     configuration_error = None
@@ -245,9 +261,15 @@ def get_ai_admin_state():
             for provider_code, item in credentials.items()
         },
         "credential_source": settings.credential_source,
-        "environment_key_available": bool(os.getenv("GEMINI_API_KEY")),
+        "environment_key_available": (
+            bool(os.getenv("GEMINI_API_KEY"))
+            and os.getenv("RAG_USER_MODE", "single_user").strip().lower() != "multi_user"
+        ),
         "environment_keys_available": {
-            provider_code: bool(os.getenv(nome_variavel))
+            provider_code: (
+                bool(os.getenv(nome_variavel))
+                and os.getenv("RAG_USER_MODE", "single_user").strip().lower() != "multi_user"
+            )
             for provider_code, nome_variavel in PROVIDER_ENV_KEYS.items()
         },
         "generation": settings.generation,
@@ -258,6 +280,7 @@ def get_ai_admin_state():
 
 
 def save_ai_models(generation, embedding_model, embedding_dimensions=768):
+    current_configuration_scope()
     reranking = generation.get(TASK_RERANKING) or {}
     try:
         candidate_limit = int(reranking.get("candidate_limit"))
