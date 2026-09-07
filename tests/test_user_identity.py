@@ -64,9 +64,12 @@ def test_registers_oidc_user_and_claims_only_unassigned_projects_in_single_user_
     )
 
     assert user.id == USER_ID
+    assert user.is_operator is True
     assert current_user_id() == USER_ID
     statements = [call.args[0] for call in cursor.execute.call_args_list]
     assert "INSERT INTO application_users" in statements[0]
+    assert "is_operator" in statements[0]
+    assert cursor.execute.call_args_list[0].args[1][-1] is True
     assert "NOT EXISTS" in statements[1]
     assert "INSERT INTO project_memberships" in statements[1]
     assert "UPDATE project_lifecycle_events" in statements[2]
@@ -97,12 +100,14 @@ def test_does_not_claim_legacy_projects_when_multi_user_mode_is_requested():
         subject="subject",
     )
 
-    ensure_application_user(
+    user = ensure_application_user(
         decision,
         user_mode="multi_user",
         connection_factory=factory,
     )
 
+    assert user.is_operator is False
+    assert cursor.execute.call_args_list[0].args[1][-1] is False
     assert cursor.execute.call_count == 1
 
 

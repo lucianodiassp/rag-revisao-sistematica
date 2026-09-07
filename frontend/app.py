@@ -5,6 +5,7 @@ import streamlit as st
 from backend.app.version import application_caption, application_metadata
 from backend.app.observability import log_event
 from backend.app.operational_health import ServiceHeartbeatThread
+from backend.app.user_identity import current_user_is_operator
 from frontend.auth_gate import enforce_access
 
 
@@ -43,6 +44,8 @@ metadata = registrar_identidade_aplicacao()
 iniciar_sinal_de_vida_aplicacao()
 enforce_access(metadata)
 st.sidebar.caption(f"**{application_caption()}**")
+if current_user_is_operator():
+    st.sidebar.caption("Acesso administrativo: **operador da instalação**")
 
 pages = [
     st.Page(
@@ -109,17 +112,23 @@ pages = [
         title="Avaliação Quantitativa do RAG",
         icon="🧪",
     ),
-    st.Page(
-        "views/9_Backup_Restauracao.py",
-        title="Backup e Restauração",
-        icon="🛡️",
-    ),
-    st.Page(
-        "views/13_Diagnostico_Operacional.py",
-        title="Diagnóstico Operacional",
-        icon="🩺",
-    ),
 ]
+
+if current_user_is_operator():
+    pages.extend(
+        [
+            st.Page(
+                "views/9_Backup_Restauracao.py",
+                title="Backup e Restauração",
+                icon="🛡️",
+            ),
+            st.Page(
+                "views/13_Diagnostico_Operacional.py",
+                title="Diagnóstico Operacional",
+                icon="🩺",
+            ),
+        ]
+    )
 
 selected_page = st.navigation(pages)
 selected_page.run()

@@ -46,3 +46,22 @@ def test_project_lifecycle_page_exposes_reversible_and_protected_flows():
     assert "backup completo **depois deste arquivamento**" in page
     assert "digite exatamente o título" in page
     assert "Histórico imutável do ciclo de vida" in page
+
+
+def test_installation_pages_are_visible_only_to_operator_and_recheck_backend_role():
+    navigation = (ROOT / "frontend/app.py").read_text(encoding="utf-8")
+    backup_page = (ROOT / "frontend/views/9_Backup_Restauracao.py").read_text(
+        encoding="utf-8"
+    )
+    health_page = (
+        ROOT / "frontend/views/13_Diagnostico_Operacional.py"
+    ).read_text(encoding="utf-8")
+
+    assert "if current_user_is_operator():" in navigation
+    assert 'title="Backup e Restauração"' in navigation
+    assert 'title="Diagnóstico Operacional"' in navigation
+    assert "require_installation_operator()" in backup_page
+    assert "create_installation_backup" in backup_page
+    assert "restore_installation_backup" in backup_page
+    assert "require_installation_operator()" in health_page
+    assert "build_installation_health_report" in health_page

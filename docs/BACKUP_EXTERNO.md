@@ -114,3 +114,8 @@ Para recuperar outro servidor, baixe um `.ragbackup` do bucket, prepare uma
 instalação limpa e use o fluxo **Validar backup** e **Restaurar instalação**. O
 arquivo de ambiente Web, as credenciais OIDC e a senha do backup continuam sendo
 administrados separadamente e não fazem parte do objeto restaurado.
+
+Na fundação multiusuário da `2.6`, o backup continua abrangendo a instalação
+inteira. A página, a solicitação manual e a restauração são exclusivas do operador
+da instalação; usuários comuns não recebem acesso ao arquivo global. O agendador
+continua sendo um processo interno confiável do servidor.

@@ -142,6 +142,7 @@ def enforce_access(metadata: dict):
             "email": user.email,
             "display_name": user.display_name,
             "status": user.status,
+            "is_operator": user.is_operator,
         }
     }
 

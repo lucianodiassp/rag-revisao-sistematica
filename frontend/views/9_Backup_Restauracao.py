@@ -12,16 +12,18 @@ from backend.app.backup_service import (
     BACKUP_EXTENSION,
     BackupError,
     RestoreError,
-    create_backup,
     default_backup_directory,
-    inspect_backup,
-    restore_backup,
 )
 from backend.app.external_backup import (
     external_backup_configuration,
     next_scheduled_run,
     read_external_backup_status,
-    request_external_backup_now,
+)
+from backend.app.installation_admin_service import (
+    create_installation_backup,
+    inspect_installation_backup,
+    request_installation_external_backup,
+    restore_installation_backup,
 )
 from backend.app.storage_service import (
     StorageCapacityError,
@@ -29,6 +31,7 @@ from backend.app.storage_service import (
     storage_limits,
     storage_overview,
 )
+from backend.app.user_identity import require_installation_operator
 
 
 def _format_size(size: int) -> str:
@@ -76,7 +79,15 @@ def _show_manifest(manifest: dict) -> None:
     )
 
 
+try:
+    require_installation_operator()
+except PermissionError:
+    st.title("🛡️ Backup e Restauração")
+    st.error("Esta área é restrita ao operador da instalação.")
+    st.stop()
+
 st.title("🛡️ Backup e Restauração")
+st.caption("Área administrativa do operador da instalação")
 st.markdown(
     "Crie uma cópia completa e portátil da instalação, incluindo banco de dados, "
     "PDFs e chave-mestra. O arquivo é protegido por senha antes de ser gravado."
@@ -125,7 +136,7 @@ if create_submitted:
         if not sensitive_ack:
             raise ValueError("Confirme o cuidado com a senha e o arquivo de backup.")
         with st.spinner("Gerando dump, conferindo arquivos e criptografando..."):
-            result = create_backup(password)
+            result = create_installation_backup(password)
         st.session_state["last_full_backup"] = str(result["path"])
         st.success(
             f"Backup concluído: {result['filename']} ({_format_size(result['size'])})."
@@ -207,7 +218,7 @@ else:
 
     if st.button("☁️ Solicitar backup externo agora", use_container_width=True):
         try:
-            request_external_backup_now()
+            request_installation_external_backup()
             st.success(
                 "Solicitação registrada. O serviço iniciará o backup em até 30 segundos."
             )
@@ -240,7 +251,7 @@ if st.button(
         )
         temporary_path = _temporary_upload(uploaded_bytes)
         with st.spinner("Decifrando e verificando a integridade do manifesto..."):
-            manifest = inspect_backup(temporary_path, restore_password)
+            manifest = inspect_installation_backup(temporary_path, restore_password)
         st.session_state["validated_backup"] = {
             "sha256": hashlib.sha256(uploaded_bytes).hexdigest(),
             "manifest": manifest,
@@ -287,7 +298,7 @@ if validated and validated.get("sha256") == current_digest:
             with st.spinner(
                 "Criando cópia de recuperação e restaurando banco, PDFs e credenciais..."
             ):
-                result = restore_backup(
+                result = restore_installation_backup(
                     temporary_path,
                     restore_password,
                     typed_confirmation,
