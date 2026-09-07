@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -10,6 +11,7 @@ from backend.app.storage_service import (
     StorageConfigurationError,
     ensure_free_space,
     ensure_upload_allowed,
+    save_project_pdf_upload,
     save_upload_atomic,
     storage_limits,
 )
@@ -87,3 +89,50 @@ def test_storage_paths_can_be_redirected_to_persistent_volumes(tmp_path, monkeyp
     assert storage.pdf_directory() == pdfs.resolve()
     assert storage.backup_directory() == backups.resolve()
     assert storage.private_directory() == private.resolve()
+
+
+def _connection(eligible):
+    connection = Mock()
+    connection.__enter__ = Mock(return_value=connection)
+    connection.__exit__ = Mock(return_value=False)
+    cursor = Mock()
+    cursor.__enter__ = Mock(return_value=cursor)
+    cursor.__exit__ = Mock(return_value=False)
+    cursor.fetchone.return_value = (eligible,)
+    connection.cursor.return_value = cursor
+    return Mock(return_value=connection)
+
+
+def test_project_pdf_upload_requires_matching_included_article(tmp_path, monkeypatch):
+    _configure_limits(monkeypatch)
+    monkeypatch.setattr(
+        storage.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(total=100 * MEBIBYTE, used=0, free=100 * MEBIBYTE),
+    )
+    project_id = "10000000-0000-0000-0000-000000000001"
+    paper_id = "20000000-0000-0000-0000-000000000002"
+    with pytest.MonkeyPatch.context() as scoped:
+        scoped.setattr(
+            "backend.app.user_identity.enforce_project_access",
+            lambda *_args, **_kwargs: None,
+        )
+        with pytest.raises(PermissionError, match="não pertence"):
+            save_project_pdf_upload(
+                project_id,
+                paper_id,
+                b"%PDF-1.7\nconteudo",
+                destination_directory=tmp_path,
+                connection_factory=_connection(False),
+            )
+
+        destination = save_project_pdf_upload(
+            project_id,
+            paper_id,
+            b"%PDF-1.7\nconteudo",
+            destination_directory=tmp_path,
+            connection_factory=_connection(True),
+        )
+
+    assert destination == (tmp_path / f"{paper_id}.pdf").resolve()
+    assert destination.read_bytes() == b"%PDF-1.7\nconteudo"

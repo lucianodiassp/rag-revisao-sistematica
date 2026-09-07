@@ -6,6 +6,7 @@ from backend.app.user_identity import (
     ApplicationUser,
     bind_current_user,
     current_user_id,
+    enforce_project_access,
     ensure_application_user,
     ensure_project_owner,
     require_project_access,
@@ -250,3 +251,22 @@ def test_worker_can_bind_explicit_authorized_requester():
 
     assert access.role == "editor"
     assert current_user_id() == USER_ID
+
+
+def test_unbound_local_single_user_operation_remains_compatible(monkeypatch):
+    monkeypatch.setenv("RAG_DEPLOYMENT_PROFILE", "local")
+    monkeypatch.setenv("RAG_USER_MODE", "single_user")
+
+    assert enforce_project_access(PROJECT_ID, "editor") is None
+
+
+def test_unbound_multi_user_operation_fails_closed(monkeypatch):
+    monkeypatch.setenv("RAG_DEPLOYMENT_PROFILE", "web_private")
+    monkeypatch.setenv("RAG_USER_MODE", "multi_user")
+
+    try:
+        enforce_project_access(PROJECT_ID, "viewer")
+    except PermissionError as error:
+        assert "identidade autenticada" in str(error)
+    else:
+        raise AssertionError("Uma operação Web sem identidade deveria ser negada.")

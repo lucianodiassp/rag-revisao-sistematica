@@ -36,6 +36,18 @@ operacional; esta evolução começa em `2.6.0-dev`.
 - a migração `021_background_job_requester.sql` associa tarefas históricas ao
   proprietário ativo quando essa relação já existe.
 
+## Terceira entrega: protocolo e PDFs
+
+- alterações de protocolo, coleta, registros de agentes e avaliações exigem papel
+  de edição quando existe uma identidade vinculada;
+- histórico e impacto do protocolo, status dos PDFs e resultados de avaliação
+  aceitam o papel de leitura;
+- reavaliar um artigo incluído e iniciar a indexação exigem `editor` ou `owner`;
+- o upload de PDF confirma no banco que o artigo pertence ao projeto e continua
+  incluído antes da gravação atômica;
+- scripts locais de usuário único permanecem compatíveis, enquanto uma execução
+  futura em `multi_user` sem identidade falha fechada.
+
 ## Limite de segurança atual
 
 Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
@@ -78,3 +90,13 @@ os mesmos projetos e funcionalidades após a atualização.
 5. simular `viewer`, associação revogada e usuário desativado nos testes negativos;
 6. executar a suíte completa e o diagnóstico operacional;
 7. repetir uma tarefa funcional e validar um novo backup completo.
+
+## Validação de protocolo e PDFs
+
+1. executar os testes negativos de papel e identidade ausente;
+2. editar e salvar um protocolo como proprietário;
+3. abrir histórico e impacto do protocolo após atualizar a página;
+4. conferir a listagem de PDFs de um projeto existente;
+5. confirmar que a indexação continua passando pela fila autorizada;
+6. validar que um PDF só pode ser relacionado a artigo incluído no mesmo projeto;
+7. executar diagnóstico e gerar um novo backup completo.

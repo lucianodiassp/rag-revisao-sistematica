@@ -22,6 +22,10 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   o papel de edição imediatamente antes de executar e recusa acessos revogados.
 - A migração `021` vincula tarefas anteriores ao proprietário ativo quando
   possível, preservando histórico e compatibilidade dos backups completos.
+- A autorização por papel passa a proteger também protocolo, coleta, interações
+  de agentes, avaliações, reavaliações e leitura/indexação dos PDFs.
+- Uploads de PDF agora validam no backend o papel de edição e confirmam que o
+  artigo está incluído e pertence ao projeto antes de gravar o arquivo.
 - O modo `multi_user` permanece bloqueado no preflight até que todas as operações
   internas e tarefas em segundo plano adotem autorização obrigatória.
 

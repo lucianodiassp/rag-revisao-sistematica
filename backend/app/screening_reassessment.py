@@ -45,6 +45,9 @@ def reassess_included_paper(
         from backend.app.database import get_connection
 
         connection_factory = get_connection
+    from backend.app.user_identity import enforce_project_access
+
+    enforce_project_access(project_id, "editor", connection_factory=connection_factory)
 
     resulting_decision = None if action == ACTION_RETURN_TO_SCREENING else "Excluir"
 

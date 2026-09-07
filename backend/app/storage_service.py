@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -254,6 +255,62 @@ def save_upload_atomic(data, destination: Path | str, *, kind: str) -> Path:
         temporary.unlink(missing_ok=True)
         raise
     return destination_path
+
+
+def save_project_pdf_upload(
+    project_id,
+    paper_id,
+    data,
+    *,
+    destination_directory: Path | str | None = None,
+    connection_factory=None,
+) -> Path:
+    """Grava um PDF somente para artigo incluído no projeto autorizado."""
+
+    try:
+        normalized_project_id = str(uuid.UUID(str(project_id)))
+        normalized_paper_id = str(uuid.UUID(str(paper_id)))
+    except (TypeError, ValueError, AttributeError) as error:
+        raise ValueError("Projeto ou artigo inválido para armazenar o PDF.") from error
+    if connection_factory is None:
+        from backend.app.database import get_connection
+
+        connection_factory = get_connection
+    from backend.app.user_identity import enforce_project_access
+
+    enforce_project_access(
+        normalized_project_id,
+        "editor",
+        connection_factory=connection_factory,
+    )
+    with connection_factory() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM deduplicated_papers AS paper
+                WHERE paper.id = %s
+                  AND paper.project_id = %s
+                  AND EXISTS (
+                      SELECT 1 FROM screening_decisions AS screening
+                      WHERE screening.paper_id = paper.id
+                        AND screening.human_decision = 'Incluir'
+                  )
+            )
+            """,
+            (normalized_paper_id, normalized_project_id),
+        )
+        eligible = bool(cursor.fetchone()[0])
+    if not eligible:
+        raise PermissionError(
+            "O artigo não pertence ao projeto autorizado ou não está incluído."
+        )
+    root = Path(destination_directory or pdf_directory()).expanduser().resolve()
+    return save_upload_atomic(
+        data,
+        root / f"{normalized_paper_id}.pdf",
+        kind="pdf",
+    )
 
 
 def validate_startup_storage() -> list[StorageStatus]:

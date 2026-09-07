@@ -11,6 +11,7 @@ from backend.processamento.ocr_pdf import (
     sanitize_pdf_text,
 )
 from backend.app.storage_service import pdf_directory
+from backend.app.user_identity import enforce_project_access
 
 # ==========================================
 # CONFIGURAÇÃO DE AMBIENTE
@@ -31,6 +32,7 @@ def get_conexao():
 def carregar_status_pdfs(project_id=None):
     """Retorna o estágio real de cada artigo incluído no fluxo de evidências."""
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "viewer", connection_factory=get_conexao)
     embedding_config = get_embedding_config()
 
     with get_conexao() as conexao, conexao.cursor() as cursor:
@@ -263,6 +265,7 @@ def criar_chunks_por_pagina(paginas, max_palavras=250, overlap=50):
 
 def processar_pdfs(project_id=None, progress_callback=None):
     project_id = resolver_project_id(project_id)
+    enforce_project_access(project_id, "editor", connection_factory=get_conexao)
     embedding_config = get_embedding_config()
     resumo = {
         "total_aprovados": 0,

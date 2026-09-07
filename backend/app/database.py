@@ -17,7 +17,7 @@ from backend.app.project_utils import (
     normalizar_titulo,
 )
 from backend.app.protocol_service import protocol_fingerprint
-from backend.app.user_identity import current_user_id
+from backend.app.user_identity import current_user_id, enforce_project_access
 
 
 load_dotenv()
@@ -143,6 +143,7 @@ def criar_projeto(titulo, pergunta):
 
 
 def salvar_protocolo_projeto(project_id, pergunta, protocolo, motivo="Atualização do protocolo"):
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             "SELECT protocol_version FROM review_projects WHERE id = %s FOR UPDATE",
@@ -194,6 +195,7 @@ def resolver_project_id(project_id=None):
 
 
 def registrar_busca(project_id, fonte, query_text, parametros=None):
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -222,6 +224,7 @@ def registrar_busca(project_id, fonte, query_text, parametros=None):
 
 def atualizar_metadados_busca(project_id, search_query_id, parametros):
     """Atualiza o relatório auditável de uma execução de coleta/importação."""
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -247,6 +250,7 @@ def salvar_artigo_coletado(
     registro_bruto=None,
 ):
     """Registra a coleta e aplica uma decisão de deduplicação auditável."""
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     doi = normalizar_doi((fontes_dict or {}).get("external_ids", {}).get("doi"))
     fonte_registro = fonte or next(iter((fontes_dict or {}).get("sources", [])), "desconhecida")
     ids_externos = (fontes_dict or {}).get("external_ids", {})
@@ -378,6 +382,7 @@ def salvar_artigo_coletado(
 
 
 def log_interacao_agente(project_id, nome_agente, input_dict, output_dict, modelo_dict):
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -398,6 +403,7 @@ def log_interacao_agente(project_id, nome_agente, input_dict, output_dict, model
 
 
 def salvar_execucao_avaliacao(project_id, run_type, metricas, parametros):
+    enforce_project_access(project_id, "editor", connection_factory=get_connection)
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
@@ -411,6 +417,7 @@ def salvar_execucao_avaliacao(project_id, run_type, metricas, parametros):
 
 
 def carregar_ultima_execucao_avaliacao(project_id, run_type="rag_llm_judge"):
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
     with get_connection() as conexao, conexao.cursor() as cursor:
         cursor.execute(
             """
