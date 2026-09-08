@@ -75,8 +75,17 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - O diagnóstico completo passa a detectar projeto sem exatamente um proprietário
   ativo, convite pendente sem titular seguro e ausência de operador ativo, sem
   listar nomes ou e-mails.
-- O modo `multi_user` permanece bloqueado no preflight até que todas as operações
-  internas e tarefas em segundo plano adotem autorização obrigatória.
+- Adicionada matriz negativa de isolamento entre duas identidades, dois projetos e
+  os papéis `viewer`, `editor`, `owner` e operador global, incluindo revogação sem
+  acesso residual e separação entre administração da instalação e dados científicos.
+- Listagens e criações de projeto passam a falhar fechadas sem identidade no futuro
+  modo multiusuário; projetos novos, importados e demonstrativos registram o
+  proprietário na mesma transação que cria seus dados.
+- Arquivamento, restauração, prévia de exclusão e exclusão permanente agora exigem
+  explicitamente o papel `owner`; editores e leitores não recebem a gestão do ciclo
+  de vida nem por chamada direta ao backend.
+- O modo `multi_user` permanece bloqueado no preflight até o piloto OIDC com uma
+  segunda conta real e a definição operacional de suporte e recuperação.
 
 ## [2.5.0] — 2026-09-05
 

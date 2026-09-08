@@ -171,8 +171,44 @@ def test_lifecycle_project_listing_is_scoped_to_current_user():
     sql, params = cursor.execute.call_args.args
     assert "JOIN project_memberships" in sql
     assert "membership.user_id = %s" in sql
+    assert "membership.role = 'owner'" in sql
     assert params == ("user-1",)
     assert projects[0]["id"] == PROJECT_ID
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        lambda factory: deletion_preview(PROJECT_ID, connection_factory=factory),
+        lambda factory: archive_project(
+            PROJECT_ID,
+            "Justificativa suficientemente detalhada.",
+            connection_factory=factory,
+        ),
+        lambda factory: restore_project(PROJECT_ID, connection_factory=factory),
+        lambda factory: permanently_delete_project(
+            PROJECT_ID,
+            "Revisão a arquivar",
+            backup_confirmed=True,
+            connection_factory=factory,
+        ),
+    ],
+)
+def test_lifecycle_operations_require_owner_before_database_or_files(operation):
+    factory = Mock()
+    with patch(
+        "backend.app.project_lifecycle.enforce_project_access",
+        side_effect=PermissionError("owner required"),
+    ) as access_gate:
+        with pytest.raises(PermissionError, match="owner required"):
+            operation(factory)
+
+    access_gate.assert_called_once_with(
+        PROJECT_ID,
+        "owner",
+        connection_factory=factory,
+    )
+    factory.assert_not_called()
 
 
 def test_lifecycle_receipts_are_scoped_to_owner_after_project_deletion():

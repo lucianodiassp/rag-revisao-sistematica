@@ -1115,6 +1115,12 @@ def import_reproducibility_package(
     connection_factory=None,
 ) -> dict:
     """Cria um projeto independente e preserva o pacote em uma única transação."""
+    from backend.app.user_identity import (
+        assign_current_user_as_project_owner,
+        enforce_authenticated_identity,
+    )
+
+    enforce_authenticated_identity()
     validated = validate_reproducibility_package(data)
     dataset = validated["dataset"]
     dataset["_generated_at"] = validated["manifest"].get("generated_at")
@@ -1130,6 +1136,7 @@ def import_reproducibility_package(
     try:
         with connection.cursor() as cursor:
             _insert_import(cursor, dataset, prepared)
+            assign_current_user_as_project_owner(cursor, prepared["project_id"])
         connection.commit()
     except ReproducibilityImportError:
         connection.rollback()

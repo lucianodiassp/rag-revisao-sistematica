@@ -130,17 +130,36 @@ operacional; esta evolução começa em `2.6.0-dev`.
   único proprietário ativo, convite pendente ligado a titularidade insegura ou
   instalação sem operador ativo; nenhuma identidade é exibida no relatório.
 
+## Nona entrega: matriz negativa de isolamento
+
+- duas identidades e dois projetos distintos comprovam que uma associação em um
+  projeto não concede leitura, edição ou administração no outro;
+- `viewer` consulta, `editor` consulta e altera conteúdo, e somente `owner`
+  administra acessos e o ciclo de vida do projeto;
+- o operador global não recebe acesso científico implícito, enquanto ser
+  proprietário de projeto não concede backup, restauração ou diagnóstico global;
+- associação revogada perde acesso imediatamente nas barreiras do backend;
+- listagens, detalhes e criação de projetos falham fechados sem identidade em
+  `multi_user`, antes de abrir conexão ou processar pacote importado;
+- projeto comum, pacote de reprodutibilidade e projeto demonstrativo registram seu
+  proprietário dentro da própria transação de criação;
+- arquivamento, restauração, prévia e exclusão permanente exigem `owner` antes de
+  consultar dados ou manipular PDFs.
+
+A cobertura e os limites desta etapa estão registrados em
+[Matriz de isolamento multiusuário](MULTIUSER_ISOLATION_MATRIX.md).
+
 ## Limite de segurança atual
 
 Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
-rejeitando esse valor. A fila já propaga e revalida o solicitante, mas várias
-operações síncronas especializadas ainda recebem apenas `project_id`. Antes da
-ativação serão necessários:
+rejeitando esse valor. A matriz negativa automatizada agora cobre as barreiras
+científicas, de arquivos, exportações, administração dos projetos e administração
+global. Antes da ativação ainda será necessário:
 
-1. testes negativos de isolamento para todas as áreas e arquivos;
-2. validar o fluxo OIDC completo com uma segunda conta em ambiente controlado;
-3. definir recuperação, auditoria e suporte para uma implantação com vários
-   operadores, mantendo o backup completo fora do autoatendimento comum.
+1. validar o fluxo OIDC completo com uma segunda conta em ambiente controlado;
+2. definir recuperação, auditoria e suporte para uma implantação com vários
+   operadores, mantendo o backup completo fora do autoatendimento comum;
+3. executar um piloto controlado com plano de reversão antes de expor o perfil.
 
 ## Compatibilidade e recuperação
 
@@ -243,3 +262,13 @@ os mesmos projetos e funcionalidades após a atualização.
 7. confirmar que uma conta proprietária, o usuário conectado e o último operador
    ativo não podem ser desativados;
 8. executar a suíte completa, o diagnóstico e validar um novo backup completo.
+
+## Validação da matriz de isolamento
+
+1. executar a suíte e confirmar os cenários de duas identidades, dois projetos,
+   três papéis de projeto, operador global e associação revogada;
+2. abrir **Gestão de Projetos** como proprietário e conferir arquivamento e
+   restauração de um projeto descartável;
+3. confirmar que o projeto restaurado preserva conteúdo e volta ao seletor;
+4. gerar e validar um backup completo após o teste;
+5. manter o preflight rejeitando `multi_user` até o piloto OIDC com segunda conta.

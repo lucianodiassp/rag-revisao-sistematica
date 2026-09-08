@@ -885,6 +885,12 @@ def ensure_demo_project(
     pdf_directory: Path | None = None,
 ) -> dict:
     """Cria, abre ou restaura somente o projeto marcado com o seed oficial."""
+    from backend.app.user_identity import (
+        assign_current_user_as_project_owner,
+        enforce_authenticated_identity,
+    )
+
+    enforce_authenticated_identity()
     if connection_factory is None:
         from backend.app.database import get_connection
 
@@ -921,6 +927,7 @@ def ensure_demo_project(
                 }
 
         _insert_dataset(cursor, dataset)
+        assign_current_user_as_project_owner(cursor, DEMO_PROJECT_ID)
         created = True
 
     if restored:
