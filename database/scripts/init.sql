@@ -12,6 +12,7 @@ CREATE TABLE application_users (
     email VARCHAR(320),
     display_name VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
+    is_operator BOOLEAN NOT NULL DEFAULT FALSE,
     last_login_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -61,6 +62,57 @@ CREATE INDEX idx_project_memberships_user
 CREATE INDEX idx_application_users_email
     ON application_users(lower(email))
     WHERE email IS NOT NULL;
+CREATE INDEX idx_application_users_operator
+    ON application_users(status, is_operator)
+    WHERE is_operator = TRUE;
+
+CREATE TABLE project_invitations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES review_projects(id) ON DELETE CASCADE,
+    email VARCHAR(320) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    invited_by_user_id UUID REFERENCES application_users(id) ON DELETE SET NULL,
+    accepted_by_user_id UUID REFERENCES application_users(id) ON DELETE SET NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    accepted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (email = lower(email)),
+    CHECK (length(btrim(email)) >= 3),
+    CHECK (role IN ('editor', 'viewer')),
+    CHECK (status IN ('pending', 'accepted', 'revoked', 'expired')),
+    CHECK ((status = 'accepted' AND accepted_by_user_id IS NOT NULL AND accepted_at IS NOT NULL) OR status <> 'accepted')
+);
+CREATE UNIQUE INDEX uq_project_invitations_pending_email
+    ON project_invitations(project_id, lower(email)) WHERE status = 'pending';
+CREATE INDEX idx_project_invitations_email_status
+    ON project_invitations(lower(email), status, expires_at);
+CREATE INDEX idx_project_invitations_project
+    ON project_invitations(project_id, created_at DESC);
+
+CREATE TABLE project_access_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    target_project_id UUID,
+    project_title VARCHAR(255),
+    action VARCHAR(40) NOT NULL,
+    actor_user_id UUID REFERENCES application_users(id) ON DELETE SET NULL,
+    target_user_id UUID REFERENCES application_users(id) ON DELETE SET NULL,
+    target_email VARCHAR(320),
+    previous_role VARCHAR(20),
+    new_role VARCHAR(20),
+    details_jsonb JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (action IN ('invited', 'invitation_accepted', 'invitation_revoked', 'role_changed', 'membership_revoked', 'ownership_transferred', 'user_enabled', 'user_disabled')),
+    CHECK (target_email IS NULL OR target_email = lower(target_email)),
+    CHECK (previous_role IS NULL OR previous_role IN ('owner', 'editor', 'viewer')),
+    CHECK (new_role IS NULL OR new_role IN ('owner', 'editor', 'viewer')),
+    CHECK (jsonb_typeof(details_jsonb) = 'object')
+);
+CREATE INDEX idx_project_access_events_project
+    ON project_access_events(target_project_id, created_at DESC);
+CREATE INDEX idx_project_access_events_target_user
+    ON project_access_events(target_user_id, created_at DESC);
 
 -- Recibos imutáveis que permanecem disponíveis após a exclusão do projeto.
 CREATE TABLE project_lifecycle_events (

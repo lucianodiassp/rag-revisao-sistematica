@@ -65,3 +65,18 @@ def test_installation_pages_are_visible_only_to_operator_and_recheck_backend_rol
     assert "restore_installation_backup" in backup_page
     assert "require_installation_operator()" in health_page
     assert "build_installation_health_report" in health_page
+
+
+def test_user_access_page_exposes_protected_membership_and_ownership_flows():
+    navigation = (ROOT / "frontend/app.py").read_text(encoding="utf-8")
+    page = (ROOT / "frontend/views/16_Usuarios_Acessos.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'title="Usuários e Acessos"' in navigation
+    assert "pré-autorização por e-mail verificado" in page
+    assert "não enviam mensagem" in page
+    assert "Somente o operador pode ativar ou desativar contas" in page
+    assert "O projeto nunca fica sem proprietário" in page
+    assert "transfer_project_ownership" in page
+    assert "set_application_user_status" in page

@@ -155,6 +155,18 @@ def ensure_application_user(
         if row.get("status") != "active":
             raise PermissionError("A identidade da aplicação está desativada.")
         user_id = str(row["id"])
+        if user_mode == "multi_user" and email:
+            # A pré-autorização é vinculada somente depois que o provedor OIDC
+            # confirma a mesma identidade e o mesmo e-mail verificado.
+            from backend.app.user_access_admin import (
+                accept_pending_invitations_for_user,
+            )
+
+            accept_pending_invitations_for_user(
+                cursor,
+                user_id=user_id,
+                email=email,
+            )
         if user_mode == "single_user":
             cursor.execute(
                 """

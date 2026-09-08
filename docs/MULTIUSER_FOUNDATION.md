@@ -105,6 +105,23 @@ operacional; esta evolução começa em `2.6.0-dev`.
 - o `.ragbackup` continua representando a instalação inteira. Ele não é apresentado
   como exportação individual de um usuário ou projeto.
 
+## Oitava entrega: administração de usuários e acessos
+
+- proprietários registram pré-autorizações com e-mail normalizado, papel inicial
+  `editor` ou `viewer`, prazo de expiração e revogação explícita;
+- nenhuma senha, sessão ou token OIDC é criado ou enviado pela aplicação;
+- quando o modo multiusuário for liberado, o primeiro login com o mesmo e-mail
+  verificado aceita os convites ainda válidos dentro da transação de identidade;
+- contas já conhecidas recebem a associação imediatamente, sem duplicar membros;
+- proprietários podem alterar o papel ou revogar membros, mas não removem o
+  proprietário pelo fluxo comum;
+- a transferência de titularidade exige um membro ativo e a digitação exata do
+  título; a transação promove o destino e mantém o titular anterior como editor;
+- o operador da instalação pode ativar e desativar contas, desde que transfira
+  antes todos os projetos pertencentes a elas e preserve um operador ativo;
+- recibos de administração sobrevivem como auditoria sem transportar conteúdo
+  científico, credenciais ou tokens.
+
 ## Limite de segurança atual
 
 Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
@@ -112,7 +129,7 @@ rejeitando esse valor. A fila já propaga e revalida o solicitante, mas várias
 operações síncronas especializadas ainda recebem apenas `project_id`. Antes da
 ativação serão necessários:
 
-1. administração de convites, desativação e transferência de propriedade;
+1. conectar a pré-autorização à barreira OIDC e ao fluxo de entrada do usuário;
 2. testes negativos de isolamento para todas as áreas e arquivos;
 3. definir recuperação, auditoria e suporte para uma implantação com vários
    operadores, mantendo o backup completo fora do autoatendimento comum.
@@ -124,7 +141,8 @@ científico; a `021_background_job_requester.sql` acrescenta a autoria das taref
 e a `022_user_private_configuration.sql` vincula configurações e segredos cifrados
 legados ao único usuário ativo, sem descriptografá-los. A migração
 `023_installation_operator.sql` preserva para essa identidade o acesso às rotinas
-globais de operação.
+globais de operação. A `024_user_access_administration.sql` acrescenta convites e
+recibos de acesso sem modificar o conteúdo dos projetos ou expor credenciais.
 Backups completos incluem as novas estruturas. Pacotes acadêmicos não
 transportam identidade pessoal: ao serem importados, pertencem ao usuário que
 executou a importação. O modo local e a Web privada de usuário único devem manter
@@ -203,3 +221,17 @@ os mesmos projetos e funcionalidades após a atualização.
    de tocar em banco, arquivo, backup externo ou diagnóstico;
 6. confirmar que um usuário comum não recebe as páginas administrativas na navegação;
 7. reiniciar a aplicação e verificar que o papel de operador persiste.
+
+## Validação da administração de usuários e acessos
+
+1. aplicar a migração `024` duas vezes e confirmar idempotência;
+2. abrir **Usuários e Acessos** como proprietário e registrar um convite de leitor;
+3. confirmar a mensagem de pré-autorização, a validade e a ausência de envio de e-mail;
+4. revogar o convite e verificar o recibo no histórico;
+5. com uma segunda conta de teste, validar associação, troca entre leitor/editor e
+   revogação sem acesso residual ao projeto;
+6. transferir um projeto descartável e confirmar que o proprietário anterior virou
+   editor e que sempre existe exatamente um titular ativo;
+7. confirmar que uma conta proprietária, o usuário conectado e o último operador
+   ativo não podem ser desativados;
+8. executar a suíte completa, o diagnóstico e validar um novo backup completo.
