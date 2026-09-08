@@ -9,6 +9,11 @@ provedor de identidade, como Google Identity, Microsoft Entra ID, Okta ou Auth0.
 Após o login, a aplicação verifica se o e-mail recebido está na lista explícita de
 acesso. No modo `single_user`, exatamente um e-mail deve ser autorizado.
 
+O futuro modo `multi_user` mantém essa lista como porta administrativa e também
+consulta pré-autorizações de projeto no banco. Uma pessoa convidada precisa usar
+um e-mail verificado e uma identidade OIDC com `iss` e `sub` estáveis. Convites
+expirados ou revogados e contas sem associação ativa não concedem entrada.
+
 ## Proteções aplicadas
 
 - A autenticação é executada antes da criação da navegação e das páginas.
@@ -78,8 +83,9 @@ o botão **Sair**.
 Altere `RAG_DEPLOYMENT_PROFILE` para `local` e recrie o serviço. O arquivo OIDC pode
 permanecer presente, mas não será exigido no perfil local.
 
-## Limite desta etapa
+## Limite atual
 
-A lista com mais de um e-mail é aceita apenas quando `RAG_USER_MODE=multi_user`,
-perfil reservado para a evolução posterior. Isso ainda não implementa propriedade
-ou isolamento de dados entre usuários.
+A lista com mais de um e-mail e as pré-autorizações são avaliadas apenas quando
+`RAG_USER_MODE=multi_user`. O gate já está preparado, mas esse perfil continua
+bloqueado no preflight até o encerramento dos testes negativos de isolamento e do
+piloto OIDC com uma segunda conta. Não altere a VPS para esse modo nesta etapa.

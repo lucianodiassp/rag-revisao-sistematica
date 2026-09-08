@@ -253,6 +253,94 @@ def check_migrations():
         )
 
 
+def check_access_integrity():
+    """Detecta órfãos e portas de entrada inseguras sem listar identidades."""
+
+    try:
+        with get_connection() as connection, connection.cursor(
+            cursor_factory=RealDictCursor
+        ) as cursor:
+            cursor.execute(
+                """
+                WITH owner_counts AS (
+                    SELECT project.id AS project_id,
+                           COUNT(membership.user_id) FILTER (
+                               WHERE membership.role = 'owner'
+                                 AND membership.is_active = TRUE
+                                 AND application_user.status = 'active'
+                           ) AS active_owners
+                    FROM review_projects AS project
+                    LEFT JOIN project_memberships AS membership
+                      ON membership.project_id = project.id
+                    LEFT JOIN application_users AS application_user
+                      ON application_user.id = membership.user_id
+                    GROUP BY project.id
+                )
+                SELECT
+                    COUNT(*) FILTER (WHERE active_owners <> 1) AS orphaned_projects,
+                    (
+                        SELECT COUNT(*) FROM application_users
+                        WHERE status = 'active' AND is_operator = TRUE
+                    ) AS active_operators,
+                    (
+                        SELECT COUNT(*)
+                        FROM project_invitations AS invitation
+                        JOIN owner_counts
+                          ON owner_counts.project_id = invitation.project_id
+                        WHERE invitation.status = 'pending'
+                          AND invitation.expires_at > CURRENT_TIMESTAMP
+                          AND owner_counts.active_owners <> 1
+                    ) AS unsafe_pending_invitations
+                FROM owner_counts
+                """
+            )
+            row = dict(cursor.fetchone() or {})
+        details = {
+            "orphaned_projects": int(row.get("orphaned_projects") or 0),
+            "active_operators": int(row.get("active_operators") or 0),
+            "unsafe_pending_invitations": int(
+                row.get("unsafe_pending_invitations") or 0
+            ),
+        }
+        if (
+            details["orphaned_projects"]
+            or not details["active_operators"]
+            or details["unsafe_pending_invitations"]
+        ):
+            return _check(
+                "access_integrity",
+                "Integridade de acesso",
+                "error",
+                "authorization",
+                "A titularidade ou a administração de acesso requer correção.",
+                {
+                    **details,
+                    "action": (
+                        "Revise proprietários e operadores antes de habilitar "
+                        "novos acessos."
+                    ),
+                },
+            )
+        return _check(
+            "access_integrity",
+            "Integridade de acesso",
+            "ok",
+            "authorization",
+            "Projetos, convites e operador preservam as invariantes de acesso.",
+            details,
+        )
+    except Exception as error:
+        issue = classify_error(error, component_hint="database")
+        return _check(
+            "access_integrity",
+            "Integridade de acesso",
+            "error",
+            "authorization",
+            "Não foi possível confirmar a integridade dos acessos.",
+            {"action": issue.recommended_action},
+        )
+
+
 def check_storage():
     try:
         from backend.app.storage_service import storage_overview
@@ -711,6 +799,7 @@ def build_health_report(component="full", http_url=None):
     if component == "full":
         checks.extend(
             [
+                check_access_integrity(),
                 check_job_queue(),
                 check_external_backup(),
                 check_ai_configuration(),

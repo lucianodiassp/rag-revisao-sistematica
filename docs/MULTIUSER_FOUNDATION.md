@@ -121,6 +121,14 @@ operacional; esta evolução começa em `2.6.0-dev`.
   antes todos os projetos pertencentes a elas e preserve um operador ativo;
 - recibos de administração sobrevivem como auditoria sem transportar conteúdo
   científico, credenciais ou tokens.
+- o gate de autenticação distingue a lista administrativa do servidor das
+  pré-autorizações de projeto e consulta estas últimas somente em `multi_user`;
+- no retorno, a identidade precisa conservar o mesmo par OIDC `iss`/`sub`, estar
+  ativa e possuir uma associação ativa; um convite novo ainda exige e-mail
+  verificado e sujeito estável antes de ser aceito.
+- o diagnóstico agrega somente contadores e falha quando encontra projeto sem um
+  único proprietário ativo, convite pendente ligado a titularidade insegura ou
+  instalação sem operador ativo; nenhuma identidade é exibida no relatório.
 
 ## Limite de segurança atual
 
@@ -129,8 +137,8 @@ rejeitando esse valor. A fila já propaga e revalida o solicitante, mas várias
 operações síncronas especializadas ainda recebem apenas `project_id`. Antes da
 ativação serão necessários:
 
-1. conectar a pré-autorização à barreira OIDC e ao fluxo de entrada do usuário;
-2. testes negativos de isolamento para todas as áreas e arquivos;
+1. testes negativos de isolamento para todas as áreas e arquivos;
+2. validar o fluxo OIDC completo com uma segunda conta em ambiente controlado;
 3. definir recuperação, auditoria e suporte para uma implantação com vários
    operadores, mantendo o backup completo fora do autoatendimento comum.
 

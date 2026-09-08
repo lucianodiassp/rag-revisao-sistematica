@@ -6,6 +6,7 @@ import streamlit as st
 
 from backend.app.auth import AuthConfigurationError, evaluate_access
 from backend.app.observability import log_event
+from backend.app.user_access_admin import multi_user_admission_source
 from backend.app.user_identity import (
     bind_current_user,
     ensure_application_user,
@@ -65,6 +66,30 @@ def enforce_access(metadata: dict):
     except AuthConfigurationError as error:
         _render_configuration_error(str(error))
 
+    if decision.code == "email_not_allowed" and metadata["user_mode"] == "multi_user":
+        try:
+            admission_source = multi_user_admission_source(
+                decision.email,
+                decision.identity_provider,
+                decision.subject,
+            )
+        except Exception:
+            log_event(
+                "multi_user_admission_check_failed",
+                component="app",
+                level="error",
+                category="authentication",
+            )
+            st.error("Não foi possível verificar a autorização desta conta.")
+            st.stop()
+        if admission_source:
+            decision = evaluate_access(
+                deployment_profile=metadata["deployment_profile"],
+                user_mode=metadata["user_mode"],
+                identity=identity,
+                additional_allowed_emails=(decision.email,),
+            )
+
     if decision.code == "login_required":
         log_event(
             "authentication_required",
@@ -95,6 +120,8 @@ def enforce_access(metadata: dict):
             st.error("O provedor não informou um e-mail para esta conta.")
         elif decision.code == "identity_subject_missing":
             st.error("O provedor não informou uma identidade estável para esta conta.")
+        elif decision.code == "identity_provider_missing":
+            st.error("O provedor não informou a origem estável desta identidade.")
         else:
             st.error("Esta conta não está autorizada a acessar a aplicação.")
         if decision.email:
@@ -151,6 +178,7 @@ def enforce_access(metadata: dict):
             "authentication_succeeded",
             component="app",
             category="authentication",
+            authorization_source=decision.authorization_source,
         )
         st.session_state["authentication_success_logged"] = True
     if is_web:

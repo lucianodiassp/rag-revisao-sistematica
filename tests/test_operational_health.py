@@ -1,11 +1,12 @@
 import json
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend.app.operational_health import (
     LATEST_REQUIRED_MIGRATION,
     REQUIRED_TABLES,
     HealthCheck,
     build_health_report,
+    check_access_integrity,
     main,
 )
 
@@ -34,7 +35,37 @@ def _check(code, status):
     )
 
 
+def _connection(row):
+    connection = Mock()
+    connection.__enter__ = Mock(return_value=connection)
+    connection.__exit__ = Mock(return_value=False)
+    cursor = Mock()
+    cursor.__enter__ = Mock(return_value=cursor)
+    cursor.__exit__ = Mock(return_value=False)
+    cursor.fetchone.return_value = row
+    connection.cursor.return_value = cursor
+    return Mock(return_value=connection), cursor
+
+
+def test_access_integrity_reports_orphaned_projects_without_exposing_users():
+    factory, cursor = _connection(
+        {
+            "orphaned_projects": 1,
+            "active_operators": 1,
+            "unsafe_pending_invitations": 0,
+        }
+    )
+    with patch("backend.app.operational_health.get_connection", factory):
+        check = check_access_integrity()
+
+    assert check.status == "error"
+    assert check.details["orphaned_projects"] == 1
+    assert "email" not in check.details
+    assert "active_owners <> 1" in cursor.execute.call_args.args[0]
+
+
 @patch("backend.app.operational_health.recent_job_failures", return_value=[])
+@patch("backend.app.operational_health.check_access_integrity", return_value=_check("access", "ok"))
 @patch("backend.app.operational_health.check_bibliographic_sources", return_value=_check("sources", "ok"))
 @patch("backend.app.operational_health.check_ai_configuration", return_value=_check("ai", "warning"))
 @patch("backend.app.operational_health.check_external_backup", return_value=_check("backup", "ok"))
@@ -49,10 +80,11 @@ def test_full_report_marks_warnings_as_degraded(*_mocks):
     report = build_health_report("full")
 
     assert report["overall_status"] == "degraded"
-    assert len(report["checks"]) == 10
+    assert len(report["checks"]) == 11
 
 
 @patch("backend.app.operational_health.recent_job_failures", return_value=[])
+@patch("backend.app.operational_health.check_access_integrity", return_value=_check("access", "ok"))
 @patch("backend.app.operational_health.check_bibliographic_sources", return_value=_check("sources", "ok"))
 @patch("backend.app.operational_health.check_ai_configuration", return_value=_check("ai", "ok"))
 @patch("backend.app.operational_health.check_external_backup", return_value=_check("backup", "ok"))

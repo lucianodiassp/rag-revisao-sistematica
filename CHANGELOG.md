@@ -67,6 +67,14 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Convites válidos são aceitos no primeiro login futuro com o mesmo e-mail
   verificado; a liberação efetiva ainda depende do modo multiusuário e de sua
   barreira de autenticação.
+- O gate OIDC futuro passa a reconhecer separadamente a lista administrativa do
+  servidor e uma pré-autorização confirmada no banco, somente em `multi_user`.
+- Colaboradores recorrentes precisam corresponder ao par estável provedor/sujeito,
+  permanecer ativos e conservar ao menos uma associação de projeto; convites
+  expirados, revogados ou sem identidade estável falham fechados.
+- O diagnóstico completo passa a detectar projeto sem exatamente um proprietário
+  ativo, convite pendente sem titular seguro e ausência de operador ativo, sem
+  listar nomes ou e-mails.
 - O modo `multi_user` permanece bloqueado no preflight até que todas as operações
   internas e tarefas em segundo plano adotem autorização obrigatória.
 

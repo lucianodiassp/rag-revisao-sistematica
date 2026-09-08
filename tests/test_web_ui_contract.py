@@ -80,3 +80,13 @@ def test_user_access_page_exposes_protected_membership_and_ownership_flows():
     assert "O projeto nunca fica sem proprietário" in page
     assert "transfer_project_ownership" in page
     assert "set_application_user_status" in page
+
+
+def test_auth_gate_uses_project_admission_only_for_future_multi_user_mode():
+    gate = (ROOT / "frontend/auth_gate.py").read_text(encoding="utf-8")
+
+    assert 'decision.code == "email_not_allowed"' in gate
+    assert 'metadata["user_mode"] == "multi_user"' in gate
+    assert "multi_user_admission_source" in gate
+    assert "additional_allowed_emails=(decision.email,)" in gate
+    assert "multi_user_admission_check_failed" in gate

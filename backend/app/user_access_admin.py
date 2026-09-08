@@ -108,6 +108,77 @@ def _record_event(
     return dict(cursor.fetchone())
 
 
+def multi_user_admission_source(
+    email,
+    identity_provider,
+    subject,
+    *,
+    connection_factory=None,
+) -> str | None:
+    """Confirma uma porta de entrada sem criar usuário ou associação.
+
+    Um usuário recorrente precisa corresponder ao par OIDC estável e ainda possuir
+    acesso ativo. Uma identidade nova entra apenas por convite pendente e válido.
+    """
+
+    try:
+        email = _validated_email(email)
+    except ValueError:
+        return None
+    provider = str(identity_provider or "").strip()[:255]
+    stable_subject = str(subject or "").strip()[:512]
+    if not provider or not stable_subject:
+        return None
+    factory = _factory(connection_factory)
+    with factory() as connection, connection.cursor(
+        cursor_factory=RealDictCursor
+    ) as cursor:
+        cursor.execute(
+            """
+            SELECT CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM application_users AS application_user
+                    WHERE application_user.identity_provider = %s
+                      AND application_user.subject = %s
+                      AND lower(application_user.email) = %s
+                      AND application_user.status = 'active'
+                      AND (
+                          application_user.is_operator = TRUE
+                          OR EXISTS (
+                              SELECT 1
+                              FROM project_memberships AS membership
+                              WHERE membership.user_id = application_user.id
+                                AND membership.is_active = TRUE
+                          )
+                      )
+                ) THEN 'existing_user'
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM project_invitations AS invitation
+                    WHERE lower(invitation.email) = %s
+                      AND invitation.status = 'pending'
+                      AND invitation.expires_at > CURRENT_TIMESTAMP
+                      AND EXISTS (
+                          SELECT 1
+                          FROM project_memberships AS project_owner
+                          JOIN application_users AS owner_user
+                            ON owner_user.id = project_owner.user_id
+                          WHERE project_owner.project_id = invitation.project_id
+                            AND project_owner.role = 'owner'
+                            AND project_owner.is_active = TRUE
+                            AND owner_user.status = 'active'
+                      )
+                ) THEN 'pending_invitation'
+                ELSE NULL
+            END AS admission_source
+            """,
+            (provider, stable_subject, email, email),
+        )
+        row = cursor.fetchone()
+    return str(row["admission_source"]) if row and row.get("admission_source") else None
+
+
 def list_project_access(project_id, *, connection_factory=None) -> dict:
     """Lista membros, convites pendentes e recibos para o proprietário."""
 
