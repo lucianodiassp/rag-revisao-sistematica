@@ -261,6 +261,26 @@ def current_user_is_operator() -> bool:
     return bool(user and user.status == "active" and user.is_operator)
 
 
+def enforce_authenticated_identity() -> ApplicationUser | None:
+    """Exige identidade ativa quando o perfil multiusuário estiver habilitado.
+
+    Operações que criam um projeto ainda não possuem ``project_id`` para consultar
+    uma associação. Esta barreira impede que uma chamada sem sessão produza um
+    projeto órfão no futuro modo multiusuário, preservando a compatibilidade dos
+    scripts locais de usuário único.
+    """
+
+    user = current_user()
+    if user:
+        if user.status != "active":
+            raise PermissionError("A identidade da aplicação está desativada.")
+        return user
+    user_mode = os.getenv("RAG_USER_MODE", "single_user").strip().lower()
+    if user_mode == "multi_user":
+        raise PermissionError("A operação exige uma identidade autenticada.")
+    return None
+
+
 def require_installation_operator(*, connection_factory=None) -> ApplicationUser:
     """Revalida no banco o papel global antes de uma operação da instalação."""
 
@@ -306,23 +326,31 @@ def require_installation_operator(*, connection_factory=None) -> ApplicationUser
 def ensure_project_owner(project_id, *, connection_factory=None) -> bool:
     """Associa ao usuário corrente um projeto recém-criado pela interface."""
 
-    user_id = current_user_id()
-    if not user_id:
+    if not current_user_id():
         return False
     if connection_factory is None:
         from backend.app.database import get_connection
 
         connection_factory = get_connection
     with connection_factory() as connection, connection.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO project_memberships (project_id, user_id, role, is_active)
-            VALUES (%s, %s, 'owner', TRUE)
-            ON CONFLICT (project_id, user_id) DO UPDATE
-            SET role = 'owner', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-            """,
-            (str(project_id), user_id),
-        )
+        return assign_current_user_as_project_owner(cursor, project_id)
+
+
+def assign_current_user_as_project_owner(cursor, project_id) -> bool:
+    """Registra o proprietário dentro da transação que cria o projeto."""
+
+    user_id = current_user_id()
+    if not user_id:
+        return False
+    cursor.execute(
+        """
+        INSERT INTO project_memberships (project_id, user_id, role, is_active)
+        VALUES (%s, %s, 'owner', TRUE)
+        ON CONFLICT (project_id, user_id) DO UPDATE
+        SET role = 'owner', is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+        """,
+        (str(project_id), user_id),
+    )
     return True
 
 

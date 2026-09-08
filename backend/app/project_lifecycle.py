@@ -13,7 +13,11 @@ from backend.app.backup_service import BACKUP_EXTENSION, default_backup_director
 from backend.app.database import get_connection
 from backend.app.demo_project import is_demo_project
 from backend.app.storage_service import pdf_directory
-from backend.app.user_identity import current_user_id
+from backend.app.user_identity import (
+    current_user_id,
+    enforce_authenticated_identity,
+    enforce_project_access,
+)
 
 
 ACTIVE_JOB_STATUSES = ("queued", "running", "retry_wait")
@@ -113,6 +117,7 @@ def _latest_backup(directory: Path):
 
 
 def list_projects_for_lifecycle(*, connection_factory=None):
+    enforce_authenticated_identity()
     factory = connection_factory or get_connection
     user_id = current_user_id()
     joins = ""
@@ -124,6 +129,10 @@ def list_projects_for_lifecycle(*, connection_factory=None):
               ON membership.project_id = project.id
              AND membership.user_id = %s
              AND membership.is_active = TRUE
+             AND membership.role = 'owner'
+            JOIN application_users AS application_user
+              ON application_user.id = membership.user_id
+             AND application_user.status = 'active'
         """
         params.append(user_id)
         role_select = "membership.role AS access_role"
@@ -152,6 +161,7 @@ def deletion_preview(
     backup_root: Path | None = None,
 ):
     factory = connection_factory or get_connection
+    enforce_project_access(project_id, "owner", connection_factory=factory)
     with factory() as connection, connection.cursor(cursor_factory=RealDictCursor) as cursor:
         project = _load_project(cursor, project_id)
         counts = _load_counts(cursor, project_id)
@@ -191,12 +201,13 @@ def deletion_preview(
 
 
 def archive_project(project_id, reason, *, actor=None, connection_factory=None):
+    factory = connection_factory or get_connection
+    enforce_project_access(project_id, "owner", connection_factory=factory)
     reason = str(reason or "").strip()
     if len(reason) < ARCHIVE_REASON_MIN_LENGTH:
         raise ValueError(
             f"Informe uma justificativa com pelo menos {ARCHIVE_REASON_MIN_LENGTH} caracteres."
         )
-    factory = connection_factory or get_connection
     with factory() as connection, connection.cursor(cursor_factory=RealDictCursor) as cursor:
         project = _load_project(cursor, project_id, lock=True)
         if project.get("archived_at"):
@@ -268,6 +279,7 @@ def archive_project(project_id, reason, *, actor=None, connection_factory=None):
 
 def restore_project(project_id, *, actor=None, connection_factory=None):
     factory = connection_factory or get_connection
+    enforce_project_access(project_id, "owner", connection_factory=factory)
     with factory() as connection, connection.cursor(cursor_factory=RealDictCursor) as cursor:
         project = _load_project(cursor, project_id, lock=True)
         if not project.get("archived_at"):
@@ -375,6 +387,7 @@ def permanently_delete_project(
 ):
     """Exclui um projeto arquivado, preservando recibo sem FK e evitando PDFs órfãos."""
     factory = connection_factory or get_connection
+    enforce_project_access(project_id, "owner", connection_factory=factory)
     root = Path(pdf_root or pdf_directory()).resolve()
     backup_dir = Path(backup_root or default_backup_directory()).resolve()
     event_id = uuid.uuid4()
@@ -462,6 +475,7 @@ def permanently_delete_project(
 
 
 def list_lifecycle_events(limit=100, *, connection_factory=None):
+    enforce_authenticated_identity()
     factory = connection_factory or get_connection
     safe_limit = max(1, min(int(limit), 500))
     user_id = current_user_id()

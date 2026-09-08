@@ -165,7 +165,10 @@ endurecimento operacional da Web privada de usuário único.
    bloqueado. A administração de acesso já registra convites por e-mail verificado,
    papéis, revogações, contas ativas/desativadas e transferência atômica de
    titularidade, mas ainda não representa cadastro público ou compartilhamento
-   liberado em produção.
+   liberado em produção. A matriz negativa automatizada já cobre duas identidades,
+   dois projetos, papéis, revogação, ciclo de vida, criação transacional e a
+   separação entre operador global e acesso científico; o próximo marco é o piloto
+   OIDC controlado com uma segunda conta real.
    [Escopo incremental](MULTIUSER_FOUNDATION.md).
 8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.5.x`.

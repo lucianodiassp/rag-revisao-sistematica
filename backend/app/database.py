@@ -17,7 +17,12 @@ from backend.app.project_utils import (
     normalizar_titulo,
 )
 from backend.app.protocol_service import protocol_fingerprint
-from backend.app.user_identity import current_user_id, enforce_project_access
+from backend.app.user_identity import (
+    assign_current_user_as_project_owner,
+    current_user_id,
+    enforce_authenticated_identity,
+    enforce_project_access,
+)
 
 
 load_dotenv()
@@ -35,6 +40,7 @@ def get_connection():
 
 
 def listar_projetos(incluir_arquivados=False):
+    enforce_authenticated_identity()
     user_id = current_user_id()
     joins = ""
     role_select = "NULL::text AS access_role"
@@ -46,6 +52,9 @@ def listar_projetos(incluir_arquivados=False):
               ON membership.project_id = project.id
              AND membership.user_id = %s
              AND membership.is_active = TRUE
+            JOIN application_users AS application_user
+              ON application_user.id = membership.user_id
+             AND application_user.status = 'active'
         """
         params.append(user_id)
         role_select = "membership.role AS access_role"
@@ -72,6 +81,7 @@ def listar_projetos(incluir_arquivados=False):
 
 
 def obter_projeto(project_id):
+    enforce_authenticated_identity()
     user_id = current_user_id()
     access_filter = ""
     params = [project_id]
@@ -79,6 +89,9 @@ def obter_projeto(project_id):
         access_filter = """
             AND EXISTS (
                 SELECT 1 FROM project_memberships AS membership
+                JOIN application_users AS application_user
+                  ON application_user.id = membership.user_id
+                 AND application_user.status = 'active'
                 WHERE membership.project_id = project.id
                   AND membership.user_id = %s
                   AND membership.is_active = TRUE
@@ -106,6 +119,7 @@ def obter_projeto(project_id):
 
 
 def criar_projeto(titulo, pergunta):
+    enforce_authenticated_identity()
     projeto_id = str(uuid.uuid4())
     protocolo_inicial = {
         "pico": {},
@@ -131,14 +145,7 @@ def criar_projeto(titulo, pergunta):
             """,
             (projeto_id, pergunta.strip(), Json(protocolo_inicial)),
         )
-        if user_id := current_user_id():
-            cursor.execute(
-                """
-                INSERT INTO project_memberships (project_id, user_id, role, is_active)
-                VALUES (%s, %s, 'owner', TRUE)
-                """,
-                (projeto_id, user_id),
-            )
+        assign_current_user_as_project_owner(cursor, projeto_id)
     return projeto_id
 
 
