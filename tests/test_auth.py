@@ -8,12 +8,18 @@ from backend.app.auth import (
 )
 
 
-def _web_access(identity=None, emails="pesquisador@example.org", user_mode="single_user"):
+def _web_access(
+    identity=None,
+    emails="pesquisador@example.org",
+    user_mode="single_user",
+    additional_allowed_emails=(),
+):
     return evaluate_access(
         deployment_profile="web_private",
         user_mode=user_mode,
         identity=identity,
         environ={"RAG_AUTH_ALLOWED_EMAILS": emails},
+        additional_allowed_emails=additional_allowed_emails,
     )
 
 
@@ -123,6 +129,8 @@ def test_multi_user_policy_can_receive_more_than_one_explicit_email():
         {
             "is_logged_in": True,
             "email": "segundo@example.org",
+            "email_verified": True,
+            "iss": "https://accounts.example.org",
             "sub": "segundo-123",
         },
         emails="primeiro@example.org,segundo@example.org",
@@ -134,10 +142,83 @@ def test_multi_user_policy_can_receive_more_than_one_explicit_email():
 
 def test_multi_user_policy_requires_stable_subject_from_provider():
     decision = _web_access(
-        {"is_logged_in": True, "email": "segundo@example.org"},
+        {
+            "is_logged_in": True,
+            "email": "segundo@example.org",
+            "email_verified": True,
+            "iss": "https://accounts.example.org",
+        },
         emails="primeiro@example.org,segundo@example.org",
         user_mode="multi_user",
     )
 
     assert decision.authorized is False
     assert decision.code == "identity_subject_missing"
+
+
+def test_multi_user_policy_requires_stable_identity_provider():
+    decision = _web_access(
+        {
+            "is_logged_in": True,
+            "email": "segundo@example.org",
+            "email_verified": True,
+            "sub": "segundo-123",
+        },
+        emails="primeiro@example.org,segundo@example.org",
+        user_mode="multi_user",
+    )
+
+    assert decision.authorized is False
+    assert decision.code == "identity_provider_missing"
+
+
+def test_multi_user_policy_requires_explicitly_verified_email_claim():
+    decision = _web_access(
+        {
+            "is_logged_in": True,
+            "email": "segundo@example.org",
+            "iss": "https://accounts.example.org",
+            "sub": "segundo-123",
+        },
+        emails="primeiro@example.org,segundo@example.org",
+        user_mode="multi_user",
+    )
+
+    assert decision.authorized is False
+    assert decision.code == "email_unverified"
+
+
+def test_multi_user_policy_accepts_project_preauthorization_with_stable_identity():
+    decision = _web_access(
+        {
+            "is_logged_in": True,
+            "email": "convidada@example.org",
+            "email_verified": True,
+            "iss": "https://accounts.example.org",
+            "sub": "convidada-123",
+        },
+        emails="operador@example.org",
+        user_mode="multi_user",
+        additional_allowed_emails=("convidada@example.org",),
+    )
+
+    assert decision.authorized is True
+    assert decision.authorization_source == "project_access"
+
+
+def test_single_user_policy_ignores_project_preauthorization():
+    decision = _web_access(
+        {
+            "is_logged_in": True,
+            "email": "convidada@example.org",
+            "email_verified": True,
+            "iss": "https://accounts.example.org",
+            "sub": "convidada-123",
+        },
+        emails="operador@example.org",
+        user_mode="single_user",
+        additional_allowed_emails=("convidada@example.org",),
+    )
+
+    assert decision.authorized is False
+    assert decision.code == "email_not_allowed"

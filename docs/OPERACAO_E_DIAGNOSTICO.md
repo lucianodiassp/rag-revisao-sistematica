@@ -36,6 +36,7 @@ senhas, tokens, chaves de API, caminhos privados ou conteúdo científico.
 | Categoria | Indício principal | Primeira ação |
 |---|---|---|
 | `configuration` | preflight ou configuração da aplicação inválida | revisar os arquivos locais e executar novamente o preflight |
+| `authorization` | projeto órfão, convite inseguro ou ausência de operador ativo | revisar titularidade, associações e operadores antes de liberar acessos |
 | `database` | PostgreSQL ou migração indisponível | conferir `db`, depois `migrate` |
 | `storage` | volume sem escrita ou reserva livre | conferir montagem, permissão e espaço do volume |
 | `ai_provider` | modelo, cota, 429, 503 ou timeout de IA | conferir Configuração de IA e aguardar a tentativa automática |

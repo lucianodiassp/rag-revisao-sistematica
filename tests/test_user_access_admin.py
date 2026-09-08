@@ -9,6 +9,7 @@ import pytest
 from backend.app.user_access_admin import (
     accept_pending_invitations_for_user,
     invite_project_member,
+    multi_user_admission_source,
     set_application_user_status,
     transfer_project_ownership,
 )
@@ -62,6 +63,51 @@ def test_invitation_requires_active_identity_before_database_access():
             connection_factory=factory,
         )
 
+    factory.assert_not_called()
+
+
+def test_multi_user_admission_accepts_only_database_confirmed_source():
+    factory, _connection_object, cursor = _connection(
+        [{"admission_source": "pending_invitation"}]
+    )
+
+    source = multi_user_admission_source(
+        " Invited@Example.org ",
+        "https://accounts.example.org",
+        "stable-subject",
+        connection_factory=factory,
+    )
+
+    assert source == "pending_invitation"
+    sql, params = cursor.execute.call_args.args
+    assert "application_user.identity_provider = %s" in sql
+    assert "application_user.subject = %s" in sql
+    assert "application_user.status = 'active'" in sql
+    assert "membership.is_active = TRUE" in sql
+    assert "invitation.status = 'pending'" in sql
+    assert "invitation.expires_at > CURRENT_TIMESTAMP" in sql
+    assert "project_owner.role = 'owner'" in sql
+    assert "owner_user.status = 'active'" in sql
+    assert params == (
+        "https://accounts.example.org",
+        "stable-subject",
+        "invited@example.org",
+        "invited@example.org",
+    )
+
+
+def test_multi_user_admission_fails_closed_without_stable_subject():
+    factory = Mock()
+
+    assert (
+        multi_user_admission_source(
+            "invited@example.org",
+            "https://accounts.example.org",
+            "",
+            connection_factory=factory,
+        )
+        is None
+    )
     factory.assert_not_called()
 
 

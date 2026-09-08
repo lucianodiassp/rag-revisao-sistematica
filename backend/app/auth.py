@@ -29,6 +29,7 @@ class AccessDecision:
     display_name: str | None = None
     identity_provider: str | None = None
     subject: str | None = None
+    authorization_source: str | None = None
 
 
 def normalize_email(value) -> str:
@@ -72,6 +73,7 @@ def evaluate_access(
     user_mode: str,
     identity=None,
     environ=None,
+    additional_allowed_emails=(),
 ) -> AccessDecision:
     """Avalia o acesso sem depender do Streamlit ou do provedor OIDC."""
 
@@ -84,6 +86,7 @@ def evaluate_access(
             display_name="Usuário local",
             identity_provider="local",
             subject="single-user-installation",
+            authorization_source="local",
         )
     if deployment_profile != "web_private":
         raise AuthConfigurationError(
@@ -119,7 +122,10 @@ def evaluate_access(
             code="email_missing",
             display_name=display_name,
         )
-    if _identity_value(identity, "email_verified") is False:
+    email_verified = _identity_value(identity, "email_verified")
+    if email_verified is False or (
+        user_mode == "multi_user" and email_verified is not True
+    ):
         return AccessDecision(
             required=True,
             authenticated=True,
@@ -128,18 +134,19 @@ def evaluate_access(
             email=email,
             display_name=display_name,
         )
-    if email not in configured_emails:
+    identity_provider = str(_identity_value(identity, "iss") or "").strip()
+    subject = str(_identity_value(identity, "sub") or "").strip()
+    if user_mode == "multi_user" and not identity_provider:
         return AccessDecision(
             required=True,
             authenticated=True,
             authorized=False,
-            code="email_not_allowed",
+            code="identity_provider_missing",
             email=email,
             display_name=display_name,
+            subject=subject or None,
         )
-    identity_provider = str(_identity_value(identity, "iss") or "oidc").strip()
-    subject = str(_identity_value(identity, "sub") or "").strip()
-    if not subject and user_mode == "multi_user":
+    if user_mode == "multi_user" and not subject:
         return AccessDecision(
             required=True,
             authenticated=True,
@@ -148,6 +155,25 @@ def evaluate_access(
             email=email,
             display_name=display_name,
             identity_provider=identity_provider,
+        )
+    if not identity_provider:
+        identity_provider = "oidc"
+    extra_emails = {
+        normalize_email(item)
+        for item in additional_allowed_emails
+        if normalize_email(item)
+    }
+    permitted_by_project = user_mode == "multi_user" and email in extra_emails
+    if email not in configured_emails and not permitted_by_project:
+        return AccessDecision(
+            required=True,
+            authenticated=True,
+            authorized=False,
+            code="email_not_allowed",
+            email=email,
+            display_name=display_name,
+            identity_provider=identity_provider,
+            subject=subject or None,
         )
     if not subject:
         # Compatibilidade com provedores já configurados no perfil de usuário único.
@@ -161,4 +187,7 @@ def evaluate_access(
         display_name=display_name,
         identity_provider=identity_provider,
         subject=subject,
+        authorization_source=(
+            "project_access" if permitted_by_project else "server_allowlist"
+        ),
     )
