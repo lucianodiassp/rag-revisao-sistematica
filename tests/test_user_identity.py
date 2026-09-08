@@ -108,7 +108,9 @@ def test_does_not_claim_legacy_projects_when_multi_user_mode_is_requested():
 
     assert user.is_operator is False
     assert cursor.execute.call_args_list[0].args[1][-1] is False
-    assert cursor.execute.call_count == 1
+    statements = [call.args[0] for call in cursor.execute.call_args_list]
+    assert any("project_invitations" in statement for statement in statements[1:])
+    assert not any("UPDATE ai_provider_credentials" in statement for statement in statements)
 
 
 def test_assigns_new_project_to_current_user():

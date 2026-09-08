@@ -65,6 +65,11 @@ pages = [
         icon="🗂️",
     ),
     st.Page(
+        "views/16_Usuarios_Acessos.py",
+        title="Usuários e Acessos",
+        icon="👥",
+    ),
+    st.Page(
         "views/11_Calibracao_Busca.py",
         title="Calibração da Busca",
         icon="🎯",

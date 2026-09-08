@@ -56,6 +56,17 @@ reprodutibilidade, migrações do banco e protocolos científicos.
   banco imediatamente antes da operação.
 - As páginas de Backup e Diagnóstico deixam de aparecer para usuários comuns; os
   processos internos de agendamento, health check e operação por SSH são preservados.
+- Adicionada administração de acesso por projeto com pré-autorização por e-mail
+  verificado, validade e revogação explícita de convites.
+- Proprietários podem alternar membros entre `editor` e `viewer`, revogar uma
+  associação e transferir a titularidade atomicamente, permanecendo como editores.
+- Eventos de convite, papel, revogação e titularidade geram recibos de auditoria
+  sem armazenar senha, token OIDC ou conteúdo científico.
+- O operador pode ativar e desativar contas, mas não pode desativar a própria
+  identidade, o último operador ativo nem uma pessoa que ainda possua projetos.
+- Convites válidos são aceitos no primeiro login futuro com o mesmo e-mail
+  verificado; a liberação efetiva ainda depende do modo multiusuário e de sua
+  barreira de autenticação.
 - O modo `multi_user` permanece bloqueado no preflight até que todas as operações
   internas e tarefas em segundo plano adotem autorização obrigatória.
 

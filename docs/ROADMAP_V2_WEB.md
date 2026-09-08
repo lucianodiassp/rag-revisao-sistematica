@@ -162,7 +162,10 @@ endurecimento operacional da Web privada de usuário único.
    PDFs, além de triagem, deduplicação, calibração, qualidade metodológica,
    confiança, fluxo visual, agentes, Golden Set, PRISMA e exportação acadêmica já
    adotam papéis de leitura/edição no backend. O modo multiusuário continua
-   bloqueado, ainda sem cadastro público ou compartilhamento.
+   bloqueado. A administração de acesso já registra convites por e-mail verificado,
+   papéis, revogações, contas ativas/desativadas e transferência atômica de
+   titularidade, mas ainda não representa cadastro público ou compartilhamento
+   liberado em produção.
    [Escopo incremental](MULTIUSER_FOUNDATION.md).
 8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.5.x`.
