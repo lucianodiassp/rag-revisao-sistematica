@@ -151,15 +151,35 @@ A cobertura e os limites desta etapa estão registrados em
 
 ## Limite de segurança atual
 
-Esta entrega **não habilita `RAG_USER_MODE=multi_user`**. O preflight continua
-rejeitando esse valor. A matriz negativa automatizada agora cobre as barreiras
-científicas, de arquivos, exportações, administração dos projetos e administração
-global. Antes da ativação ainda será necessário:
+Esta entrega **não libera `RAG_USER_MODE=multi_user` de forma geral**. O preflight
+aceita esse valor somente com as confirmações explícitas do piloto e backup externo
+habilitado. A matriz negativa automatizada cobre as barreiras científicas, de
+arquivos, exportações, administração dos projetos e administração global. Antes de
+uma liberação além do piloto ainda será necessário:
 
 1. validar o fluxo OIDC completo com uma segunda conta em ambiente controlado;
 2. definir recuperação, auditoria e suporte para uma implantação com vários
    operadores, mantendo o backup completo fora do autoatendimento comum;
 3. executar um piloto controlado com plano de reversão antes de expor o perfil.
+
+## Décima entrega: piloto OIDC controlado
+
+- `multi_user` continua indisponível por padrão e requer duas confirmações
+  operacionais explícitas no arquivo privado do servidor;
+- a lista fixa conserva exatamente um operador, enquanto colaboradores entram
+  exclusivamente por convite válido, nunca por um segundo e-mail no ambiente;
+- o preflight exige backup externo configurado antes de liberar o piloto;
+- aplicação, worker e agendador recebem o mesmo modo validado pelo preflight;
+- a conta convidada não cria ou importa projetos durante o ensaio, evitando dados
+  inacessíveis ao retornar temporariamente para `single_user`;
+- o diagnóstico sem sessão respeita o escopo privado das configurações de IA e
+  fontes, que são verificadas somente após autenticação;
+- a identidade da lista administrativa precisa já corresponder a um operador OIDC
+  estável; o diagnóstico expõe somente os contadores de prontidão e convites;
+- a interface identifica visualmente o estado **Piloto multiusuário controlado**.
+
+O procedimento de duas sessões, revogação e retorno está documentado em
+[Piloto OIDC controlado](PILOTO_OIDC_CONTROLADO.md).
 
 ## Compatibilidade e recuperação
 
@@ -184,7 +204,7 @@ os mesmos projetos e funcionalidades após a atualização.
 5. arquivar e restaurar esse projeto sem afetar os demais;
 6. reiniciar a aplicação e confirmar que identidade e associações persistem;
 7. gerar e validar um backup completo;
-8. manter o preflight Web rejeitando `multi_user` até a conclusão do escopo.
+8. confirmar que o preflight rejeita `multi_user` sem as proteções explícitas do piloto.
 
 ## Validação da autorização da fila
 

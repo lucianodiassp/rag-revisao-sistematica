@@ -11,7 +11,13 @@ from urllib.parse import urlparse
 
 from dotenv import dotenv_values
 
-from backend.app.auth import AuthConfigurationError, parse_allowed_emails
+from backend.app.auth import (
+    MULTI_USER_PILOT_ACK_ENV,
+    MULTI_USER_PILOT_ACK_VALUE,
+    MULTI_USER_PILOT_ENABLED_ENV,
+    AuthConfigurationError,
+    parse_allowed_emails,
+)
 from backend.app.external_backup import external_backup_configuration
 from backend.app.observability import log_event
 
@@ -106,8 +112,18 @@ def validate_web_configuration(
         )
     if _text(environ.get("RAG_DEPLOYMENT_PROFILE")) != "web_private":
         errors.append("RAG_DEPLOYMENT_PROFILE deve ser web_private.")
-    if _text(environ.get("RAG_USER_MODE")) != "single_user":
-        errors.append("A primeira versão Web exige RAG_USER_MODE=single_user.")
+    user_mode = _text(environ.get("RAG_USER_MODE"))
+    if user_mode not in {"single_user", "multi_user"}:
+        errors.append("RAG_USER_MODE deve ser single_user ou multi_user.")
+    elif user_mode == "multi_user":
+        if _text(environ.get(MULTI_USER_PILOT_ENABLED_ENV)).lower() != "true":
+            errors.append(
+                f"{MULTI_USER_PILOT_ENABLED_ENV} deve ser true para o piloto controlado."
+            )
+        if _text(environ.get(MULTI_USER_PILOT_ACK_ENV)) != MULTI_USER_PILOT_ACK_VALUE:
+            errors.append(
+                f"{MULTI_USER_PILOT_ACK_ENV} deve confirmar isolamento e backup."
+            )
     try:
         job_workers = int(_text(environ.get("RAG_JOB_WORKERS")))
     except ValueError:
@@ -151,7 +167,10 @@ def validate_web_configuration(
     try:
         emails = parse_allowed_emails(environ.get("RAG_AUTH_ALLOWED_EMAILS"))
         if len(emails) != 1:
-            errors.append("RAG_AUTH_ALLOWED_EMAILS deve conter exatamente um e-mail.")
+            errors.append(
+                "RAG_AUTH_ALLOWED_EMAILS deve conter exatamente um e-mail administrativo; "
+                "colaboradores entram somente por convite."
+            )
     except AuthConfigurationError:
         errors.append("RAG_AUTH_ALLOWED_EMAILS contém um e-mail inválido.")
 
@@ -207,8 +226,10 @@ def validate_web_configuration(
     ):
         errors.append("RAG_MAX_BACKUP_UPLOAD_MB não pode exceder RAG_MAX_UPLOAD_MB.")
 
-    _, external_backup_errors = external_backup_configuration(environ)
+    external_backup, external_backup_errors = external_backup_configuration(environ)
     errors.extend(external_backup_errors)
+    if user_mode == "multi_user" and not external_backup.enabled:
+        errors.append("O piloto multiusuário exige backup externo habilitado.")
 
     redirect_uri = _text(auth_config.get("redirect_uri"))
     expected_redirect = f"https://{domain}/oauth2callback" if domain else ""

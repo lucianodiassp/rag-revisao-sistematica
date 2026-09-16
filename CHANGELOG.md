@@ -84,8 +84,22 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - Arquivamento, restauração, prévia de exclusão e exclusão permanente agora exigem
   explicitamente o papel `owner`; editores e leitores não recebem a gestão do ciclo
   de vida nem por chamada direta ao backend.
-- O modo `multi_user` permanece bloqueado no preflight até o piloto OIDC com uma
-  segunda conta real e a definição operacional de suporte e recuperação.
+- O modo `multi_user` permanece indisponível por padrão e não representa abertura
+  pública; somente a configuração explícita do piloto pode ultrapassar o preflight.
+- Preparado o piloto OIDC controlado por dupla confirmação explícita no ambiente,
+  mantendo exatamente um e-mail administrativo no servidor e admitindo a segunda
+  conta somente por convite válido no banco.
+- O preflight do piloto exige backup externo habilitado, e o Compose propaga o
+  mesmo modo de usuário à aplicação, ao worker e ao agendador sem alterar o padrão
+  seguro `single_user`.
+- Durante o piloto, somente o operador cria, importa ou restaura projetos
+  demonstrativos; colaboradores atuam apenas nos projetos recebidos, preservando
+  uma reversão segura ao perfil anterior.
+- O diagnóstico executado sem sessão não tenta carregar credenciais privadas de
+  outro usuário e informa que IA e fontes são verificadas em cada sessão autenticada.
+- A lista administrativa não promove implicitamente uma nova identidade: no piloto,
+  ela precisa corresponder a um operador OIDC já registrado, e o diagnóstico mostra
+  apenas contadores de prontidão e convites válidos.
 
 ## [2.5.0] — 2026-09-05
 

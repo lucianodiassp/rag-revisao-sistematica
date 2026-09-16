@@ -10,6 +10,7 @@ from backend.app.user_access_admin import multi_user_admission_source
 from backend.app.user_identity import (
     bind_current_user,
     ensure_application_user,
+    enforce_multi_user_pilot_principal,
 )
 
 
@@ -149,6 +150,11 @@ def enforce_access(metadata: dict):
         # pode continuar autorizada apenas por estar presente na sessão do navegador.
         user = ensure_application_user(
             decision,
+            user_mode=metadata["user_mode"],
+        )
+        enforce_multi_user_pilot_principal(
+            user,
+            decision.authorization_source,
             user_mode=metadata["user_mode"],
         )
     except Exception:

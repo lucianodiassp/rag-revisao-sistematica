@@ -16,6 +16,7 @@ from backend.app.user_access_admin import (
     transfer_project_ownership,
 )
 from backend.app.user_identity import current_user, current_user_is_operator
+from backend.app.version import application_metadata
 
 
 ROLE_LABELS = {"owner": "Proprietário", "editor": "Editor", "viewer": "Leitor"}
@@ -39,11 +40,16 @@ st.write(
     "Administre quem poderá colaborar em cada projeto e qual será o papel de cada "
     "pessoa. Senhas e tokens de autenticação não são armazenados aqui."
 )
-st.info(
-    "O modo multiusuário ainda não está liberado no servidor. Os convites abaixo "
-    "funcionam como **pré-autorização por e-mail verificado** e não enviam mensagem "
-    "automaticamente."
-)
+if application_metadata()["user_mode"] == "multi_user":
+    st.warning(
+        "Piloto multiusuário ativo: novos acessos dependem de convite e e-mail "
+        "confirmado pelo provedor OIDC."
+    )
+else:
+    st.info(
+        "Os convites abaixo funcionam como **pré-autorização por e-mail verificado** "
+        "para o piloto e não enviam mensagem automaticamente."
+    )
 
 if flash := st.session_state.pop("access_admin_flash", None):
     getattr(st, flash[0])(flash[1])

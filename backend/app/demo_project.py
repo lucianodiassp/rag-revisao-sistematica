@@ -887,10 +887,10 @@ def ensure_demo_project(
     """Cria, abre ou restaura somente o projeto marcado com o seed oficial."""
     from backend.app.user_identity import (
         assign_current_user_as_project_owner,
-        enforce_authenticated_identity,
+        enforce_project_creation_access,
     )
 
-    enforce_authenticated_identity()
+    enforce_project_creation_access()
     if connection_factory is None:
         from backend.app.database import get_connection
 

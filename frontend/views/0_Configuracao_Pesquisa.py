@@ -29,7 +29,11 @@ from backend.app.reproducibility_import import (  # noqa: E402
     import_reproducibility_package,
     validate_reproducibility_package,
 )
-from backend.app.user_identity import ensure_project_owner  # noqa: E402
+from backend.app.user_identity import (  # noqa: E402
+    current_user_is_operator,
+    ensure_project_owner,
+)
+from backend.app.version import application_metadata  # noqa: E402
 from backend.coleta.importador_bibtex import (  # noqa: E402
     ErroBibTeX,
     analisar_bibtex,
@@ -48,6 +52,11 @@ from frontend.background_jobs_ui import (  # noqa: E402
 
 st.set_page_config(page_title="Configuração da Pesquisa", page_icon="⚙️", layout="wide")
 
+_metadata = application_metadata()
+pilot_collaborator = (
+    _metadata["user_mode"] == "multi_user" and not current_user_is_operator()
+)
+
 
 with st.sidebar.expander("🧪 Projeto demonstrativo", expanded=False):
     st.caption(
@@ -58,6 +67,7 @@ with st.sidebar.expander("🧪 Projeto demonstrativo", expanded=False):
     abrir_demo = st.button(
         "Criar / abrir demonstração",
         use_container_width=True,
+        disabled=pilot_collaborator,
         key="open_demo_project",
     )
     confirmar_restauracao = st.checkbox(
@@ -67,7 +77,7 @@ with st.sidebar.expander("🧪 Projeto demonstrativo", expanded=False):
     restaurar_demo = st.button(
         "Restaurar dados originais",
         use_container_width=True,
-        disabled=not confirmar_restauracao,
+        disabled=pilot_collaborator or not confirmar_restauracao,
         key="reset_demo_project",
     )
 
@@ -95,10 +105,16 @@ with st.sidebar.expander("🧪 Projeto demonstrativo", expanded=False):
 
 
 with st.sidebar.expander("➕ Novo projeto", expanded=False):
+    if pilot_collaborator:
+        st.caption("Durante o piloto, projetos são criados somente pelo operador.")
     with st.form("form_novo_projeto"):
         novo_titulo = st.text_input("Título do projeto")
         nova_pergunta = st.text_area("Pergunta inicial")
-        criar = st.form_submit_button("Criar projeto", type="primary")
+        criar = st.form_submit_button(
+            "Criar projeto",
+            type="primary",
+            disabled=pilot_collaborator,
+        )
         if criar:
             if not novo_titulo.strip() or not nova_pergunta.strip():
                 st.warning("Informe o título e a pergunta inicial.")
@@ -117,6 +133,7 @@ with st.sidebar.expander("📦 Importar projeto", expanded=False):
     arquivo_pacote = st.file_uploader(
         "Pacote de reprodutibilidade (.zip)",
         type=["zip"],
+        disabled=pilot_collaborator,
         key="reproducibility_package_uploader",
     )
     if arquivo_pacote is not None:
@@ -190,7 +207,10 @@ if mensagem_importacao:
     st.success(mensagem_importacao)
 
 if projeto is None:
-    st.info("Crie o primeiro projeto no painel lateral para iniciar a revisão.")
+    if pilot_collaborator:
+        st.info("Nenhum projeto está associado à sua conta. Solicite acesso ao operador.")
+    else:
+        st.info("Crie o primeiro projeto no painel lateral para iniciar a revisão.")
     st.stop()
 
 project_id = str(projeto["id"])

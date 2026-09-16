@@ -17,6 +17,7 @@ from psycopg2.extras import Json, RealDictCursor
 
 from backend.app.database import get_connection
 from backend.app.observability import classify_error, sanitize_fields
+from backend.app.user_identity import current_user_id
 from backend.app.version import APP_VERSION, application_metadata
 
 
@@ -283,6 +284,19 @@ def check_access_integrity():
                         WHERE status = 'active' AND is_operator = TRUE
                     ) AS active_operators,
                     (
+                        SELECT COUNT(*) FROM application_users
+                        WHERE status = 'active'
+                          AND is_operator = TRUE
+                          AND identity_provider NOT IN ('local', 'oidc')
+                          AND subject <> 'single-user-installation'
+                          AND subject NOT LIKE 'email:%'
+                    ) AS oidc_ready_operators,
+                    (
+                        SELECT COUNT(*) FROM project_invitations
+                        WHERE status = 'pending'
+                          AND expires_at > CURRENT_TIMESTAMP
+                    ) AS valid_pending_invitations,
+                    (
                         SELECT COUNT(*)
                         FROM project_invitations AS invitation
                         JOIN owner_counts
@@ -298,14 +312,23 @@ def check_access_integrity():
         details = {
             "orphaned_projects": int(row.get("orphaned_projects") or 0),
             "active_operators": int(row.get("active_operators") or 0),
+            "oidc_ready_operators": int(row.get("oidc_ready_operators") or 0),
+            "valid_pending_invitations": int(
+                row.get("valid_pending_invitations") or 0
+            ),
             "unsafe_pending_invitations": int(
                 row.get("unsafe_pending_invitations") or 0
             ),
         }
+        multi_user_without_oidc_operator = (
+            application_metadata()["user_mode"] == "multi_user"
+            and not details["oidc_ready_operators"]
+        )
         if (
             details["orphaned_projects"]
             or not details["active_operators"]
             or details["unsafe_pending_invitations"]
+            or multi_user_without_oidc_operator
         ):
             return _check(
                 "access_integrity",
@@ -470,6 +493,18 @@ def check_worker():
 
 
 def check_ai_configuration():
+    if (
+        application_metadata()["user_mode"] == "multi_user"
+        and not current_user_id()
+    ):
+        return _check(
+            "ai_configuration",
+            "Provedor de IA",
+            "ok",
+            "ai_provider",
+            "As credenciais de IA são verificadas dentro de cada sessão autenticada.",
+            {"scope": "authenticated_user", "session_required": True},
+        )
     try:
         from backend.app.ai_config import get_ai_settings, get_provider_api_key
 
@@ -518,6 +553,18 @@ def check_ai_configuration():
 
 
 def check_bibliographic_sources():
+    if (
+        application_metadata()["user_mode"] == "multi_user"
+        and not current_user_id()
+    ):
+        return _check(
+            "bibliographic_sources",
+            "Fontes bibliográficas",
+            "ok",
+            "bibliographic_source",
+            "As fontes privadas são verificadas dentro de cada sessão autenticada.",
+            {"scope": "authenticated_user", "session_required": True},
+        )
     try:
         from backend.app.bibliographic_config import get_bibliographic_settings
 

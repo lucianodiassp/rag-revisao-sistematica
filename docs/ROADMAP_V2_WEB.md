@@ -167,8 +167,9 @@ endurecimento operacional da Web privada de usuário único.
    titularidade, mas ainda não representa cadastro público ou compartilhamento
    liberado em produção. A matriz negativa automatizada já cobre duas identidades,
    dois projetos, papéis, revogação, ciclo de vida, criação transacional e a
-   separação entre operador global e acesso científico; o próximo marco é o piloto
-   OIDC controlado com uma segunda conta real.
+   separação entre operador global e acesso científico. O piloto OIDC controlado
+   agora possui ativação dupla, entrada somente por convite, exigência de backup
+   externo e procedimento de reversão; falta executá-lo com uma segunda conta real.
    [Escopo incremental](MULTIUSER_FOUNDATION.md).
 8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.5.x`.

@@ -9,6 +9,8 @@ from backend.app.user_identity import (
     ApplicationUser,
     bind_current_user,
     enforce_authenticated_identity,
+    enforce_multi_user_pilot_principal,
+    enforce_project_creation_access,
     require_installation_operator,
     require_project_access,
 )
@@ -152,17 +154,17 @@ def test_disabled_identity_is_rejected_before_project_creation(monkeypatch):
     [
         (
             lambda: database.criar_projeto("Projeto", "Pergunta"),
-            "backend.app.database.enforce_authenticated_identity",
+            "backend.app.database.enforce_project_creation_access",
             "backend.app.database.get_connection",
         ),
         (
             lambda: reproducibility_import.import_reproducibility_package(b"package"),
-            "backend.app.user_identity.enforce_authenticated_identity",
+            "backend.app.user_identity.enforce_project_creation_access",
             "backend.app.reproducibility_import.validate_reproducibility_package",
         ),
         (
             demo_project.ensure_demo_project,
-            "backend.app.user_identity.enforce_authenticated_identity",
+            "backend.app.user_identity.enforce_project_creation_access",
             "backend.app.demo_project.build_demo_dataset",
         ),
     ],
@@ -185,6 +187,46 @@ def test_project_creation_flows_fail_closed_without_identity(
 
     gate.assert_called_once_with()
     protected_dependency.assert_not_called()
+
+
+def test_invited_collaborator_cannot_create_project_during_pilot(monkeypatch):
+    monkeypatch.setenv("RAG_USER_MODE", "multi_user")
+    bind_current_user(_user(EDITOR_A))
+
+    with pytest.raises(PermissionError, match="somente o operador"):
+        enforce_project_creation_access()
+
+
+def test_installation_operator_can_create_project_during_pilot(monkeypatch):
+    monkeypatch.setenv("RAG_USER_MODE", "multi_user")
+    operator = _user(OPERATOR, operator=True)
+    bind_current_user(operator)
+
+    assert enforce_project_creation_access() == operator
+
+
+def test_server_allowlist_cannot_create_an_implicit_pilot_operator():
+    collaborator = _user(EDITOR_A)
+
+    with pytest.raises(PermissionError, match="operador registrado"):
+        enforce_multi_user_pilot_principal(
+            collaborator,
+            "server_allowlist",
+            user_mode="multi_user",
+        )
+
+
+def test_invited_collaborator_is_valid_pilot_principal():
+    collaborator = _user(EDITOR_A)
+
+    assert (
+        enforce_multi_user_pilot_principal(
+            collaborator,
+            "project_access",
+            user_mode="multi_user",
+        )
+        == collaborator
+    )
 
 
 @pytest.mark.parametrize(

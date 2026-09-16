@@ -1,6 +1,9 @@
 import pytest
 
 from backend.app.auth import (
+    MULTI_USER_PILOT_ACK_ENV,
+    MULTI_USER_PILOT_ACK_VALUE,
+    MULTI_USER_PILOT_ENABLED_ENV,
     AuthConfigurationError,
     evaluate_access,
     normalize_email,
@@ -14,11 +17,19 @@ def _web_access(
     user_mode="single_user",
     additional_allowed_emails=(),
 ):
+    environment = {"RAG_AUTH_ALLOWED_EMAILS": emails}
+    if user_mode == "multi_user":
+        environment.update(
+            {
+                MULTI_USER_PILOT_ENABLED_ENV: "true",
+                MULTI_USER_PILOT_ACK_ENV: MULTI_USER_PILOT_ACK_VALUE,
+            }
+        )
     return evaluate_access(
         deployment_profile="web_private",
         user_mode=user_mode,
         identity=identity,
-        environ={"RAG_AUTH_ALLOWED_EMAILS": emails},
+        environ=environment,
         additional_allowed_emails=additional_allowed_emails,
     )
 
@@ -124,20 +135,29 @@ def test_web_profile_authorizes_configured_email_case_insensitively():
     assert decision.subject == "subject-123"
 
 
-def test_multi_user_policy_can_receive_more_than_one_explicit_email():
-    decision = _web_access(
-        {
-            "is_logged_in": True,
-            "email": "segundo@example.org",
-            "email_verified": True,
-            "iss": "https://accounts.example.org",
-            "sub": "segundo-123",
-        },
-        emails="primeiro@example.org,segundo@example.org",
-        user_mode="multi_user",
-    )
+def test_multi_user_pilot_keeps_exactly_one_administrative_email():
+    with pytest.raises(AuthConfigurationError, match="exatamente um e-mail administrativo"):
+        _web_access(
+            {
+                "is_logged_in": True,
+                "email": "segundo@example.org",
+                "email_verified": True,
+                "iss": "https://accounts.example.org",
+                "sub": "segundo-123",
+            },
+            emails="primeiro@example.org,segundo@example.org",
+            user_mode="multi_user",
+        )
 
-    assert decision.authorized is True
+
+def test_multi_user_policy_rejects_runtime_without_pilot_confirmation():
+    with pytest.raises(AuthConfigurationError, match="piloto multiusuário"):
+        evaluate_access(
+            deployment_profile="web_private",
+            user_mode="multi_user",
+            identity=None,
+            environ={"RAG_AUTH_ALLOWED_EMAILS": "operador@example.org"},
+        )
 
 
 def test_multi_user_policy_requires_stable_subject_from_provider():
@@ -148,7 +168,7 @@ def test_multi_user_policy_requires_stable_subject_from_provider():
             "email_verified": True,
             "iss": "https://accounts.example.org",
         },
-        emails="primeiro@example.org,segundo@example.org",
+        emails="segundo@example.org",
         user_mode="multi_user",
     )
 
@@ -164,7 +184,7 @@ def test_multi_user_policy_requires_stable_identity_provider():
             "email_verified": True,
             "sub": "segundo-123",
         },
-        emails="primeiro@example.org,segundo@example.org",
+        emails="segundo@example.org",
         user_mode="multi_user",
     )
 
@@ -180,7 +200,7 @@ def test_multi_user_policy_requires_explicitly_verified_email_claim():
             "iss": "https://accounts.example.org",
             "sub": "segundo-123",
         },
-        emails="primeiro@example.org,segundo@example.org",
+        emails="segundo@example.org",
         user_mode="multi_user",
     )
 

@@ -9,6 +9,9 @@ from typing import Mapping
 
 
 ALLOWED_EMAILS_ENV = "RAG_AUTH_ALLOWED_EMAILS"
+MULTI_USER_PILOT_ENABLED_ENV = "RAG_MULTI_USER_PILOT_ENABLED"
+MULTI_USER_PILOT_ACK_ENV = "RAG_MULTI_USER_PILOT_ACK"
+MULTI_USER_PILOT_ACK_VALUE = "ISOLAMENTO_E_BACKUP_CONFIRMADOS"
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _EMAIL_SEPARATORS = re.compile(r"[,;\s]+")
 
@@ -59,6 +62,15 @@ def allowed_emails(environ=None) -> tuple[str, ...]:
     return parse_allowed_emails(environment.get(ALLOWED_EMAILS_ENV, ""))
 
 
+def multi_user_pilot_enabled(environ=None) -> bool:
+    """Confirma a dupla ativação explícita do piloto multiusuário."""
+
+    environment = os.environ if environ is None else environ
+    enabled = str(environment.get(MULTI_USER_PILOT_ENABLED_ENV, "")).strip().lower()
+    acknowledgement = str(environment.get(MULTI_USER_PILOT_ACK_ENV, "")).strip()
+    return enabled == "true" and acknowledgement == MULTI_USER_PILOT_ACK_VALUE
+
+
 def _identity_value(identity, key, default=None):
     if identity is None:
         return default
@@ -93,14 +105,24 @@ def evaluate_access(
             f"Perfil de implantação não suportado pela autenticação: {deployment_profile!r}."
         )
 
-    configured_emails = allowed_emails(environ)
+    environment = os.environ if environ is None else environ
+    if user_mode not in {"single_user", "multi_user"}:
+        raise AuthConfigurationError(
+            f"Modo de usuário não suportado pela autenticação: {user_mode!r}."
+        )
+    if user_mode == "multi_user" and not multi_user_pilot_enabled(environment):
+        raise AuthConfigurationError(
+            "O piloto multiusuário não possui a confirmação operacional exigida."
+        )
+
+    configured_emails = allowed_emails(environment)
     if not configured_emails:
         raise AuthConfigurationError(
             f"Defina {ALLOWED_EMAILS_ENV} antes de ativar o perfil Web privado."
         )
-    if user_mode == "single_user" and len(configured_emails) != 1:
+    if len(configured_emails) != 1:
         raise AuthConfigurationError(
-            f"O modo single_user exige exatamente um e-mail em {ALLOWED_EMAILS_ENV}."
+            f"A implantação exige exatamente um e-mail administrativo em {ALLOWED_EMAILS_ENV}."
         )
 
     authenticated = bool(_identity_value(identity, "is_logged_in", False))

@@ -44,8 +44,8 @@ até a prévia de exclusão exige proprietário antes de tocar no banco ou nos P
 
 ## Limite desta etapa
 
-A matriz testa as decisões e fachadas do backend de forma determinística. Ainda é
-necessário realizar um piloto Web controlado com duas contas OIDC reais, incluindo
-convite, primeiro login, troca de papel, revogação e nova autenticação. O preflight
-continua bloqueando o modo multiusuário até esse piloto e a decisão operacional de
-liberação.
+A matriz testa as decisões e fachadas do backend de forma determinística. O
+preflight agora aceita apenas a configuração protegida descrita no roteiro do
+piloto. Ainda é necessário executá-lo com duas contas OIDC reais, incluindo convite,
+primeiro login, troca de papel, revogação e nova autenticação, antes de qualquer
+decisão de liberação mais ampla.
