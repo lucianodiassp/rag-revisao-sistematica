@@ -44,6 +44,8 @@ metadata = registrar_identidade_aplicacao()
 iniciar_sinal_de_vida_aplicacao()
 enforce_access(metadata)
 st.sidebar.caption(f"**{application_caption()}**")
+if metadata["user_mode"] == "multi_user":
+    st.sidebar.warning("Piloto multiusuário controlado")
 if current_user_is_operator():
     st.sidebar.caption("Acesso administrativo: **operador da instalação**")
 

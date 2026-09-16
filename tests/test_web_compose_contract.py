@@ -72,6 +72,13 @@ def test_preflight_observability_uses_requested_web_profile():
     assert "RAG_MIN_FREE_STORAGE_MB: ${RAG_MIN_FREE_STORAGE_MB:-2048}" in preflight
 
 
+def test_web_runtime_services_receive_the_preflight_user_mode():
+    for service_name in ("app", "worker", "backup-scheduler"):
+        service = _service_block(service_name)
+        assert "RAG_USER_MODE: ${RAG_USER_MODE:-single_user}" in service
+        assert "RAG_USER_MODE: single_user" not in service
+
+
 def test_only_proxy_publishes_public_ports_in_web_profile():
     compose = WEB_COMPOSE.read_text(encoding="utf-8")
     proxy = _service_block("proxy")

@@ -5,6 +5,7 @@ from backend.app.web_deployment import (
     validate_web_configuration,
     validate_web_files,
 )
+from backend.app.auth import MULTI_USER_PILOT_ACK_VALUE
 
 
 def _valid_environment():
@@ -43,11 +44,29 @@ def _valid_auth():
     }
 
 
+def _valid_multi_user_environment():
+    environment = _valid_environment()
+    environment.update(
+        {
+            "RAG_USER_MODE": "multi_user",
+            "RAG_MULTI_USER_PILOT_ENABLED": "true",
+            "RAG_MULTI_USER_PILOT_ACK": MULTI_USER_PILOT_ACK_VALUE,
+            "RAG_EXTERNAL_BACKUP_ENABLED": "true",
+            "RAG_EXTERNAL_BACKUP_BUCKET": "rag-pilot-backups",
+            "RAG_EXTERNAL_BACKUP_ENDPOINT_URL": "https://storage.example.org",
+            "RAG_EXTERNAL_BACKUP_ACCESS_KEY_ID": "pilot-access-key",
+            "RAG_EXTERNAL_BACKUP_SECRET_ACCESS_KEY": "pilot-secret-key",
+            "RAG_EXTERNAL_BACKUP_PASSWORD": "Backup-Piloto-2026!",
+        }
+    )
+    return environment
+
+
 def test_accepts_complete_web_configuration():
     assert validate_web_configuration(_valid_environment(), _valid_auth()) == []
 
 
-def test_rejects_local_or_multi_user_profile():
+def test_rejects_local_profile_and_unconfirmed_multi_user_pilot():
     environment = _valid_environment()
     environment["RAG_DEPLOYMENT_PROFILE"] = "local"
     environment["RAG_USER_MODE"] = "multi_user"
@@ -55,7 +74,37 @@ def test_rejects_local_or_multi_user_profile():
     errors = validate_web_configuration(environment, _valid_auth())
 
     assert any("web_private" in error for error in errors)
-    assert any("single_user" in error for error in errors)
+    assert any("RAG_MULTI_USER_PILOT_ENABLED" in error for error in errors)
+    assert any("RAG_MULTI_USER_PILOT_ACK" in error for error in errors)
+    assert any("backup externo" in error for error in errors)
+
+
+def test_accepts_controlled_multi_user_pilot_configuration():
+    assert validate_web_configuration(
+        _valid_multi_user_environment(),
+        _valid_auth(),
+    ) == []
+
+
+def test_multi_user_pilot_rejects_second_server_allowlist_email():
+    environment = _valid_multi_user_environment()
+    environment["RAG_AUTH_ALLOWED_EMAILS"] = (
+        "operador@example.org,colaborador@example.org"
+    )
+
+    errors = validate_web_configuration(environment, _valid_auth())
+
+    assert any("exatamente um e-mail administrativo" in error for error in errors)
+    assert any("somente por convite" in error for error in errors)
+
+
+def test_multi_user_pilot_requires_external_backup():
+    environment = _valid_multi_user_environment()
+    environment["RAG_EXTERNAL_BACKUP_ENABLED"] = "false"
+
+    errors = validate_web_configuration(environment, _valid_auth())
+
+    assert any("exige backup externo habilitado" in error for error in errors)
 
 
 def test_rejects_unsafe_background_worker_limits():

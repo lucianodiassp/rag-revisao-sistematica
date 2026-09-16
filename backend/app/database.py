@@ -21,6 +21,7 @@ from backend.app.user_identity import (
     assign_current_user_as_project_owner,
     current_user_id,
     enforce_authenticated_identity,
+    enforce_project_creation_access,
     enforce_project_access,
 )
 
@@ -119,7 +120,7 @@ def obter_projeto(project_id):
 
 
 def criar_projeto(titulo, pergunta):
-    enforce_authenticated_identity()
+    enforce_project_creation_access()
     projeto_id = str(uuid.uuid4())
     protocolo_inicial = {
         "pico": {},

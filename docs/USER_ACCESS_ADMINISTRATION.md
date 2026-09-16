@@ -3,13 +3,14 @@
 ## Escopo desta entrega
 
 A tela **Usuários e Acessos** prepara o compartilhamento por projeto sem tornar a
-instalação pública. O perfil `multi_user` continua bloqueado pelo preflight; no
-perfil atual, um convite é somente uma pré-autorização registrada no banco.
+instalação pública. O perfil `multi_user` somente atravessa o preflight no piloto
+explicitamente confirmado; em `single_user`, um convite é uma pré-autorização
+registrada no banco.
 
 Um convite contém e-mail normalizado, projeto, papel, validade e autoria. A
-aplicação não cria senha, não envia e-mail e não armazena token OIDC. Quando a
-entrada multiusuário for habilitada, a associação só será aceita depois que o
-provedor confirmar o mesmo e-mail e uma identidade estável.
+aplicação não cria senha, não envia e-mail e não armazena token OIDC. No piloto, a
+associação só é aceita depois que o provedor confirma o mesmo e-mail e uma
+identidade estável.
 
 ## Papéis
 
@@ -33,4 +34,5 @@ provedor confirmar o mesmo e-mail e uma identidade estável.
 
 Instalações locais e Web privadas de usuário único continuam funcionando como
 antes. O único usuário permanece operador e proprietário dos projetos existentes.
-Convites pendentes não ampliam a lista de acesso OIDC nesta fase.
+Convites pendentes não ampliam a lista fixa do servidor; somente o gate controlado
+consulta cada pré-autorização válida no banco.

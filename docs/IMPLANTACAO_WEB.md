@@ -43,15 +43,16 @@ Edite `deploy/web.env` e substitua todos os valores de exemplo. São obrigatóri
 
 - `RAG_DOMAIN`: somente o domínio, sem `https://`, porta ou caminho;
 - `RAG_DEPLOYMENT_PROFILE=web_private`;
-- `RAG_USER_MODE=single_user`;
-- `RAG_AUTH_ALLOWED_EMAILS`: exatamente um e-mail;
+- `RAG_USER_MODE=single_user` normalmente, ou `multi_user` somente no piloto
+  explicitamente confirmado;
+- `RAG_AUTH_ALLOWED_EMAILS`: exatamente um e-mail administrativo nos dois modos;
 - `DB_NAME` e `DB_USER` com identificadores simples;
 - `DB_PASSWORD` aleatória, com pelo menos 16 caracteres.
 - `RAG_MAX_UPLOAD_MB`: teto global aceito pelo servidor;
 - `RAG_MAX_PDF_UPLOAD_MB`: limite de cada artigo em PDF;
 - `RAG_MAX_BACKUP_UPLOAD_MB`: limite de importação do `.ragbackup`;
 - `RAG_MIN_FREE_STORAGE_MB`: reserva que não pode ser consumida por uma operação.
-- `RAG_JOB_WORKERS=1`: concorrência fixa da fila no perfil de usuário único;
+- `RAG_JOB_WORKERS=1`: concorrência fixa da fila na Web privada;
 - `RAG_JOB_HEARTBEAT_SECONDS` e `RAG_JOB_STALE_SECONDS`: detecção segura de
   processamento interrompido;
 - `RAG_JOB_MAX_ATTEMPTS` e `RAG_JOB_RETRY_BASE_SECONDS`: limite e intervalo inicial
@@ -90,7 +91,8 @@ docker compose --env-file deploy/web.env -f docker-compose.web.yml run --rm pref
 O comando retorna somente mensagens seguras. Ele não imprime senhas, chaves, e-mail
 ou valores recebidos. A implantação é interrompida quando identifica:
 
-- perfil diferente de Web privada e usuário único;
+- perfil diferente de Web privada ou modo de usuário desconhecido;
+- piloto multiusuário sem as duas confirmações explícitas ou sem backup externo;
 - domínio local, IP, URL com protocolo, porta ou caminho;
 - mais de um e-mail ou endereço inválido;
 - credencial padrão, ausente ou fraca no PostgreSQL;
@@ -100,6 +102,10 @@ ou valores recebidos. A implantação é interrompida quando identifica:
 - limites de upload ausentes, inválidos ou maiores que o teto do servidor.
 
 O mesmo preflight é uma dependência obrigatória do banco no Compose Web.
+
+Para o ensaio com uma segunda conta, siga
+[Piloto OIDC controlado](PILOTO_OIDC_CONTROLADO.md). O modo padrão permanece
+`single_user` e não deve ser alterado sem concluir a preparação e o backup descritos.
 
 ## 4. Subir a aplicação
 

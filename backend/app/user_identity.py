@@ -281,6 +281,37 @@ def enforce_authenticated_identity() -> ApplicationUser | None:
     return None
 
 
+def enforce_project_creation_access() -> ApplicationUser | None:
+    """Restringe criações ao operador durante o piloto multiusuário."""
+
+    user = enforce_authenticated_identity()
+    user_mode = os.getenv("RAG_USER_MODE", "single_user").strip().lower()
+    if user_mode == "multi_user" and (not user or not user.is_operator):
+        raise PermissionError(
+            "Durante o piloto multiusuário, somente o operador pode criar ou importar projetos."
+        )
+    return user
+
+
+def enforce_multi_user_pilot_principal(
+    user: ApplicationUser,
+    authorization_source: str | None,
+    *,
+    user_mode: str,
+) -> ApplicationUser:
+    """Impede que a lista fixa promova implicitamente um novo operador."""
+
+    if (
+        str(user_mode).strip().lower() == "multi_user"
+        and authorization_source == "server_allowlist"
+        and not user.is_operator
+    ):
+        raise PermissionError(
+            "O e-mail administrativo não corresponde ao operador registrado."
+        )
+    return user
+
+
 def require_installation_operator(*, connection_factory=None) -> ApplicationUser:
     """Revalida no banco o papel global antes de uma operação da instalação."""
 

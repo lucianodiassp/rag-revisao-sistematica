@@ -7,8 +7,11 @@ from backend.app.operational_health import (
     HealthCheck,
     build_health_report,
     check_access_integrity,
+    check_ai_configuration,
+    check_bibliographic_sources,
     main,
 )
+from backend.app.user_identity import bind_current_user
 
 
 def test_latest_schema_is_required_by_operational_health():
@@ -52,6 +55,8 @@ def test_access_integrity_reports_orphaned_projects_without_exposing_users():
         {
             "orphaned_projects": 1,
             "active_operators": 1,
+            "oidc_ready_operators": 1,
+            "valid_pending_invitations": 0,
             "unsafe_pending_invitations": 0,
         }
     )
@@ -62,6 +67,50 @@ def test_access_integrity_reports_orphaned_projects_without_exposing_users():
     assert check.details["orphaned_projects"] == 1
     assert "email" not in check.details
     assert "active_owners <> 1" in cursor.execute.call_args.args[0]
+    assert "oidc_ready_operators" in cursor.execute.call_args.args[0]
+
+
+def test_multi_user_integrity_requires_stable_oidc_operator(monkeypatch):
+    monkeypatch.setenv("RAG_DEPLOYMENT_PROFILE", "web_private")
+    monkeypatch.setenv("RAG_USER_MODE", "multi_user")
+    factory, _cursor = _connection(
+        {
+            "orphaned_projects": 0,
+            "active_operators": 1,
+            "oidc_ready_operators": 0,
+            "valid_pending_invitations": 1,
+            "unsafe_pending_invitations": 0,
+        }
+    )
+
+    with patch("backend.app.operational_health.get_connection", factory):
+        check = check_access_integrity()
+
+    assert check.status == "error"
+    assert check.details["oidc_ready_operators"] == 0
+    assert "email" not in check.details
+
+
+def test_unbound_multi_user_health_does_not_read_private_ai_configuration(monkeypatch):
+    monkeypatch.setenv("RAG_DEPLOYMENT_PROFILE", "web_private")
+    monkeypatch.setenv("RAG_USER_MODE", "multi_user")
+    bind_current_user(None)
+
+    check = check_ai_configuration()
+
+    assert check.status == "ok"
+    assert check.details == {"scope": "authenticated_user", "session_required": True}
+
+
+def test_unbound_multi_user_health_does_not_read_private_source_configuration(monkeypatch):
+    monkeypatch.setenv("RAG_DEPLOYMENT_PROFILE", "web_private")
+    monkeypatch.setenv("RAG_USER_MODE", "multi_user")
+    bind_current_user(None)
+
+    check = check_bibliographic_sources()
+
+    assert check.status == "ok"
+    assert check.details == {"scope": "authenticated_user", "session_required": True}
 
 
 @patch("backend.app.operational_health.recent_job_failures", return_value=[])

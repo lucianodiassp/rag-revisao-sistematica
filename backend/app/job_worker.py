@@ -314,7 +314,7 @@ def main():
     configured_workers = int(os.getenv("RAG_JOB_WORKERS", "1"))
     if configured_workers != 1:
         raise RuntimeError(
-            "A versão Web privada de usuário único exige RAG_JOB_WORKERS=1."
+            "A versão Web privada exige RAG_JOB_WORKERS=1."
         )
     worker = JobWorker()
     signal.signal(signal.SIGTERM, worker.request_stop)

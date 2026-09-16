@@ -90,3 +90,22 @@ def test_auth_gate_uses_project_admission_only_for_future_multi_user_mode():
     assert "multi_user_admission_source" in gate
     assert "additional_allowed_emails=(decision.email,)" in gate
     assert "multi_user_admission_check_failed" in gate
+    assert "enforce_multi_user_pilot_principal" in gate
+
+
+def test_navigation_identifies_controlled_multi_user_pilot():
+    navigation = (ROOT / "frontend/app.py").read_text(encoding="utf-8")
+
+    assert 'metadata["user_mode"] == "multi_user"' in navigation
+    assert "Piloto multiusuário controlado" in navigation
+
+
+def test_research_configuration_limits_project_creation_during_pilot():
+    page = (ROOT / "frontend/views/0_Configuracao_Pesquisa.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "pilot_collaborator" in page
+    assert "current_user_is_operator" in page
+    assert "projetos são criados somente pelo operador" in page
+    assert "Solicite acesso ao operador" in page

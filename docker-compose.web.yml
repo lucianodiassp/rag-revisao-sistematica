@@ -80,7 +80,7 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       RAG_DEPLOYMENT_PROFILE: web_private
-      RAG_USER_MODE: single_user
+      RAG_USER_MODE: ${RAG_USER_MODE:-single_user}
       RAG_MANAGED_STORAGE: "true"
       AI_CONFIG_DATABASE_ENABLED: "true"
       AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
@@ -124,7 +124,7 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       RAG_DEPLOYMENT_PROFILE: web_private
-      RAG_USER_MODE: single_user
+      RAG_USER_MODE: ${RAG_USER_MODE:-single_user}
       RAG_MANAGED_STORAGE: "true"
       AI_CONFIG_DATABASE_ENABLED: "true"
       AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
@@ -166,7 +166,7 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       RAG_DEPLOYMENT_PROFILE: web_private
-      RAG_USER_MODE: single_user
+      RAG_USER_MODE: ${RAG_USER_MODE:-single_user}
       RAG_MANAGED_STORAGE: "true"
       AI_LOCAL_MASTER_KEY_PATH: /app/data/private/master.key
       PDF_DIRECTORY: /app/data/pdfs
