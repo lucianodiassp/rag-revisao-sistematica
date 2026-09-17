@@ -94,6 +94,10 @@ associações e recibos permanecem preservados no banco.
 - [x] Retorno a usuário único validado sem perda de dados.
 - [x] Evidências registradas sem e-mails, tokens, chaves ou conteúdo científico.
 - [x] Preparar `release/v2.6.0` somente após aprovação integral do piloto.
-- [ ] Integrar a promoção em `main`, criar a tag estável e atualizar a VPS.
+- [x] Integrar a promoção em `main`, criar a tag estável e atualizar a VPS.
 
 Não mova a tag da candidata. Correções produzem `v2.6.0-rc.2`.
+
+Promoção concluída em 2026-09-16: a tag estável `v2.6.0` aponta para o merge
+`ffac24b`, a VPS reporta a versão correta em `single_user`, os componentes estão
+saudáveis e o endpoint público responde com `HTTP/2 200`.

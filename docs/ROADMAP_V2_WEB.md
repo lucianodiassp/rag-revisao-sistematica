@@ -12,8 +12,8 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: integração das próximas entregas; promoção `v2.6.0` preparada após a
-  aprovação da candidata `v2.6.0-rc.1` no piloto OIDC controlado.
+- `main`: integração das próximas entregas; versão estável `v2.6.0` publicada e
+  validada na VPS após a aprovação da candidata `v2.6.0-rc.1` no piloto OIDC.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 
@@ -153,8 +153,8 @@ endurecimento operacional da Web privada de usuário único.
    isolada e backup externo. Contém arquivamento reversível, restauração, exclusão
    permanente protegida, limpeza de PDFs e recibos imutáveis.
    [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
-7. `v2.6.x`: fundação multiusuário — concluída e preparada para promoção em
-   `v2.6.0`, com identidade OIDC
+7. `v2.6.x`: fundação multiusuário — concluída, promovida para `v2.6.0` e validada
+   na VPS, com identidade OIDC
    persistente, propriedade explícita, migração segura dos projetos atuais,
    propagação do solicitante para tarefas em segundo plano e credenciais e
    preferências privadas de IA/fontes bibliográficas por usuário. Operações globais
