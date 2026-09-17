@@ -83,3 +83,16 @@ encerraram com código zero, todos os serviços ficaram saudáveis, a identidade
 `2.6.0` foi confirmada dentro da aplicação e o diagnóstico completo reconheceu a
 migração `024` com estado geral `healthy`. A tag estável deve apontar para o merge
 dessa branch em `main`, nunca para o commit da candidata.
+
+## Fechamento da versão estável
+
+A promoção foi integrada à `main` pelo PR #78. A tag anotada `v2.6.0` aponta para
+o merge `ffac24b` e foi publicada como release estável e mais recente.
+
+Na VPS, o preflight reconheceu `2.6.0 · Web privada · Usuário único`. A atualização
+preservou projetos, alteração do piloto, registros de acesso e configurações
+privadas. Aplicação, PostgreSQL, worker, agendador e proxy ficaram saudáveis; as
+migrações encerraram com código zero, o diagnóstico reconheceu
+`024_user_access_administration.sql`, um operador OIDC pronto, ausência de projetos
+órfãos e convites inseguros e estado geral `healthy`. O endpoint público respondeu
+com `HTTP/2 200`.

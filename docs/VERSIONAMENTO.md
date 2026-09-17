@@ -82,6 +82,11 @@ os formatos v1 de backup e pacote acadêmico. O piloto Web partiu da tag imutáv
 candidata e aprovou a promoção em `release/v2.4.0`, sem mover ou reutilizar a tag.
 A tag estável `v2.4.0` foi publicada no merge da promoção e validada na VPS.
 
+A fundação multiusuário foi aprovada na candidata imutável `v2.6.0-rc.1` com duas
+contas OIDC, convite, alternância de papel e revogação. A promoção `v2.6.0` aponta
+para o merge `ffac24b`, mantém `single_user` como padrão e foi validada na VPS sem
+mover a tag da candidata.
+
 ## Fluxo concluído da v1.0.0
 
 1. Mesclar a branch de versionamento na `main`.
