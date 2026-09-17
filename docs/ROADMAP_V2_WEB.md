@@ -12,8 +12,8 @@ isolamento por proprietário e revisão das rotinas administrativas.
 
 ## Estratégia de branches
 
-- `main`: integração das próximas entregas; versão estável `v2.5.0` publicada e
-  validada na VPS após a aprovação da candidata `v2.5.0-rc.1` no piloto Web.
+- `main`: integração das próximas entregas; promoção `v2.6.0` preparada após a
+  aprovação da candidata `v2.6.0-rc.1` no piloto OIDC controlado.
 - `v2-web`: linha histórica usada para integrar a primeira versão Web.
 - novas branches: correções e funcionalidades passam a partir da `main`.
 
@@ -153,7 +153,8 @@ endurecimento operacional da Web privada de usuário único.
    isolada e backup externo. Contém arquivamento reversível, restauração, exclusão
    permanente protegida, limpeza de PDFs e recibos imutáveis.
    [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
-7. `v2.6.x`: fundação multiusuário — candidata `2.6.0-rc.1` em preparação, com identidade OIDC
+7. `v2.6.x`: fundação multiusuário — concluída e preparada para promoção em
+   `v2.6.0`, com identidade OIDC
    persistente, propriedade explícita, migração segura dos projetos atuais,
    propagação do solicitante para tarefas em segundo plano e credenciais e
    preferências privadas de IA/fontes bibliográficas por usuário. Operações globais
@@ -162,16 +163,17 @@ endurecimento operacional da Web privada de usuário único.
    PDFs, além de triagem, deduplicação, calibração, qualidade metodológica,
    confiança, fluxo visual, agentes, Golden Set, PRISMA e exportação acadêmica já
    adotam papéis de leitura/edição no backend. O modo multiusuário continua
-   bloqueado. A administração de acesso já registra convites por e-mail verificado,
+   desabilitado por padrão. A administração de acesso registra convites por e-mail verificado,
    papéis, revogações, contas ativas/desativadas e transferência atômica de
    titularidade, mas ainda não representa cadastro público ou compartilhamento
    liberado em produção. A matriz negativa automatizada já cobre duas identidades,
    dois projetos, papéis, revogação, ciclo de vida, criação transacional e a
    separação entre operador global e acesso científico. O piloto OIDC controlado
-   agora possui ativação dupla, entrada somente por convite, exigência de backup
-   externo e procedimento de reversão; a promoção depende de executá-lo com uma
-   segunda conta real na VPS.
+   possui ativação dupla, entrada somente por convite, exigência de backup externo
+   e procedimento de reversão. O piloto com uma segunda conta real aprovou edição,
+   redução para leitura, revogação, isolamento privado, backups e retorno seguro a
+   `single_user`.
    [Escopo incremental](MULTIUSER_FOUNDATION.md).
 8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
-   modelos e isolamento operacional; não faz parte da `v2.5.x`.
+   modelos e isolamento operacional; não faz parte da `v2.6.x`.
 9. `v3.x`: compartilhamento de projetos, cadastro público, cotas e escalabilidade.

@@ -15,9 +15,9 @@ As evidências ficam em [VALIDACAO_V2_6_RC1.md](VALIDACAO_V2_6_RC1.md).
 - [x] Identidade `2.6.0-rc.1`, 442 testes e contratos de implantação aprovados.
 - [x] Docker local reconstruído, migrações com código zero e serviços saudáveis.
 - [x] Diagnóstico completo local saudável.
-- [ ] Commit da branch `release/v2.6.0-rc.1` enviado ao GitHub.
-- [ ] Pull request para `main`, checks e merge concluídos.
-- [ ] Tag anotada `v2.6.0-rc.1` publicada como pré-release.
+- [x] Commit da branch `release/v2.6.0-rc.1` enviado ao GitHub.
+- [x] Pull request para `main`, checks e merge concluídos.
+- [x] Tag anotada `v2.6.0-rc.1` publicada como pré-release.
 
 ## 2. Implantação inicial da tag em usuário único
 
@@ -41,23 +41,23 @@ curl -I https://revisaorag.tech
 sudo docker compose --env-file deploy/web.env -f docker-compose.web.yml exec -T app python -m backend.app.operational_health --component full
 ```
 
-- [ ] Preflight e migrações `020` a `024` terminam com código zero.
-- [ ] Aplicação, PostgreSQL, worker, agendador e proxy ficam saudáveis.
-- [ ] HTTPS retorna `200` e o menu mostra `2.6.0-rc.1 · Web privada · Usuário único`.
-- [ ] Projetos, navegação, credenciais e tarefas permanecem operacionais.
-- [ ] Diagnóstico informa um operador ativo e `oidc_ready_operators: 1`.
+- [x] Preflight e migrações `020` a `024` terminam com código zero.
+- [x] Aplicação, PostgreSQL, worker, agendador e proxy ficam saudáveis.
+- [x] HTTPS retorna `200` e o menu mostra `2.6.0-rc.1 · Web privada · Usuário único`.
+- [x] Projetos, navegação, credenciais e tarefas permanecem operacionais.
+- [x] Diagnóstico informa um operador ativo e `oidc_ready_operators: 1`.
 
 Não prossiga se o operador OIDC não estiver pronto ou se o backup externo não
 estiver em estado de sucesso.
 
 ## 3. Preparação do piloto
 
-- [ ] Escolher um projeto não crítico para o compartilhamento controlado.
-- [ ] Registrar convite válido para o e-mail verificado da segunda conta.
-- [ ] Iniciar com papel `viewer`; não adicionar a segunda conta à allowlist do servidor.
-- [ ] Confirmar `valid_pending_invitations >= 1`, `orphaned_projects: 0` e
+- [x] Escolher um projeto não crítico para o compartilhamento controlado.
+- [x] Registrar convite válido para o e-mail verificado da segunda conta.
+- [x] Manter a segunda conta fora da allowlist e testar `editor` seguido de `viewer`.
+- [x] Confirmar `valid_pending_invitations >= 1`, `orphaned_projects: 0` e
   `unsafe_pending_invitations: 0` no diagnóstico.
-- [ ] Gerar e validar novo backup completo e confirmar a cópia externa.
+- [x] Gerar e validar novo backup completo e confirmar a cópia externa.
 
 No `deploy/web.env`, preservar exatamente um e-mail administrativo e ativar:
 
@@ -75,15 +75,15 @@ desabilitado.
 
 Use duas sessões de navegador independentes.
 
-- [ ] O operador mantém acesso aos próprios projetos e às páginas administrativas.
-- [ ] A segunda conta entra somente pelo convite e vê apenas o projeto recebido.
-- [ ] Como `viewer`, a segunda conta lê, mas não altera nem cria/importa projetos.
-- [ ] Após promoção para `editor`, uma alteração controlada conclui normalmente.
-- [ ] Credenciais e preferências privadas não aparecem entre as contas.
-- [ ] Revogação remove o acesso da segunda conta sem acesso residual.
-- [ ] Backup, restauração e diagnóstico continuam exclusivos do operador.
-- [ ] Fila, RAG, relatórios, PDFs e navegação não apresentam regressão.
-- [ ] Backup pós-piloto é gerado, baixado, validado e confirmado no destino externo.
+- [x] O operador mantém acesso aos próprios projetos e às páginas administrativas.
+- [x] A segunda conta entra somente pelo convite e vê apenas o projeto recebido.
+- [x] Como `viewer`, a segunda conta lê, mas não altera nem cria/importa projetos.
+- [x] Como `editor`, uma alteração controlada conclui normalmente.
+- [x] Credenciais e preferências privadas não aparecem entre as contas.
+- [x] Revogação remove o acesso da segunda conta sem acesso residual.
+- [x] Backup, restauração e diagnóstico continuam exclusivos do operador.
+- [x] Fila, RAG, relatórios, PDFs e navegação não apresentam regressão.
+- [x] Backup pós-piloto é gerado, baixado, validado e confirmado no destino externo.
 
 ## 5. Reversão e promoção
 
@@ -91,8 +91,9 @@ Para encerrar o piloto, retorne `RAG_USER_MODE=single_user`, desative a flag e
 reaplique o Compose. Não é necessário restaurar o backup: usuários, convites,
 associações e recibos permanecem preservados no banco.
 
-- [ ] Retorno a usuário único validado sem perda de dados.
-- [ ] Evidências registradas sem e-mails, tokens, chaves ou conteúdo científico.
-- [ ] Preparar `release/v2.6.0` somente após aprovação integral do piloto.
+- [x] Retorno a usuário único validado sem perda de dados.
+- [x] Evidências registradas sem e-mails, tokens, chaves ou conteúdo científico.
+- [x] Preparar `release/v2.6.0` somente após aprovação integral do piloto.
+- [ ] Integrar a promoção em `main`, criar a tag estável e atualizar a VPS.
 
 Não mova a tag da candidata. Correções produzem `v2.6.0-rc.2`.

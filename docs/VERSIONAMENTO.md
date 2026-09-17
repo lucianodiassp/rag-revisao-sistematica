@@ -6,7 +6,7 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.6.0-rc.1` | Candidata do piloto OIDC multiusuário controlado |
+| Aplicação | `2.6.0` | Fundação multiusuário com piloto OIDC controlado |
 | Migração do banco | `024` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
@@ -59,11 +59,12 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
 - `2.6.0-rc.1`: candidata sem cadastro público, com identidades persistentes,
   propriedade e papéis por projeto, operador global, convites e piloto OIDC
   protegido por ativação dupla e backup externo.
+- `2.6.0`: promoção estável da fundação após piloto real com convite, troca de papel,
+  revogação, backups e retorno seguro ao perfil de usuário único.
 
 O sufixo `-rc.N` identifica as candidatas e impede que sejam confundidas com
-releases estáveis. A versão estável atual é `v2.5.0`; a candidata `2.6.0-rc.1`
-deve permanecer imutável durante o piloto, assim como `2.5.0-rc.1` permanece no
-histórico da versão anterior.
+releases estáveis. A versão estável atual é `v2.6.0`; a candidata `2.6.0-rc.1`
+permanece imutável no histórico do piloto, assim como as candidatas anteriores.
 
 A implementação multiprovedor foi incorporada à `main` pelo PR #51, validada na
 candidata `v2.2.0-rc.1` e promovida em `release/v2.2.0`, sem mover ou reutilizar a

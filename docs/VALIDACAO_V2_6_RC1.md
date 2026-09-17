@@ -37,11 +37,49 @@ pelo PR #76. Antes da preparação da candidata:
 
 ## Piloto Web
 
-A candidata deve ser implantada primeiro em usuário único. A ativação multiusuário
-só pode ocorrer depois de confirmar operador OIDC estável, convite válido, backup
-externo em sucesso e plano de reversão. O roteiro reproduzível está em
-[CHECKLIST_RELEASE_V2_6.md](CHECKLIST_RELEASE_V2_6.md) e os detalhes de segurança em
-[PILOTO_OIDC_CONTROLADO.md](PILOTO_OIDC_CONTROLADO.md).
+A tag imutável `v2.6.0-rc.1`, no commit
+`e1323e1e889c5b3237de803ca612418d02cb0f0f`, foi publicada como pré-release e
+instalada na VPS em 2026-09-16.
 
-Este documento será completado com contagens, horários e resultados sem registrar
-e-mails, identificadores OIDC, tokens, chaves ou conteúdo dos projetos.
+- a candidata foi implantada primeiro em `single_user`; preflight, migrações,
+  serviços, HTTPS e diagnóstico permaneceram saudáveis;
+- o diagnóstico confirmou um operador OIDC pronto, nenhum projeto órfão ou convite
+  inseguro e backup externo em estado de sucesso;
+- um convite válido para uma segunda identidade conhecida foi registrado sem
+  acrescentá-la à allowlist administrativa;
+- o preflight aceitou `multi_user` somente depois da ativação dupla e da confirmação
+  do backup externo;
+- a segunda conta entrou somente pelo convite e visualizou apenas o projeto recebido;
+- como `editor`, registrou uma alteração controlada; depois de reduzida a `viewer`,
+  manteve leitura, mas não conseguiu salvar novas alterações;
+- criação e importação de projetos permaneceram restritas ao operador, e as rotinas
+  de backup e diagnóstico não ficaram disponíveis ao colaborador;
+- configurações privadas do operador não foram expostas à segunda identidade;
+- a revogação retirou o acesso imediatamente, e uma nova autenticação terminou em
+  acesso não autorizado, sem acesso residual ao projeto;
+- projeto e alteração permaneceram preservados para o operador.
+
+## Backup e reversão
+
+Backups completos foram gerados, baixados e validados antes e depois do piloto. A
+cópia externa posterior também foi confirmada no Cloudflare R2 privado.
+
+O arquivo privado voltou a `single_user`, as confirmações temporárias do piloto
+foram removidas e o preflight foi repetido. Os serviços retornaram saudáveis, HTTPS,
+projetos, alteração e diagnóstico permaneceram disponíveis ao operador, e nenhuma
+restauração de dados foi necessária. Usuário, associação revogada e recibos ficaram
+preservados para auditoria sem conceder acesso.
+
+Todos os critérios da candidata foram aprovados. Não foi necessária uma
+`v2.6.0-rc.2`; a promoção estável pode prosseguir em `release/v2.6.0` sem mover a
+tag da candidata.
+
+## Preparação da promoção estável
+
+A branch `release/v2.6.0` atualiza somente identidade e documentação. A suíte
+completa permaneceu com **442 testes aprovados**, e os contratos de implantação
+incluídos na suíte continuaram válidos. O Docker local foi reconstruído; migrações
+encerraram com código zero, todos os serviços ficaram saudáveis, a identidade
+`2.6.0` foi confirmada dentro da aplicação e o diagnóstico completo reconheceu a
+migração `024` com estado geral `healthy`. A tag estável deve apontar para o merge
+dessa branch em `main`, nunca para o commit da candidata.

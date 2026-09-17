@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.6.0--dev-blue.svg)
+![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -94,11 +94,12 @@ ausência de tarefas ativas, backup posterior e confirmação explícita. O flux
 validado localmente, na Web privada e em uma restauração isolada. Consulte
 [Gestão do ciclo de vida dos projetos](docs/PROJECT_LIFECYCLE.md).
 
-A candidata **2.6.0-rc.1** prepara um piloto OIDC multiusuário controlado, sem
-cadastro público: identidades persistentes, propriedade explícita, papéis por
-projeto, credenciais privadas por usuário, administração por convites e operação
-global restrita. O padrão continua sendo usuário único; o piloto exige ativação
-dupla, backup externo e uma segunda conta convidada. Consulte
+A versão estável **2.6.0** acrescenta a fundação multiusuário e o piloto OIDC
+controlado, sem cadastro público: identidades persistentes, propriedade explícita,
+papéis por projeto, credenciais privadas por usuário, administração por convites e
+operação global restrita. O padrão continua sendo usuário único; o modo multiusuário
+permanece opt-in, exige ativação dupla e backup externo e foi aprovado com uma
+segunda conta real antes da promoção. Consulte
 [Fundação multiusuário](docs/MULTIUSER_FOUNDATION.md) e
 [Piloto OIDC controlado](docs/PILOTO_OIDC_CONTROLADO.md).
 

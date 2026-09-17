@@ -6,6 +6,22 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.6.0] — 2026-09-16
+
+### Promoção da fundação multiusuário
+
+- Promovidas identidades persistentes, propriedade e papéis por projeto,
+  configurações privadas por usuário, operador da instalação e administração de
+  convites após aprovação da candidata `v2.6.0-rc.1`.
+- O piloto OIDC real confirmou entrada somente por convite, isolamento entre
+  projetos e credenciais, edição por `editor`, redução imediata para `viewer` e
+  revogação sem acesso residual.
+- Criação e importação permaneceram restritas ao operador; backup local e externo,
+  diagnóstico saudável e retorno seguro a `single_user` foram validados sem perda
+  de dados ou restauração.
+- O modo multiusuário continua desabilitado por padrão, requer confirmação explícita
+  e não representa cadastro público, autoatendimento ou múltiplos operadores.
+
 ## [2.6.0-rc.1] — 2026-09-16
 
 ### Fundação multiusuário
