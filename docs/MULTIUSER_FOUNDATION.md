@@ -5,7 +5,7 @@
 Preparar identidade persistente e propriedade de projetos sem transformar a
 instalação privada atual em serviço público antes que todas as barreiras de
 autorização estejam prontas. A versão estável `v2.5.0` continua sendo a referência
-operacional; esta evolução começa em `2.6.0-dev`.
+operacional; a candidata controlada desta evolução é `2.6.0-rc.1`.
 
 ## Primeira entrega
 
@@ -198,7 +198,7 @@ os mesmos projetos e funcionalidades após a atualização.
 ## Validação inicial
 
 1. aplicar a migração `020` duas vezes e confirmar idempotência;
-2. abrir a aplicação local e confirmar `Versão 2.6.0-dev · Local · Usuário único`;
+2. abrir a aplicação local e confirmar `Versão 2.6.0-rc.1 · Local · Usuário único`;
 3. conferir que todos os projetos existentes continuam no seletor;
 4. criar ou importar um projeto e confirmar sua associação como proprietário;
 5. arquivar e restaurar esse projeto sem afetar os demais;

@@ -6,8 +6,8 @@ O projeto mantém separadas as seguintes identidades:
 
 | Identidade | Exemplo | Responsabilidade |
 |---|---:|---|
-| Aplicação | `2.6.0-dev` | Fundação de identidade e propriedade de projetos |
-| Migração do banco | `020` | Evolução progressiva do schema PostgreSQL |
+| Aplicação | `2.6.0-rc.1` | Candidata do piloto OIDC multiusuário controlado |
+| Migração do banco | `024` | Evolução progressiva do schema PostgreSQL |
 | Formato do backup | `1` | Leitura e restauração do `.ragbackup` |
 | Pacote de reprodutibilidade | `1` | Exportação e importação acadêmica |
 | Protocolo científico | `v3` | Histórico metodológico dentro de cada projeto |
@@ -56,12 +56,14 @@ por `RAG_DEPLOYMENT_PROFILE=local|web_private`; o modo de usuários, por
   permanente condicionada a backup posterior e recibos imutáveis.
 - `2.5.0`: promoção estável aprovada localmente, na Web privada e por restauração
   isolada, com backup externo confirmado no destino S3 compatível.
-- `2.6.0-dev`: fundação ainda não pública para identidades persistentes e
-  propriedade de projetos; o preflight Web permanece em usuário único.
+- `2.6.0-rc.1`: candidata sem cadastro público, com identidades persistentes,
+  propriedade e papéis por projeto, operador global, convites e piloto OIDC
+  protegido por ativação dupla e backup externo.
 
 O sufixo `-rc.N` identifica as candidatas e impede que sejam confundidas com
-releases estáveis. A versão estável atual é `v2.5.0`; a linha `2.6.0-dev` ainda não
-é uma candidata, e `2.5.0-rc.1` permanece como pré-release imutável do piloto.
+releases estáveis. A versão estável atual é `v2.5.0`; a candidata `2.6.0-rc.1`
+deve permanecer imutável durante o piloto, assim como `2.5.0-rc.1` permanece no
+histórico da versão anterior.
 
 A implementação multiprovedor foi incorporada à `main` pelo PR #51, validada na
 candidata `v2.2.0-rc.1` e promovida em `release/v2.2.0`, sem mover ou reutilizar a

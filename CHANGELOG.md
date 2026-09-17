@@ -6,9 +6,11 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+## [2.6.0-rc.1] — 2026-09-16
+
 ### Fundação multiusuário
 
-- Iniciada a identidade `2.6.0-dev` com usuários persistentes derivados do sujeito
+- Preparada a candidata `2.6.0-rc.1` com usuários persistentes derivados do sujeito
   estável do provedor OIDC ou do perfil local.
 - Projetos passam a possuir associação explícita de proprietário; instalações de
   usuário único adotam somente projetos ainda sem associação durante a migração.
@@ -100,6 +102,9 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 - A lista administrativa não promove implicitamente uma nova identidade: no piloto,
   ela precisa corresponder a um operador OIDC já registrado, e o diagnóstico mostra
   apenas contadores de prontidão e convites válidos.
+- A candidata preserva `single_user` como padrão seguro e registra o roteiro de
+  implantação, validação com uma segunda conta real e reversão sem restauração de
+  dados; nenhuma abertura pública faz parte deste ciclo.
 
 ## [2.5.0] — 2026-09-05
 
