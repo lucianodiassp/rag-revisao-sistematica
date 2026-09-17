@@ -42,10 +42,12 @@ fluxo de uma revisão dentro de projetos isolados. Cada projeto possui pergunta,
 protocolo versionado, artigos, decisões, PDFs, embeddings, evidências, interações de
 agentes, auditorias e relatórios próprios.
 
-O perfil padrão de implantação continua sendo **local e de usuário único**. A versão
-`2.2.0` oferece o perfil **Web privado**, também de usuário único, protegido
-por autenticação OIDC e autorização explícita por e-mail. Isolamento entre usuários
-continua reservado para uma evolução posterior.
+O perfil padrão de implantação continua sendo **local e de usuário único**. O perfil
+**Web privado** exige autenticação OIDC e pode operar em `single_user` ou no modo
+`multi_user` controlado da v2.6. Neste último, identidades, projetos, tarefas,
+credenciais e preferências são isolados por usuário e papel. Não existe cadastro
+público: a ativação é explícita, exige backup externo e colaboradores entram somente
+por convite.
 
 A versão **2.3.0 — Local e Web privada, usuário único** foi publicada e validada
 na VPS em 2026-09-03. Ela preserva o
@@ -106,9 +108,11 @@ segunda conta real antes da promoção. Consulte
 ### Autenticação da Web privada
 
 Quando `RAG_DEPLOYMENT_PROFILE=web_private`, a aplicação exige login OIDC antes de
-criar a navegação ou exibir dados. A autorização é limitada aos e-mails definidos
-em `RAG_AUTH_ALLOWED_EMAILS`; no modo `single_user`, informe exatamente um e-mail.
-O perfil `local` permanece acessível sem login.
+criar a navegação ou exibir dados. `RAG_AUTH_ALLOWED_EMAILS` contém exatamente o
+e-mail administrativo do operador. Em `single_user`, somente essa identidade entra;
+no `multi_user` controlado, colaboradores adicionais entram exclusivamente por
+convites válidos registrados no banco, nunca por novos e-mails nessa variável. O
+perfil `local` permanece acessível sem login.
 
 As credenciais do provedor ficam em `.streamlit/secrets.toml`, que não é enviado ao
 Git nem incluído no build. Consulte o guia
@@ -120,7 +124,8 @@ Microsoft ou outro provedor OIDC e validar o fluxo completo.
 O arquivo `docker-compose.web.yml` mantém PostgreSQL e Streamlit em redes Docker
 sem portas públicas e expõe somente o Caddy nas portas `80/443`. Antes de iniciar
 qualquer serviço de dados, um preflight exige domínio público, HTTPS/OIDC coerente,
-um único e-mail autorizado e senha forte de banco, sem imprimir esses valores.
+um único e-mail administrativo e senha forte de banco, sem imprimir esses valores.
+O modo multiusuário também exige confirmação dupla e backup externo configurado.
 
 O procedimento completo está em
 [Implantação Web privada](docs/IMPLANTACAO_WEB.md). A configuração foi exercitada
@@ -160,6 +165,26 @@ atualização, investigação de falhas e retorno seguro de versão.
 - Alerta de impacto quando já existem buscas, artigos ou pareceres de triagem.
 - Identificador estável de artigo por projeto, baseado no DOI normalizado ou no título normalizado.
 - Consolidação de duplicatas com preservação da proveniência das diferentes fontes.
+
+### Identidade, papéis e administração de acesso
+
+- Identidade persistente derivada do perfil local ou do par estável de provedor e
+  sujeito OIDC; tokens de autenticação não são armazenados.
+- Cada projeto possui exatamente um proprietário ativo e associações nos papéis
+  `owner`, `editor` e `viewer`.
+- `viewer` consulta; `editor` altera o conteúdo científico; `owner` também administra
+  membros e o ciclo de vida do projeto.
+- Convites por e-mail verificado possuem papel, validade e revogação explícita e são
+  aceitos no primeiro login correspondente.
+- Alteração de papel, revogação, transferência de titularidade e ativação de contas
+  geram recibos de auditoria sem tokens, chaves ou conteúdo científico.
+- O operador da instalação é independente dos papéis dos projetos e controla backup,
+  restauração, diagnóstico e estado das contas.
+- Tarefas em segundo plano registram o solicitante e revalidam sua autorização antes
+  de executar, impedindo acesso residual após revogação.
+- Credenciais e preferências de IA e fontes bibliográficas são privadas por usuário.
+- Durante o piloto multiusuário, somente o operador cria ou importa projetos e
+  restaura o projeto demonstrativo; não há autoatendimento ou cadastro público.
 
 ### Projeto demonstrativo reproduzível
 
@@ -225,7 +250,8 @@ atualização, investigação de falhas e retorno seguro de versão.
 - Importação de arquivos **BibTeX**, incluindo exportações do Web of Science.
 - Prévia antes da importação, com contagem de registros válidos, sem DOI e sem abstract.
 - Ativação ou desativação individual de cada fonte.
-- Chaves opcionais armazenadas de forma cifrada, com `.env` como fallback.
+- Chaves opcionais armazenadas de forma cifrada, com `.env` como fallback apenas
+  nos perfis local e `single_user`.
 - E-mail, identificação da aplicação, timeout e tentativas configuráveis.
 - Teste de acesso sem persistir artigos.
 - Retry limitado para falhas transitórias e respostas `429`.
@@ -251,7 +277,8 @@ atualização, investigação de falhas e retorno seguro de versão.
 
 - Geração configurável por função com adaptadores para Google Gemini e OpenAI.
 - Combinação segura de provedores, preservando o Gemini nos embeddings de 768 dimensões.
-- Credencial cifrada no banco, com `backend/.env` como fallback.
+- Credencial cifrada no banco, com `backend/.env` como fallback apenas nos perfis
+  local e `single_user`.
 - Validação da chave pela listagem de modelos, sem gerar conteúdo.
 - Modelo e temperatura configuráveis para formulação, triagem, RAG, auditoria,
   extração, qualidade metodológica e relatório.
@@ -377,7 +404,8 @@ atualização, investigação de falhas e retorno seguro de versão.
 
 ```mermaid
 flowchart LR
-    A["Projeto e protocolo"] --> B["Coleta multifonte"]
+    U["Identidade OIDC/local + papel"] --> A["Projeto e protocolo"]
+    A --> B["Coleta multifonte"]
     A --> B2["Importação BibTeX"]
     B --> C["Deduplicação explicável + revisão humana"]
     B2 --> C
@@ -403,11 +431,13 @@ flowchart LR
 |---|---|
 | Interface | Streamlit multipágina |
 | Aplicação | Python, agentes e serviços de configuração |
+| Autenticação | OIDC na Web privada e identidade determinística no perfil local |
+| Autorização | Operador global, propriedade e papéis `owner`/`editor`/`viewer` por projeto |
 | Banco | PostgreSQL 16 com `pgvector` |
 | IA | Google Gemini e OpenAI com configuração central por função |
 | Coleta | OpenAlex, Semantic Scholar, NCBI E-utilities/PubMed e BibTeX |
 | Documentos | PyMuPDF para leitura e segmentação por página |
-| Segurança local | Fernet e chave-mestra fora do banco |
+| Segredos | Fernet e chave-mestra fora do banco, com escopo privado por usuário |
 
 ## Instalação local
 
@@ -611,6 +641,10 @@ A identidade aparece no menu lateral, nos logs de inicialização e nos manifest
 dos arquivos exportados. Backups e pacotes antigos, sem esse campo, continuam
 compatíveis e são identificados como anteriores ao versionamento da aplicação.
 
+`multi_user` não é uma alternativa automática ao padrão acima. Sua ativação exige
+as confirmações descritas em [Piloto OIDC controlado](docs/PILOTO_OIDC_CONTROLADO.md),
+backup externo e exatamente um operador na allowlist administrativa.
+
 Consulte o [`CHANGELOG.md`](CHANGELOG.md) para as alterações da release e o guia
 [`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md) para o processo de tags, manutenção
 das versões estáveis e criação das próximas branches a partir da `main`.
@@ -623,7 +657,8 @@ Na página **4. Configuração de IA** é possível:
 
 1. Selecionar Google Gemini ou OpenAI para administrar suas credenciais.
 2. Testar, cifrar e salvar uma chave independente para cada provedor.
-3. Importar `GEMINI_API_KEY` ou `OPENAI_API_KEY` do ambiente como fallback.
+3. Em perfil local ou `single_user`, importar `GEMINI_API_KEY` ou `OPENAI_API_KEY`
+   do ambiente como fallback.
 4. Consultar os modelos liberados para cada credencial sem gerar conteúdo.
 5. Selecionar provedor, modelo e temperatura por função.
 6. Combinar provedores; por exemplo, OpenAI no relatório e Gemini na triagem.
@@ -638,14 +673,18 @@ Trocar o modelo de embedding exige nova indexação dos PDFs. O sistema identifi
 índice incompatível, reconstrói o documento de forma transacional e devolve a
 extração afetada para revisão humana.
 
+Em `multi_user`, cada conta administra suas próprias credenciais e preferências; os
+segredos privados do servidor não são usados como fallback nem podem ser importados
+por colaboradores.
+
 ### Fontes bibliográficas
 
 Na página **6. Fontes Bibliográficas** é possível configurar OpenAlex, Semantic
 Scholar e PubMed individualmente. Chaves são opcionais quando a API permite acesso
 sem autenticação.
 
-O banco cifrado tem precedência. Na ausência de configuração persistida, são usados
-os valores de `backend/.env`, incluindo:
+O banco cifrado tem precedência. No perfil local e em `single_user`, a ausência de
+configuração persistida permite usar os valores de `backend/.env`, incluindo:
 
 - `OPENALEX_API_KEY`
 - `SEMANTIC_SCHOLAR_API_KEY`
@@ -654,6 +693,9 @@ os valores de `backend/.env`, incluindo:
 - `BIBLIOGRAPHIC_TIMEOUT_SECONDS`
 - `BIBLIOGRAPHIC_MAX_RETRIES`
 - variáveis específicas listadas em `backend/.env.example`
+
+Em `multi_user`, configurações e credenciais bibliográficas pertencem ao usuário
+autenticado; o fallback privado do servidor fica desabilitado para colaboradores.
 
 ### OCR de PDFs digitalizados
 
@@ -703,6 +745,8 @@ recadastre as credenciais pelas telas de configuração.
 
 - Abra **4. Configuração de IA**, valide a chave e selecione modelos disponíveis.
 - Abra **6. Fontes Bibliográficas**, habilite as fontes e teste os acessos.
+- Em `multi_user`, o operador prepara o acesso em **Usuários e Acessos**; cada
+  colaborador configura apenas suas próprias credenciais após aceitar um convite.
 
 ### 2. Criar o projeto e o protocolo
 
@@ -840,11 +884,17 @@ python -m pytest -q
 
 A suíte cobre configuração de IA, armazenamento de segredos, fontes bibliográficas,
 importação BibTeX, calibração da estratégia de busca, deduplicação explicável,
-reranking com fallback, métricas do
-Golden Set, isolamento por projeto, indexação de PDFs, evidências rastreáveis e
-validação da chave-mestra usada na migração para Docker. Também verifica criptografia,
-integridade e recuperação automática dos backups, além da estrutura, privacidade,
-acentuação e manifesto do pacote de reprodutibilidade.
+reranking com fallback, métricas do Golden Set, isolamento por projeto, indexação de
+PDFs, evidências rastreáveis e validação da chave-mestra usada na migração para
+Docker. Também verifica criptografia, integridade e recuperação automática dos
+backups, além da estrutura, privacidade, acentuação e manifesto do pacote de
+reprodutibilidade.
+
+A matriz multiusuário automatizada cobre duas identidades e dois projetos, papéis
+`owner`/`editor`/`viewer`, convites, revogação, troca de titularidade, operador da
+instalação, configurações privadas, tarefas em segundo plano e bloqueio de acesso
+residual. Os contratos garantem que `multi_user` só ultrapasse o preflight com as
+proteções explícitas do piloto.
 
 O workflow **Integridade contínua** executa a suíte em pull requests e alterações
 na `main`. Ele também valida os perfis local e Web do Docker Compose, adapta o
@@ -895,13 +945,16 @@ rag-revisao-sistematica/
 
 ### Arquivos e dados locais
 
-- `backend/.env` contém segredos de fallback e é ignorado pelo Git.
+- `backend/.env` contém segredos de fallback para os perfis local e `single_user`
+  e é ignorado pelo Git.
 - `.dockerignore` impede que esse arquivo seja enviado ao contexto da imagem.
 - `data/pdfs/*.pdf` é ignorado pelo Git.
 - `data/backups/*` é ignorado pelo Git.
 - O volume `rag_postgres_data` contém o PostgreSQL.
 - No Compose, a chave-mestra fica no volume `rag_app_private_data`, fora do banco
   e do repositório.
+- Identidades, associações, convites e recibos ficam no PostgreSQL; tokens OIDC não
+  são persistidos.
 - CSV e relatório Markdown são gerados para download pela interface.
 - O pacote de reprodutibilidade é gerado em memória e disponibilizado como ZIP;
   ele não contém credenciais, PDFs, chunks integrais ou embeddings.
@@ -924,6 +977,9 @@ Na Web privada, um serviço opcional pode criar e verificar diariamente o mesmo
 arquivo em um armazenamento compatível com S3. Consulte
 [Backup externo agendado](docs/BACKUP_EXTERNO.md) para configurar destino, horário,
 retenção, primeiro teste e alertas sem enviar credenciais ao repositório.
+
+Na Web privada, criar, validar, restaurar ou solicitar backup externo pela interface
+exige o papel global de operador da instalação.
 
 Para restaurar, envie o `.ragbackup`, informe a senha e use primeiro **Validar
 backup**. Somente depois da validação a confirmação destrutiva será habilitada. A
@@ -997,10 +1053,16 @@ docker compose --profile tools down -v
 | Resposta mostra "referência bibliográfica nº 36" | É uma referência interna do artigo, não uma página. A fonte rastreável aparece como `[paper_id, p. página]`. |
 | BibTeX não é aceito | Confirme a extensão `.bib`, o limite de 20 MB e se todas as chaves e aspas estão fechadas. |
 | Pacote de projeto não é aceito | Use o ZIP original gerado pela aplicação; não altere nem recomprima seus arquivos internos. |
+| Conta convidada recebe “Acesso não autorizado” | Confirme e-mail verificado, validade do convite, associação ativa e papel no projeto; a allowlist continua contendo somente o operador. |
+| Preflight recusa `multi_user` | Confirme ativação dupla, valor exato do aceite, um único e-mail administrativo e backup externo habilitado. |
 
 ## Limites atuais
 
 - Instalação local de usuário único, sem login ou autorização.
+- O modo multiusuário é privado e opt-in: aceita somente convidados conhecidos,
+  mantém um único operador administrativo e não oferece cadastro público.
+- Colaboradores não criam nem importam projetos durante o piloto controlado; múltiplos
+  operadores, cotas, proteção contra abuso e autoatendimento pertencem a ciclos futuros.
 - Geração disponível por Google Gemini e OpenAI; embeddings ainda restritos ao Gemini e a 768 dimensões.
 - Schema vetorial fixado em 768 dimensões.
 - Coleta dependente da disponibilidade, cobertura e limites das APIs externas.
