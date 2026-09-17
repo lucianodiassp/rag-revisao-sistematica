@@ -4,8 +4,8 @@
 
 Preparar identidade persistente e propriedade de projetos sem transformar a
 instalação privada atual em serviço público antes que todas as barreiras de
-autorização estejam prontas. A versão estável `v2.5.0` continua sendo a referência
-operacional; a candidata controlada desta evolução é `2.6.0-rc.1`.
+autorização estejam prontas. A versão estável `v2.6.0` entrega a fundação e mantém
+o perfil multiusuário protegido por ativação explícita, sem cadastro público.
 
 ## Primeira entrega
 
@@ -157,10 +157,10 @@ habilitado. A matriz negativa automatizada cobre as barreiras científicas, de
 arquivos, exportações, administração dos projetos e administração global. Antes de
 uma liberação além do piloto ainda será necessário:
 
-1. validar o fluxo OIDC completo com uma segunda conta em ambiente controlado;
-2. definir recuperação, auditoria e suporte para uma implantação com vários
+1. definir recuperação, auditoria e suporte para uma implantação com vários
    operadores, mantendo o backup completo fora do autoatendimento comum;
-3. executar um piloto controlado com plano de reversão antes de expor o perfil.
+2. acrescentar cotas, proteção contra abuso e operação compatível com cadastro
+   público antes de expor o perfil além de convites privados.
 
 ## Décima entrega: piloto OIDC controlado
 
@@ -181,6 +181,11 @@ uma liberação além do piloto ainda será necessário:
 O procedimento de duas sessões, revogação e retorno está documentado em
 [Piloto OIDC controlado](PILOTO_OIDC_CONTROLADO.md).
 
+O piloto real da candidata `v2.6.0-rc.1` aprovou entrada por convite, alternância
+entre `editor` e `viewer`, revogação sem acesso residual, isolamento das credenciais,
+backup externo e retorno a `single_user` sem restauração. A promoção `v2.6.0`
+preserva o gate e o padrão de usuário único.
+
 ## Compatibilidade e recuperação
 
 A migração `020_user_project_ownership.sql` é progressiva e não modifica conteúdo
@@ -198,7 +203,7 @@ os mesmos projetos e funcionalidades após a atualização.
 ## Validação inicial
 
 1. aplicar a migração `020` duas vezes e confirmar idempotência;
-2. abrir a aplicação local e confirmar `Versão 2.6.0-rc.1 · Local · Usuário único`;
+2. abrir a aplicação local e confirmar `Versão 2.6.0 · Local · Usuário único`;
 3. conferir que todos os projetos existentes continuam no seletor;
 4. criar ou importar um projeto e confirmar sua associação como proprietário;
 5. arquivar e restaurar esse projeto sem afetar os demais;
@@ -291,4 +296,5 @@ os mesmos projetos e funcionalidades após a atualização.
    restauração de um projeto descartável;
 3. confirmar que o projeto restaurado preserva conteúdo e volta ao seletor;
 4. gerar e validar um backup completo após o teste;
-5. manter o preflight rejeitando `multi_user` até o piloto OIDC com segunda conta.
+5. confirmar que o preflight aceita `multi_user` somente com as proteções explícitas
+   do piloto e backup externo habilitado.
