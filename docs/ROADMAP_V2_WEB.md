@@ -153,7 +153,7 @@ endurecimento operacional da Web privada de usuário único.
    isolada e backup externo. Contém arquivamento reversível, restauração, exclusão
    permanente protegida, limpeza de PDFs e recibos imutáveis.
    [Escopo e critérios de aceite](PROJECT_LIFECYCLE.md).
-7. `v2.6.x`: fundação multiusuário — em desenvolvimento, com identidade OIDC
+7. `v2.6.x`: fundação multiusuário — candidata `2.6.0-rc.1` em preparação, com identidade OIDC
    persistente, propriedade explícita, migração segura dos projetos atuais,
    propagação do solicitante para tarefas em segundo plano e credenciais e
    preferências privadas de IA/fontes bibliográficas por usuário. Operações globais
@@ -169,7 +169,8 @@ endurecimento operacional da Web privada de usuário único.
    dois projetos, papéis, revogação, ciclo de vida, criação transacional e a
    separação entre operador global e acesso científico. O piloto OIDC controlado
    agora possui ativação dupla, entrada somente por convite, exigência de backup
-   externo e procedimento de reversão; falta executá-lo com uma segunda conta real.
+   externo e procedimento de reversão; a promoção depende de executá-lo com uma
+   segunda conta real na VPS.
    [Escopo incremental](MULTIUSER_FOUNDATION.md).
 8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.5.x`.

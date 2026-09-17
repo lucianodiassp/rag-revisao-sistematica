@@ -84,9 +84,9 @@ incluindo backup, restauração e portabilidade do julgamento visual. A tag est�
 
 O plano incremental da nova linha está em
 [Roadmap da versão 2 Web privada](docs/ROADMAP_V2_WEB.md).
-Os critérios de validação e o roteiro do piloto na VPS estão no
-[Checklist da candidata v2.4](docs/CHECKLIST_RELEASE_V2_4.md), com evidências em
-[Validação v2.4.0-rc.1](docs/VALIDACAO_V2_4_RC1.md).
+Os critérios atuais de validação e o roteiro do piloto na VPS estão no
+[Checklist da candidata v2.6](docs/CHECKLIST_RELEASE_V2_6.md), com evidências em
+[Validação v2.6.0-rc.1](docs/VALIDACAO_V2_6_RC1.md).
 
 A versão estável **2.5.0** acrescenta a gestão segura do ciclo de vida dos projetos:
 arquivamento reversível, restauração e exclusão permanente condicionada a uma prévia,
@@ -94,11 +94,13 @@ ausência de tarefas ativas, backup posterior e confirmação explícita. O flux
 validado localmente, na Web privada e em uma restauração isolada. Consulte
 [Gestão do ciclo de vida dos projetos](docs/PROJECT_LIFECYCLE.md).
 
-A linha em desenvolvimento **2.6.0-dev** inicia a fundação multiusuário sem liberar
-cadastro público: identidades OIDC persistentes, propriedade explícita de projetos
-e migração compatível das instalações atuais. O modo Web continua deliberadamente
-restrito a um usuário enquanto as demais barreiras de autorização são concluídas.
-Consulte [Fundação multiusuário](docs/MULTIUSER_FOUNDATION.md).
+A candidata **2.6.0-rc.1** prepara um piloto OIDC multiusuário controlado, sem
+cadastro público: identidades persistentes, propriedade explícita, papéis por
+projeto, credenciais privadas por usuário, administração por convites e operação
+global restrita. O padrão continua sendo usuário único; o piloto exige ativação
+dupla, backup externo e uma segunda conta convidada. Consulte
+[Fundação multiusuário](docs/MULTIUSER_FOUNDATION.md) e
+[Piloto OIDC controlado](docs/PILOTO_OIDC_CONTROLADO.md).
 
 ### Autenticação da Web privada
 
