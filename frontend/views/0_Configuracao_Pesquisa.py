@@ -1,6 +1,7 @@
 import os
 import sys
 import uuid
+from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -13,6 +14,7 @@ from backend.app.bibliographic_config import get_bibliographic_settings  # noqa:
 from backend.app.background_jobs import JOB_BIBLIOGRAPHIC_SEARCH  # noqa: E402
 from backend.app.database import (  # noqa: E402
     criar_projeto,
+    listar_importacoes_bibtex,
     salvar_protocolo_projeto,
 )
 from backend.app.demo_project import ensure_demo_project  # noqa: E402
@@ -380,6 +382,11 @@ with st.form(f"protocol_editor_{project_id}_{token}"):
         height=130,
     )
     st.caption(
+        "Use este campo para a estratégia conceitual geral. Buscas executadas em "
+        "bases externas, como Web of Science ou Scopus, são registradas separadamente "
+        "com sua string exata durante a importação do BibTeX."
+    )
+    st.caption(
         "As strings específicas são opcionais. Quando vazias, a fonte utiliza a string geral."
     )
     q1, q2, q3 = st.columns(3)
@@ -650,6 +657,41 @@ with aba_bibtex:
         "Os registros entram na mesma triagem dos artigos coletados por API e são "
         "deduplicados por DOI ou título, sem aplicação automática dos critérios PICO."
     )
+    try:
+        historico_importacoes = listar_importacoes_bibtex(project_id)
+    except Exception as erro:
+        st.warning(f"Não foi possível consultar o histórico de importações: {erro}")
+        historico_importacoes = []
+
+    if historico_importacoes:
+        with st.expander(
+            f"Buscas externas e importações registradas ({len(historico_importacoes)})",
+            expanded=False,
+        ):
+            for indice, item in enumerate(historico_importacoes):
+                metadados = item["metadata"]
+                busca_externa = metadados.get("external_search") or {}
+                rotulo = busca_externa.get("label") or metadados.get("file_name") or "Importação"
+                st.markdown(f"**{rotulo}**")
+                if busca_externa:
+                    st.caption(
+                        f"{busca_externa.get('database', item['source'])} · "
+                        f"busca em {busca_externa.get('executed_on', 'data não informada')} · "
+                        f"{busca_externa.get('result_count', '—')} resultado(s) · "
+                        f"arquivo `{metadados.get('file_name', 'não informado')}` · "
+                        f"SHA-256 `{str(metadados.get('file_sha256') or '')[:16]}…`"
+                    )
+                    if busca_externa.get("filters"):
+                        st.write(f"Filtros: {busca_externa['filters']}")
+                    st.code(item["query_text"], language=None)
+                else:
+                    st.caption(
+                        "Importação anterior à rastreabilidade de buscas externas; "
+                        "o registro preserva somente o arquivo e seu hash."
+                    )
+                if indice < len(historico_importacoes) - 1:
+                    st.divider()
+
     arquivo_bibtex = st.file_uploader(
         "Arquivo BibTeX",
         type=["bib"],
@@ -688,11 +730,80 @@ with aba_bibtex:
             st.write("**Prévia dos primeiros registros válidos**")
             st.dataframe(analise["preview"], use_container_width=True, hide_index=True)
 
+            st.markdown("#### Proveniência da busca externa")
+            st.caption(
+                "Registre a consulta que gerou este arquivo. Esses dados ficarão "
+                "vinculados ao protocolo confirmado, ao lote importado e ao pacote "
+                "de reprodutibilidade."
+            )
+            chave_arquivo = analise["file_sha256"][:12]
+            origem_wos = any(
+                "Web of Science" in fonte
+                for artigo in analise["articles"]
+                for fonte in artigo["fontes_dict"].get("sources", [])
+            )
+            col_base, col_rotulo = st.columns(2)
+            base_externa = col_base.text_input(
+                "Base consultada *",
+                value="Web of Science" if origem_wos else "",
+                placeholder="Ex.: Web of Science, Scopus ou IEEE Xplore",
+                key=f"external_database_{project_id}_{chave_arquivo}",
+            )
+            rotulo_busca = col_rotulo.text_input(
+                "Identificação da busca *",
+                value=f"Busca externa — {os.path.splitext(analise['file_name'])[0]}",
+                placeholder="Ex.: Busca 1 — termos gerais",
+                key=f"external_label_{project_id}_{chave_arquivo}",
+            )
+            col_data, col_resultados = st.columns(2)
+            data_busca = col_data.date_input(
+                "Data da busca *",
+                value=date.today(),
+                key=f"external_date_{project_id}_{chave_arquivo}",
+            )
+            quantidade_resultados = col_resultados.number_input(
+                "Resultados retornados pela base *",
+                min_value=int(analise["total_entries"]),
+                value=int(analise["total_entries"]),
+                step=1,
+                help=(
+                    "Informe o total exibido pela base. Ele pode ser maior que o arquivo "
+                    "quando apenas parte dos resultados foi exportada."
+                ),
+                key=f"external_result_count_{project_id}_{chave_arquivo}",
+            )
+            string_exata = st.text_area(
+                "String exata executada na base *",
+                height=150,
+                placeholder="Cole a consulta exatamente como foi executada.",
+                key=f"external_query_{project_id}_{chave_arquivo}",
+            )
+            filtros_externos = st.text_area(
+                "Filtros aplicados fora da string",
+                height=80,
+                placeholder=(
+                    "Ex.: tipos Article e Proceedings Paper; idioma inglês. "
+                    "Se não houve outros filtros, deixe vazio."
+                ),
+                key=f"external_filters_{project_id}_{chave_arquivo}",
+            )
+            confirmar_proveniencia = st.checkbox(
+                "Confirmo que a base, a string, a data, os filtros e a contagem "
+                "correspondem à busca que originou este arquivo.",
+                key=f"external_confirm_{project_id}_{chave_arquivo}",
+            )
+            proveniencia_pronta = bool(
+                base_externa.strip()
+                and rotulo_busca.strip()
+                and string_exata.strip()
+                and confirmar_proveniencia
+            )
+
             if st.button(
                 "📥 Importar registros para o projeto ativo",
                 type="primary",
                 use_container_width=True,
-                disabled=analise["valid_entries"] == 0,
+                disabled=analise["valid_entries"] == 0 or not proveniencia_pronta,
             ):
                 with st.spinner("A importar, deduplicar e registrar a proveniência..."):
                     try:
@@ -700,6 +811,14 @@ with aba_bibtex:
                             project_id,
                             conteudo_bibtex,
                             arquivo_bibtex.name,
+                            busca_externa={
+                                "label": rotulo_busca,
+                                "database": base_externa,
+                                "query": string_exata,
+                                "executed_on": data_busca.isoformat(),
+                                "filters": filtros_externos,
+                                "result_count": int(quantidade_resultados),
+                            },
                         )
                     except Exception as erro:
                         st.error(f"Erro durante a importação: {erro}")

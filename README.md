@@ -5,7 +5,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-vector(768)-blueviolet.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interface-FF4B4B.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.7.0--dev-blue.svg)
 [![CI](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml/badge.svg)](https://github.com/lucianodiassp/rag-revisao-sistematica/actions/workflows/ci.yml)
 
 Aplicação para apoiar Revisões Sistemáticas da Literatura (RSL) com coleta
@@ -104,6 +104,12 @@ permanece opt-in, exige ativação dupla e backup externo e foi aprovado com uma
 segunda conta real antes da promoção. Consulte
 [Fundação multiusuário](docs/MULTIUSER_FOUNDATION.md) e
 [Piloto OIDC controlado](docs/PILOTO_OIDC_CONTROLADO.md).
+
+A linha **2.7.0-dev** inicia a rastreabilidade de buscas executadas fora dos
+coletores integrados. Cada importação BibTeX pode registrar base, identificação,
+data, consulta exata, filtros e total retornado, vinculando-os ao arquivo, ao hash e
+ao protocolo confirmado. Consulte
+[Buscas externas rastreáveis](docs/BUSCAS_EXTERNAS.md).
 
 ### Autenticação da Web privada
 
@@ -248,6 +254,8 @@ atualização, investigação de falhas e retorno seguro de versão.
 
 - Integração com **OpenAlex**, **Semantic Scholar** e **PubMed**.
 - Importação de arquivos **BibTeX**, incluindo exportações do Web of Science.
+- Registro de múltiplas buscas externas na importação, preservando base, identificação,
+  data, string exata, filtros, total retornado, arquivo e SHA-256.
 - Prévia antes da importação, com contagem de registros válidos, sem DOI e sem abstract.
 - Ativação ou desativação individual de cada fonte.
 - Chaves opcionais armazenadas de forma cifrada, com `.env` como fallback apenas
@@ -259,6 +267,7 @@ atualização, investigação de falhas e retorno seguro de versão.
 - Registro automático da versão e do hash do protocolo usado em cada consulta ou importação.
 - Uso da string confirmada por fonte, com fallback explícito para a estratégia geral.
 - Registro auditável do arquivo importado por nome, hash SHA-256, codificação e resultado.
+- Histórico consultável das buscas externas, vinculado à versão e ao hash do protocolo.
 - Preservação da entrada BibTeX bruta e encaminhamento de candidatos por título à revisão humana.
 
 ### Calibração rastreável da estratégia de busca
@@ -762,6 +771,8 @@ recadastre as credenciais pelas telas de configuração.
   protocolo e compare uma nova versão quando necessário.
 - Preencha e registre a revisão humana PRESS da versão que seguirá para a coleta.
 - Consulte as APIs habilitadas e/ou importe um arquivo `.bib`.
+- Para exportações de bases externas, registre a consulta exata e seus filtros antes
+  de confirmar a importação. Consulte [Buscas externas rastreáveis](docs/BUSCAS_EXTERNAS.md).
 - Confira a prévia e o relatório da importação antes de seguir para a triagem.
 
 ### 3. Revisar possíveis duplicatas
