@@ -1,7 +1,12 @@
 import unittest
 from types import SimpleNamespace
 
-from backend.coleta.importador_bibtex import ErroBibTeX, analisar_bibtex, importar_bibtex
+from backend.coleta.importador_bibtex import (
+    ErroBibTeX,
+    analisar_bibtex,
+    importar_bibtex,
+    normalizar_busca_externa,
+)
 
 
 class BibTeXImporterTests(unittest.TestCase):
@@ -101,6 +106,45 @@ Unique-ID = {WOS:TESTE001},
         with self.assertRaises(ErroBibTeX):
             analisar_bibtex(b"@article{x, title={Teste}}", "teste.txt")
 
+    def test_valida_proveniencia_de_busca_externa(self):
+        resultado = normalizar_busca_externa(
+            {
+                "label": "  Busca 1 — termos gerais ",
+                "database": " Web of Science ",
+                "query": 'TI=(reproducib*) AND TS=("machine learning")',
+                "executed_on": "2026-10-11",
+                "filters": "Article e Proceedings Paper",
+                "result_count": "464",
+            },
+            total_exportado=464,
+        )
+
+        self.assertEqual(resultado["label"], "Busca 1 — termos gerais")
+        self.assertEqual(resultado["database"], "Web of Science")
+        self.assertEqual(resultado["result_count"], 464)
+
+    def test_rejeita_proveniencia_incompleta_ou_contagem_incoerente(self):
+        with self.assertRaisesRegex(ErroBibTeX, "string exata"):
+            normalizar_busca_externa(
+                {
+                    "label": "Busca 1",
+                    "database": "Web of Science",
+                    "executed_on": "2026-10-11",
+                    "result_count": 464,
+                }
+            )
+        with self.assertRaisesRegex(ErroBibTeX, "menor"):
+            normalizar_busca_externa(
+                {
+                    "label": "Busca 1",
+                    "database": "Web of Science",
+                    "query": "reproducib*",
+                    "executed_on": "2026-10-11",
+                    "result_count": 10,
+                },
+                total_exportado=11,
+            )
+
     def test_importacao_registra_lote_raw_e_relatorio(self):
         conteudo = b"""
 @article{novo, title={Novo artigo}, doi={10.1/novo}}
@@ -167,6 +211,48 @@ Unique-ID = {WOS:TESTE001},
         self.assertEqual(relatorio["merged_records"], 0)
         self.assertEqual(relatorio["pending_deduplication_review"], 1)
         self.assertEqual(relatorios[0]["pending_deduplication_review"], 1)
+
+    def test_importacao_vincula_string_exata_e_metadados_da_busca_externa(self):
+        conteudo = b"@article{novo, title={Novo artigo}, doi={10.1/novo}}"
+        chamadas = {"busca": None, "relatorio": None}
+
+        def registrar_busca(project_id, fonte, query_text, parametros):
+            chamadas["busca"] = (project_id, fonte, query_text, parametros)
+            return "busca-externa-1"
+
+        repositorio = SimpleNamespace(
+            registrar_busca=registrar_busca,
+            salvar_artigo_coletado=lambda **kwargs: True,
+            atualizar_metadados_busca=lambda project_id, busca_id, parametros: chamadas.update(
+                relatorio=parametros
+            ),
+        )
+
+        relatorio = importar_bibtex(
+            "projeto-1",
+            conteudo,
+            "wos.bib",
+            busca_externa={
+                "label": "Busca 1 — termos gerais",
+                "database": "Web of Science",
+                "query": 'TI=(reproducib*) AND TS=("machine learning")',
+                "executed_on": "2026-10-11",
+                "filters": "PY=2022-2026",
+                "result_count": 464,
+            },
+            _repositorio=repositorio,
+        )
+
+        _, fonte, consulta, metadados = chamadas["busca"]
+        self.assertEqual(fonte, "Web of Science (BibTeX)")
+        self.assertEqual(consulta, 'TI=(reproducib*) AND TS=("machine learning")')
+        self.assertEqual(metadados["external_search"]["result_count"], 464)
+        self.assertNotIn("query", metadados["external_search"])
+        self.assertEqual(
+            chamadas["relatorio"]["external_search"]["label"],
+            "Busca 1 — termos gerais",
+        )
+        self.assertEqual(relatorio["search_query_id"], "busca-externa-1")
 
 
 if __name__ == "__main__":

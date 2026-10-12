@@ -6,6 +6,16 @@ reprodutibilidade, migrações do banco e protocolos científicos.
 
 ## [Não publicado]
 
+### Rastreabilidade de buscas externas
+
+- A importação BibTeX passa a registrar a base consultada, identificação da busca,
+  data de execução, string exata, filtros externos e total de resultados informado.
+- Cada execução vincula esses dados ao arquivo, ao SHA-256, à versão e ao hash do
+  protocolo e aos registros recuperados, sem exigir nova migração de banco.
+- A Configuração da Pesquisa apresenta o histórico das buscas externas importadas e
+  mantém compatibilidade de leitura com lotes anteriores à nova rastreabilidade.
+- A identidade de desenvolvimento avança para `2.7.0-dev`.
+
 ## [2.6.0] — 2026-09-16
 
 ### Promoção da fundação multiusuário

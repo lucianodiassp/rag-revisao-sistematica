@@ -4,6 +4,7 @@ import hashlib
 import os
 import re
 import unicodedata
+from datetime import date
 
 from backend.app.project_utils import gerar_id_artigo, normalizar_doi, normalizar_titulo
 from backend.app.deduplication import (
@@ -20,6 +21,53 @@ TIPOS_IGNORADOS = {"comment", "preamble", "string"}
 
 class ErroBibTeX(ValueError):
     """Erro de validação ou leitura de um arquivo BibTeX."""
+
+
+def normalizar_busca_externa(busca_externa, total_exportado=None):
+    """Valida a proveniência metodológica associada a uma importação BibTeX."""
+    if not busca_externa:
+        return None
+    if not isinstance(busca_externa, dict):
+        raise ErroBibTeX("Os dados da busca externa possuem formato inválido.")
+
+    rotulo = " ".join(str(busca_externa.get("label") or "").split()).strip()
+    base = " ".join(str(busca_externa.get("database") or "").split()).strip()
+    consulta = str(busca_externa.get("query") or "").strip()
+    filtros = str(busca_externa.get("filters") or "").strip()
+    data_execucao = str(busca_externa.get("executed_on") or "").strip()
+
+    if len(rotulo) < 3:
+        raise ErroBibTeX("Identifique a busca externa com pelo menos 3 caracteres.")
+    if len(base) < 2:
+        raise ErroBibTeX("Informe a base em que a busca externa foi executada.")
+    if len(consulta) < 3:
+        raise ErroBibTeX("Informe a string exata executada na base externa.")
+
+    try:
+        date.fromisoformat(data_execucao)
+    except ValueError as exc:
+        raise ErroBibTeX("Informe a data da busca externa no formato AAAA-MM-DD.") from exc
+
+    try:
+        total_resultados = int(busca_externa.get("result_count"))
+    except (TypeError, ValueError) as exc:
+        raise ErroBibTeX("Informe a quantidade de resultados retornados pela busca.") from exc
+    if total_resultados < 0:
+        raise ErroBibTeX("A quantidade de resultados não pode ser negativa.")
+    if total_exportado is not None and total_resultados < int(total_exportado):
+        raise ErroBibTeX(
+            "A quantidade de resultados da busca não pode ser menor que o número "
+            "de registros presentes no arquivo exportado."
+        )
+
+    return {
+        "label": rotulo,
+        "database": base,
+        "query": consulta,
+        "executed_on": data_execucao,
+        "filters": filtros,
+        "result_count": total_resultados,
+    }
 
 
 def _decodificar(conteudo):
@@ -391,17 +439,36 @@ def _metadados_relatorio(analise, status, **adicionais):
     return metadados
 
 
-def importar_bibtex(project_id, conteudo, nome_arquivo="importacao.bib", _repositorio=None):
+def importar_bibtex(
+    project_id,
+    conteudo,
+    nome_arquivo="importacao.bib",
+    busca_externa=None,
+    _repositorio=None,
+):
     """Importa o arquivo para o projeto e registra um relatório da execução."""
     if _repositorio is None:
         from backend.app import database as _repositorio
 
     analise = analisar_bibtex(conteudo, nome_arquivo)
+    proveniencia = normalizar_busca_externa(
+        busca_externa,
+        total_exportado=analise["total_entries"],
+    )
+    fonte_busca = FONTE_BIBTEX
+    texto_busca = analise["file_name"]
+    metadados_iniciais = _metadados_relatorio(analise, "processing")
+    if proveniencia:
+        fonte_busca = f"{proveniencia['database']} (BibTeX)"
+        texto_busca = proveniencia["query"]
+        metadados_iniciais["external_search"] = {
+            key: value for key, value in proveniencia.items() if key != "query"
+        }
     busca_id = _repositorio.registrar_busca(
         project_id,
-        FONTE_BIBTEX,
-        analise["file_name"],
-        _metadados_relatorio(analise, "processing"),
+        fonte_busca,
+        texto_busca,
+        metadados_iniciais,
     )
     novos = 0
     mesclados = 0
@@ -452,6 +519,10 @@ def importar_bibtex(project_id, conteudo, nome_arquivo="importacao.bib", _reposi
         persistence_errors=len(erros),
         persistence_error_details=erros[:100],
     )
+    if proveniencia:
+        relatorio["external_search"] = {
+            key: value for key, value in proveniencia.items() if key != "query"
+        }
     _repositorio.atualizar_metadados_busca(project_id, busca_id, relatorio)
     return {
         **relatorio,

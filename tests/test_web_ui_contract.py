@@ -109,3 +109,19 @@ def test_research_configuration_limits_project_creation_during_pilot():
     assert "current_user_is_operator" in page
     assert "projetos são criados somente pelo operador" in page
     assert "Solicite acesso ao operador" in page
+
+
+def test_bibtex_import_requires_traceable_external_search_provenance():
+    page = (ROOT / "frontend/views/0_Configuracao_Pesquisa.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Proveniência da busca externa" in page
+    assert "Base consultada *" in page
+    assert "Identificação da busca *" in page
+    assert "String exata executada na base *" in page
+    assert "Data da busca *" in page
+    assert "Resultados retornados pela base *" in page
+    assert "Filtros aplicados fora da string" in page
+    assert "listar_importacoes_bibtex" in page
+    assert "busca_externa={" in page

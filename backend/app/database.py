@@ -247,6 +247,32 @@ def atualizar_metadados_busca(project_id, search_query_id, parametros):
             raise ValueError("Execução de coleta não encontrada no projeto ativo.")
 
 
+def listar_importacoes_bibtex(project_id):
+    """Lista buscas externas vinculadas a importações BibTeX do projeto."""
+    enforce_project_access(project_id, "viewer", connection_factory=get_connection)
+    with get_connection() as conexao, conexao.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, source, query_text, query_jsonb, executed_at
+            FROM search_queries
+            WHERE project_id = %s
+              AND query_jsonb ->> 'operation' = 'bibtex_import'
+            ORDER BY executed_at DESC, id DESC
+            """,
+            (project_id,),
+        )
+        return [
+            {
+                "id": str(linha[0]),
+                "source": linha[1],
+                "query_text": linha[2],
+                "metadata": linha[3] or {},
+                "executed_at": linha[4],
+            }
+            for linha in cursor.fetchall()
+        ]
+
+
 def salvar_artigo_coletado(
     project_id,
     id_artigo,

@@ -164,6 +164,42 @@ class ProtocolServiceTests(unittest.TestCase):
         self.assertIn("COALESCE(query_jsonb", sql)
         self.assertIn("%s::jsonb - 'protocol_version'", sql)
 
+    def test_lista_importacoes_bibtex_com_proveniencia_externa(self):
+        from backend.app import database
+
+        metadata = {
+            "operation": "bibtex_import",
+            "file_name": "busca-1.bib",
+            "external_search": {
+                "label": "Busca 1",
+                "database": "Web of Science",
+                "executed_on": "2026-10-11",
+                "result_count": 464,
+            },
+        }
+        factory, cursor = _factory(
+            fetchall=[
+                (
+                    "search-1",
+                    "Web of Science (BibTeX)",
+                    "TI=(reproducib*)",
+                    metadata,
+                    "2026-10-12",
+                )
+            ]
+        )
+        with patch.object(database, "get_connection", factory):
+            result = database.listar_importacoes_bibtex("project-1")
+
+        self.assertEqual(result[0]["id"], "search-1")
+        self.assertEqual(result[0]["query_text"], "TI=(reproducib*)")
+        self.assertEqual(
+            result[0]["metadata"]["external_search"]["database"],
+            "Web of Science",
+        )
+        self.assertIn("bibtex_import", cursor.execute.call_args.args[0])
+        self.assertEqual(cursor.execute.call_args.args[1], ("project-1",))
+
 
 if __name__ == "__main__":
     unittest.main()

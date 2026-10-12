@@ -176,4 +176,7 @@ endurecimento operacional da Web privada de usuário único.
    [Escopo incremental](MULTIUSER_FOUNDATION.md).
 8. Etapa posterior: provedor local Ollama, condicionado à análise de recursos,
    modelos e isolamento operacional; não faz parte da `v2.6.x`.
-9. `v3.x`: compartilhamento de projetos, cadastro público, cotas e escalabilidade.
+9. `v2.7.x`: rastreabilidade de buscas externas — em desenvolvimento, com registro
+   de múltiplas consultas importadas por BibTeX, incluindo base, string exata, data,
+   filtros, contagem, arquivo, hash e vínculo ao protocolo confirmado.
+10. `v3.x`: compartilhamento de projetos, cadastro público, cotas e escalabilidade.
