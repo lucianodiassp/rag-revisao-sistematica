@@ -90,8 +90,17 @@ def _decodificar(conteudo):
 
 
 def _escapado(texto, indice):
+    """Indica se o caractere foi escapado, inclusive após quebra de linha.
+
+    Alguns arquivos exportados pelo Web of Science quebram comandos LaTeX logo
+    depois da barra invertida (``\\`` + quebra de linha + indentação + ``}``).
+    Essa quebra é apenas visual; o delimitador continua sendo parte do conteúdo
+    e não deve encerrar prematuramente o campo BibTeX.
+    """
     barras = 0
     indice -= 1
+    while indice >= 0 and texto[indice].isspace():
+        indice -= 1
     while indice >= 0 and texto[indice] == "\\":
         barras += 1
         indice -= 1

@@ -42,6 +42,33 @@ Unique-ID = {WOS:TESTE001},
         self.assertEqual(artigo["fontes_dict"]["sources"], ["Web of Science (BibTeX)"])
         self.assertIn("raw_entry", artigo["registro_bruto"])
 
+    def test_aceita_comando_latex_quebrado_em_linha_pelo_web_of_science(self):
+        conteudo = br"""
+@article{ WOS:001478385500001,
+Title = {Reproducible computational experiment},
+Abstract = {Evaluation performed with (GPT-\textbackslash{}documentclass{[}12pt]
+  \{minimal\}\textbackslash{}begin\{document\}\$\$-\$\$
+  \textbackslash{}end\{document\
+  }3.5) and reported without changing the BibTeX field boundary.},
+DOI = {10.1000/wos-test},
+Unique-ID = {WOS:001478385500001},
+}
+"""
+
+        resultado = analisar_bibtex(conteudo, "savedrecs.bib")
+        artigo = resultado["articles"][0]
+
+        self.assertEqual(resultado["total_entries"], 1)
+        self.assertEqual(resultado["valid_entries"], 1)
+        self.assertEqual(
+            artigo["fontes_dict"]["external_ids"]["doi"],
+            "10.1000/wos-test",
+        )
+        self.assertEqual(
+            artigo["fontes_dict"]["external_ids"]["wos"],
+            "WOS:001478385500001",
+        )
+
     def test_aceita_entrada_sem_doi_e_sem_abstract(self):
         conteudo = b"""
 @inproceedings{chave,
